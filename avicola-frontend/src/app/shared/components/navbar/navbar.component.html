@@ -1,4 +1,4 @@
-<nav class="nav-container fixed w-full z-50 bg-white shadow-md">
+<nav class="nav-container fixed w-full z-50 bg-white/95 backdrop-blur-sm shadow-lg">
   <div class="container mx-auto px-4">
     <div class="flex justify-between items-center h-20">
       <!-- Logo -->
@@ -10,7 +10,7 @@
       </div>
       
       <!-- Enlaces de Navegación (Desktop) -->
-      <div class="hidden md:flex items-center space-x-12">
+      <div class="hidden md:flex items-center space-x-8">
         <a routerLink="/" routerLinkActive="text-blue-600" [routerLinkActiveOptions]="{exact: true}" 
            class="nav-link text-gray-800 font-medium hover:text-blue-600 transition-colors duration-200">INICIO</a>
         
@@ -18,7 +18,7 @@
            class="nav-link text-gray-800 font-medium hover:text-blue-600 transition-colors duration-200">SERVICIOS</a>
         
         <!-- Dropdown Intranet -->
-        <div class="relative group">
+        <div class="relative group" *ngIf="!isAuthenticated">
           <button type="button" class="nav-link text-gray-800 font-medium inline-flex items-center group">
             <span>INTRANET</span>
             <svg class="ml-2 h-4 w-4 transition-transform duration-200 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,9 +53,19 @@
             </button>
           </div>
         </div>
+
+        <!-- Botón de Cerrar Sesión (si está autenticado) -->
+        <button *ngIf="isAuthenticated" 
+                (click)="logout()" 
+                class="flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 transform hover:scale-105">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+          Cerrar Sesión
+        </button>
       </div>
 
-      <!-- Botón Menú Móvil -->
+      <!-- Botón del menú móvil -->
       <div class="md:hidden">
         <button (click)="toggleMobileMenu()" 
                 class="mobile-menu-button p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
@@ -79,8 +89,8 @@
         <a routerLink="/servicios" routerLinkActive="bg-blue-50 text-blue-600" 
            class="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-100 transition-colors">SERVICIOS</a>
         
-        <!-- Menú Intranet Móvil -->
-        <div class="space-y-1 pl-3">
+        <!-- Menú Intranet Móvil (si no está autenticado) -->
+        <div class="space-y-1 pl-3" *ngIf="!isAuthenticated">
           <button (click)="navigateToLogin('admin')" 
                   class="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-100 transition-colors">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,6 +115,16 @@
             <span>Chanchos</span>
           </button>
         </div>
+
+        <!-- Botón de Cerrar Sesión Móvil (si está autenticado) -->
+        <button *ngIf="isAuthenticated" 
+                (click)="logout()" 
+                class="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 transition-colors">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+          Cerrar Sesión
+        </button>
       </div>
     </div>
   </div>

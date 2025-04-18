@@ -61,6 +61,7 @@ export class LoginComponent implements OnInit {
 
       this.authService.login(username, password).subscribe({
         next: () => {
+          // Redirige al panel de administración
           this.router.navigate(['/admin']);
         },
         error: (error) => {

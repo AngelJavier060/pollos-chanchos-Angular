@@ -1,54 +1,39 @@
-import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Component } from '@angular/core';
+import { Router, RouterModule } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-admin',
   templateUrl: './admin.component.html',
-  styleUrls: ['./admin.component.scss']
+  styleUrls: ['./admin.component.scss'],
+  standalone: true,
+  imports: [CommonModule, RouterModule]
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent {
   adminName: string = 'Alexandra';
-  
+  isUserMenuOpen: boolean = false;
+
   constructor(
     private router: Router,
-    private route: ActivatedRoute,
     private authService: AuthService
-  ) { }
+  ) {}
 
-  ngOnInit(): void {
-    // Verificar si el usuario está autenticado
-    if (!this.authService.isAuthenticated()) {
-      this.router.navigate(['/login']);
-    }
+  toggleUserMenu(): void {
+    this.isUserMenuOpen = !this.isUserMenuOpen;
   }
 
-  navegarA(ruta: string): void {
-    this.router.navigate([ruta], { relativeTo: this.route });
+  closeUserMenu(): void {
+    this.isUserMenuOpen = false;
   }
 
   cerrarSesion(): void {
+    // Lógica para cerrar sesión
     this.authService.logout();
     this.router.navigate(['/']);
   }
 
-  guardarCambios(): void {
-    console.log('Guardando cambios...');
-    // Implementar lógica para guardar cambios
-  }
-
-  cancelar(): void {
-    console.log('Cancelando cambios...');
-    // Implementar lógica para cancelar
-  }
-
-  crearBackup(): void {
-    console.log('Creando backup...');
-    // Implementar lógica de backup
-  }
-
-  restaurarBackup(): void {
-    console.log('Restaurando backup...');
-    // Implementar lógica de restauración
+  navegarA(ruta: string): void {
+    this.router.navigate(['/admin', ruta]);
   }
 }

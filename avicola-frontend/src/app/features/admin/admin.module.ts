@@ -10,9 +10,8 @@ import { LotesComponent } from '../lotes/lotes.component';
 import { InventarioComponent } from '../inventario/inventario.component';
 import { PlanNutricionalComponent } from '../plan-nutricional/plan-nutricional.component';
 import { ReportesComponent } from '../reportes/reportes.component';
-import { ConfiguracionComponent } from '../configuracion/configuracion.component';
 
-const adminRoutes: Routes = [
+const routes: Routes = [
   {
     path: '',
     component: AdminComponent,
@@ -24,34 +23,26 @@ const adminRoutes: Routes = [
       { path: 'inventario', component: InventarioComponent },
       { path: 'plan-nutricional', component: PlanNutricionalComponent },
       { path: 'reportes', component: ReportesComponent },
-      { path: 'configuracion', component: ConfiguracionComponent },
       { 
-        path: 'animals', 
-        loadChildren: () => import('../animals/animals.module').then(m => m.AnimalsModule)
+        path: 'configuracion',
+        loadChildren: () => import('../configuracion/configuracion.module').then(m => m.ConfiguracionModule)
       }
     ]
   }
 ];
 
 @NgModule({
-  declarations: [
+  imports: [
+    CommonModule,
+    RouterModule.forChild(routes),
+    ReactiveFormsModule,
     AdminComponent,
     DashboardComponent,
     UsuariosComponent,
     LotesComponent,
     InventarioComponent,
     PlanNutricionalComponent,
-    ReportesComponent,
-    ConfiguracionComponent
-  ],
-  imports: [
-    CommonModule,
-    RouterModule,
-    ReactiveFormsModule,
-    RouterModule.forChild(adminRoutes)
-  ],
-  exports: [
-    AdminComponent
+    ReportesComponent
   ]
 })
 export class AdminModule { }

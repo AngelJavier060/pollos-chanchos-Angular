@@ -37,6 +37,12 @@
   }
 }
 
+// Efectos para la barra lateral
+.w-64 {
+  transition: width 0.3s ease-in-out;
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+}
+
 // Efectos de hover para los botones
 button, a {
   &:hover {
@@ -63,6 +69,24 @@ button, a {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
+// Animaciones para el menú de usuario
+.user-dropdown {
+  animation: fadeInDown 0.2s ease-out forwards;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transform-origin: top;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 // Estilos específicos para el módulo de administración
 
 // Estilo para los inputs cuando están enfocados
@@ -81,4 +105,78 @@ button {
   &:active {
     transform: translateY(0);
   }
-} 
+}
+
+// Estilos para los botones del sidebar
+button.w-full {
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+button.w-full::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0;
+  background: #fff;
+  transition: width 0.3s ease;
+}
+
+button.w-full:hover::after {
+  width: 100%;
+}
+
+// Efecto de hover para botones del sidebar
+button.w-full:hover svg {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+// Efecto especial para botón de cerrar sesión
+button.hover\:bg-red-700:hover {
+  background: linear-gradient(to right, #e11d48, #be123c);
+}
+
+// Mejoras visuales para el header
+header {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+// Estilo para imagen de perfil
+.rounded-full.border-2 {
+  transition: all 0.3s ease;
+}
+
+.rounded-full.border-2:hover {
+  transform: scale(1.05);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+// Overlay para el menú
+.fixed.inset-0 {
+  transition: opacity 0.2s ease;
+}
+
+// Mejoras para los links
+a.block.px-4 {
+  position: relative;
+}
+
+a.block.px-4::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  background: rgba(59, 130, 246, 0.05);
+  transition: width 0.2s ease;
+}
+
+a.block.px-4:hover::before {
+  width: 100%;
+}

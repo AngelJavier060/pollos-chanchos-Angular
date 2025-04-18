@@ -4,12 +4,10 @@ import { RouterModule } from '@angular/router';
 import { NavbarComponent } from './components/navbar/navbar.component';
 
 @NgModule({
-  declarations: [
-    NavbarComponent
-  ],
   imports: [
     CommonModule,
-    RouterModule
+    RouterModule,
+    NavbarComponent
   ],
   exports: [
     NavbarComponent
