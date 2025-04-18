@@ -1,0 +1,49 @@
+<div class="p-8 bg-white rounded-lg shadow-md">
+  <div class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-blue-800">¡Bienvenido a Configuración!</h1>
+    <p class="text-gray-600 mt-2">Administra la configuración general del sistema</p>
+  </div>
+  
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+    <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-300">
+      <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Animales
+      </h2>
+      <p class="mt-2 text-gray-600 mb-4">Configura los parámetros generales de animales</p>
+      
+      <div class="space-y-3">
+        <a routerLink="/admin/animals/pollos" class="flex items-center p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors">
+          <span class="text-blue-600 font-medium">Gestión de Pollos</span>
+          <svg class="w-5 h-5 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+        
+        <a routerLink="/admin/animals/chanchos" class="flex items-center p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors">
+          <span class="text-blue-600 font-medium">Gestión de Chanchos</span>
+          <svg class="w-5 h-5 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+    
+    <div class="bg-blue-50 p-6 rounded-lg border border-blue-100">
+      <h2 class="text-xl font-semibold text-blue-700">Cuenta</h2>
+      <p class="mt-2 text-gray-600">Gestiona la información de tu cuenta y preferencias</p>
+    </div>
+    
+    <div class="bg-green-50 p-6 rounded-lg border border-green-100">
+      <h2 class="text-xl font-semibold text-green-700">Notificaciones</h2>
+      <p class="mt-2 text-gray-600">Configura las preferencias de notificaciones</p>
+    </div>
+    
+    <div class="bg-purple-50 p-6 rounded-lg border border-purple-100">
+      <h2 class="text-xl font-semibold text-purple-700">Seguridad</h2>
+      <p class="mt-2 text-gray-600">Ajustes de seguridad y permisos del sistema</p>
+    </div>
+  </div>
+</div>

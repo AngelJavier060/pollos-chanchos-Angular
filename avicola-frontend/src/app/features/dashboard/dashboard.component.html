@@ -1,0 +1,91 @@
+<div class="p-8 bg-white rounded-lg shadow-md">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-3xl font-bold text-blue-800">Bienvenido al Panel de Administrador</h1>
+    <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+      <span class="font-medium">Rol:</span> Administrador
+    </div>
+  </div>
+  
+  <p class="text-gray-600 mb-6">Desde aquí podrás gestionar todos los aspectos de Granja Elvita.</p>
+  
+  <div class="flex flex-wrap gap-6">
+    <div class="stats-card bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white flex items-center">
+      <div class="mr-4">
+        <svg class="h-12 w-12 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="text-xl font-bold mb-1">1,248</div>
+        <div class="text-blue-100 text-sm">Usuarios Totales</div>
+      </div>
+    </div>
+    
+    <div class="stats-card bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white flex items-center">
+      <div class="mr-4">
+        <svg class="h-12 w-12 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="text-xl font-bold mb-1">$158,342</div>
+        <div class="text-green-100 text-sm">Ingresos Mensuales</div>
+      </div>
+    </div>
+    
+    <div class="stats-card bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white flex items-center">
+      <div class="mr-4">
+        <svg class="h-12 w-12 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="text-xl font-bold mb-1">+12.5%</div>
+        <div class="text-purple-100 text-sm">Crecimiento</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tablero de actividad reciente -->
+<div class="mt-6 bg-white rounded-lg shadow-md p-6">
+  <h3 class="text-lg font-semibold text-gray-800 mb-4">Actividad Reciente</h3>
+  
+  <div class="space-y-4">
+    <div class="flex items-start">
+      <div class="bg-blue-100 rounded-full p-2 mr-3">
+        <svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+      </div>
+      <div>
+        <p class="text-gray-800">Se ha añadido un nuevo lote de <span class="font-medium">50 pollos</span></p>
+        <p class="text-sm text-gray-500 mt-1">Hace 2 horas</p>
+      </div>
+    </div>
+    
+    <div class="flex items-start">
+      <div class="bg-green-100 rounded-full p-2 mr-3">
+        <svg class="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      <div>
+        <p class="text-gray-800">Venta completada por <span class="font-medium">$5,230</span></p>
+        <p class="text-sm text-gray-500 mt-1">Hace 5 horas</p>
+      </div>
+    </div>
+    
+    <div class="flex items-start">
+      <div class="bg-yellow-100 rounded-full p-2 mr-3">
+        <svg class="h-4 w-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+      </div>
+      <div>
+        <p class="text-gray-800">Alerta de nivel bajo de alimento para <span class="font-medium">cerdos</span></p>
+        <p class="text-sm text-gray-500 mt-1">Hace 12 horas</p>
+      </div>
+    </div>
+  </div>
+</div> 

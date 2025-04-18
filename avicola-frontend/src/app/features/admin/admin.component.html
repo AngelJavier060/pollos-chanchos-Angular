@@ -1,0 +1,113 @@
+<!-- Layout principal del panel de administrador -->
+<div class="flex h-screen bg-gray-50">
+  
+  <!-- Sidebar - Menú lateral -->
+  <div class="w-64 bg-blue-800 text-white shadow-lg flex flex-col">
+    <div class="p-4 border-b border-blue-700">
+      <div class="flex items-center">
+        <img src="assets/logo.webp" alt="Logo Granja Elvita" class="h-12 w-auto mr-3">
+        <div>
+          <h2 class="text-xl font-bold">Granja Elvita</h2>
+          <p class="text-sm text-blue-200">Panel de Control</p>
+        </div>
+      </div>
+    </div>
+    
+    <nav class="mt-5 flex-grow">
+      <div class="px-4 py-2 text-xs text-blue-300 uppercase">
+        Navegación Principal
+      </div>
+      <button (click)="navegarA('dashboard')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+        </svg>
+        Dashboard
+      </button>
+
+      <button (click)="navegarA('usuarios')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+        Usuarios
+      </button>
+
+      <button (click)="navegarA('lotes')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+        </svg>
+        Registro de Lotes
+      </button>
+
+      <button (click)="navegarA('inventario')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+        </svg>
+        Inventario
+      </button>
+
+      <button (click)="navegarA('plan-nutricional')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+        </svg>
+        Plan Nutricional
+      </button>
+
+      <button (click)="navegarA('reportes')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        Reportes
+      </button>
+
+      <button (click)="navegarA('configuracion')" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c-.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        Configuración
+      </button>
+    </nav>
+
+    <!-- Sección de usuario y cerrar sesión -->
+    <div class="p-4 border-t border-blue-700">
+      <div class="flex items-center mb-4 px-2">
+        <img class="h-10 w-10 rounded-full border-2 border-white" 
+             src="https://ui-avatars.com/api/?name=Alexandra&background=4F46E5&color=fff" 
+             alt="Avatar">
+        <div class="ml-3">
+          <p class="text-sm font-medium text-white">{{adminName}}</p>
+          <p class="text-xs text-blue-200">Administrador</p>
+        </div>
+      </div>
+      <button (click)="cerrarSesion()" 
+              class="w-full flex items-center justify-center px-4 py-3 text-white hover:bg-red-600 bg-red-500 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-blue-800 group">
+        <svg class="w-5 h-5 mr-3 transition-transform duration-300 group-hover:rotate-180" 
+             fill="none" 
+             stroke="currentColor" 
+             viewBox="0 0 24 24">
+          <path stroke-linecap="round" 
+                stroke-linejoin="round" 
+                stroke-width="2" 
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+          </path>
+        </svg>
+        <span class="font-medium">Cerrar Sesión</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Contenido principal -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Barra superior -->
+    <header class="border-b border-gray-200 bg-white shadow-sm">
+      <div class="px-6 py-3 flex justify-between items-center">
+        <h2 class="text-xl font-semibold text-gray-800">{{adminName}}</h2>
+      </div>
+    </header>
+    
+    <!-- Contenido dinámico -->
+    <main class="flex-1 overflow-y-auto p-6 bg-gray-100">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

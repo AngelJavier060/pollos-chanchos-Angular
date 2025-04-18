@@ -1,0 +1,22 @@
+// Estilos específicos para el layout principal
+:host {
+  display: block;
+  height: 100vh;
+}
+
+.h-screen {
+  height: 100vh;
+}
+
+// Añadir estilos para el area de contenido
+.content-area {
+  flex: 1;
+  overflow-y: auto;
+}
+
+// Asegurar que el sidebar tenga una altura completa
+.sidebar {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+} 
