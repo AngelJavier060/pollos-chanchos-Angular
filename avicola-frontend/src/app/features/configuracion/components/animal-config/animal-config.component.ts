@@ -1,60 +1,83 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-
-interface Animal {
-  id?: number;
-  name: string;
-  createdAt: Date;
-}
+import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
+import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { AnimalService } from '../../services/animal.service';
+import { Animal } from '../../interfaces/animal.interface';
 
 @Component({
   selector: 'app-animal-config',
   templateUrl: './animal-config.component.html',
   styleUrls: ['./animal-config.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  providers: [DatePipe]
+  imports: [
+    CommonModule,
+    RouterModule,
+    MatTableModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
+    MatTooltipModule
+  ]
 })
 export class AnimalConfigComponent implements OnInit {
   animals: Animal[] = [];
-  newAnimal: Animal = { name: '', createdAt: new Date() };
-  selectedAnimal: Animal | null = null;
-  isEditing = false;
+  loading = false;
 
-  constructor(private datePipe: DatePipe) {}
+  constructor(
+    private animalService: AnimalService,
+    private snackBar: MatSnackBar
+  ) {}
 
   ngOnInit(): void {
-    // Aquí cargarías los animales desde un servicio
+    this.loadAnimals();
   }
 
-  onSubmit() {
-    if (this.isEditing && this.selectedAnimal) {
-      const index = this.animals.findIndex(a => a.id === this.selectedAnimal!.id);
-      if (index !== -1) {
-        this.animals[index] = { ...this.selectedAnimal };
+  loadAnimals(): void {
+    this.loading = true;
+    this.animalService.getAnimals().subscribe({
+      next: (data) => {
+        this.animals = data;
+        this.loading = false;
+      },
+      error: (error) => {
+        this.showMessage('Error al cargar los animales');
+        this.loading = false;
       }
-    } else {
-      this.animals.push({ ...this.newAnimal, id: this.animals.length + 1 });
-      this.newAnimal = { name: '', createdAt: new Date() };
+    });
+  }
+
+  onDelete(id: number): void {
+    if (confirm('¿Está seguro de eliminar este animal?')) {
+      this.loading = true;
+      this.animalService.deleteAnimal(id).subscribe({
+        next: () => {
+          this.showMessage('Animal eliminado con éxito');
+          this.loadAnimals();
+        },
+        error: (error) => {
+          if (error.status === 400) {
+            this.showMessage('No se puede eliminar el animal porque tiene razas asociadas');
+          } else {
+            this.showMessage('Error al eliminar el animal');
+          }
+          this.loading = false;
+        }
+      });
     }
   }
 
-  editAnimal(animal: Animal) {
-    this.selectedAnimal = { ...animal };
-    this.isEditing = true;
-  }
-
-  cancelEdit() {
-    this.selectedAnimal = null;
-    this.isEditing = false;
-  }
-
-  deleteAnimal(id: number) {
-    this.animals = this.animals.filter(a => a.id !== id);
-  }
-
-  formatDate(date: Date): string {
-    return this.datePipe.transform(date, 'dd/MM/yyyy HH:mm') || '';
+  private showMessage(message: string): void {
+    this.snackBar.open(message, 'Cerrar', {
+      duration: 3000,
+      horizontalPosition: 'center',
+      verticalPosition: 'bottom'
+    });
   }
 }

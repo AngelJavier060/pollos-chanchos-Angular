@@ -1,66 +1,278 @@
-<div class="p-4">
-    <h2 class="text-2xl font-bold mb-4">Configuración de Animales</h2>
-    <div class="mb-6">
-        <form (ngSubmit)="onSubmit()" class="bg-white p-4 rounded-lg shadow">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700">Nombre del Animal</label>
-                <input type="text"
-                       [(ngModel)]="isEditing ? selectedAnimal!.name : newAnimal.name"
-                       name="name"
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                       required>
-            </div>
-            
-            <div class="flex justify-end space-x-2">
-                <button *ngIf="isEditing"
-                        type="button"
-                        (click)="cancelEdit()"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                    Cancelar
-                </button>
-                <button type="submit"
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                    {{isEditing ? 'Actualizar' : 'Agregar'}}
-                </button>
-            </div>
-        </form>
+<div class="page-container">
+    <!-- Encabezado -->
+    <div class="header-section">
+        <div class="title-container">
+            <h1 class="main-title">Configuración de Animales</h1>
+            <p class="subtitle">Gestione los tipos de animales del sistema</p>
+        </div>
+        <a mat-raised-button class="add-button" [routerLink]="['nuevo']">
+            <span class="button-icon">add_circle</span>
+            <span>Agregar Animal</span>
+        </a>
     </div>
 
-    <div class="bg-white rounded-lg shadow">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nombre
-                    </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Fecha de Creación
-                    </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Acciones
-                    </th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                <tr *ngFor="let animal of animals">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        {{animal.name}}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        {{formatDate(animal.createdAt)}}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button (click)="editAnimal(animal)" 
-                                class="text-blue-600 hover:text-blue-900 mr-3">
-                            Editar
-                        </button>
-                        <button (click)="deleteAnimal(animal.id!)"
-                                class="text-red-600 hover:text-red-900">
-                            Eliminar
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
+    <!-- Contenedor de la tabla -->
+    <div class="table-container">
+        <table mat-table [dataSource]="animals" class="full-width-table">
+            <!-- ID Column -->
+            <ng-container matColumnDef="id">
+                <th mat-header-cell *matHeaderCellDef class="header-cell"> ID </th>
+                <td mat-cell *matCellDef="let animal" class="data-cell"> {{animal.id}} </td>
+            </ng-container>
+
+            <!-- Nombre Column -->
+            <ng-container matColumnDef="nombre">
+                <th mat-header-cell *matHeaderCellDef class="header-cell"> NOMBRE </th>
+                <td mat-cell *matCellDef="let animal" class="data-cell"> {{animal.name}} </td>
+            </ng-container>
+
+            <!-- Acciones Column -->
+            <ng-container matColumnDef="acciones">
+                <th mat-header-cell *matHeaderCellDef class="header-cell actions-header"> ACCIONES </th>
+                <td mat-cell *matCellDef="let animal" class="data-cell actions-cell">
+                    <a class="action-link edit" [routerLink]="['editar', animal.id]">edit</a>
+                    <a class="action-link delete" (click)="onDelete(animal.id!)">delete</a>
+                </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="['id', 'nombre', 'acciones']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['id', 'nombre', 'acciones'];"
+                class="table-row"></tr>
         </table>
+
+        <!-- Loading spinner -->
+        <div *ngIf="loading" class="loading-shade">
+            <mat-spinner diameter="50"></mat-spinner>
+        </div>
+
+        <!-- No data message -->
+        <div *ngIf="!loading && animals.length === 0" class="no-data">
+            <span class="no-data-icon">pets</span>
+            <p class="no-data-text">No hay animales registrados</p>
+            <a mat-stroked-button color="primary" [routerLink]="['nuevo']" class="first-animal-button">
+                <span class="button-icon">add_circle</span>
+                Agregar el primer animal
+            </a>
+        </div>
     </div>
 </div>
+
+<style>
+    /* Fuente Material Icons */
+    @import url('https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Icons+Outlined&display=swap');
+    
+    .page-container {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .title-container {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .main-title {
+        font-size: 2rem;
+        font-weight: 500;
+        margin: 0;
+        color: #1a237e;
+    }
+
+    .subtitle {
+        color: #666;
+        margin: 0.5rem 0 0 0;
+    }
+
+    /* Botón de agregar */
+    .add-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #4355b9 !important;
+        color: white !important;
+        padding: 0 20px;
+        height: 46px;
+        border-radius: 24px;
+        text-decoration: none;
+        font-weight: 500;
+        text-transform: none;
+        font-size: 16px;
+        box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+
+    .add-button:hover {
+        background-color: #3949a3 !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .button-icon {
+        font-family: 'Material Icons';
+        font-size: 20px;
+        margin-right: 8px;
+    }
+
+    /* Contenedor de tabla */
+    .table-container {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        min-height: 200px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .full-width-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+    }
+
+    .header-cell {
+        background-color: #f5f5f5;
+        color: #424242;
+        font-weight: 500;
+        font-size: 14px;
+        padding: 16px;
+        letter-spacing: 0.5px;
+    }
+
+    .data-cell {
+        padding: 16px;
+        font-size: 14px;
+        color: #333;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .actions-header {
+        text-align: right;
+        width: 150px;
+    }
+
+    .actions-cell {
+        text-align: right;
+        padding-right: 24px;
+    }
+
+    /* Botones de acción */
+    .action-link {
+        font-family: 'Material Icons';
+        text-decoration: none;
+        margin-left: 16px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: color 0.2s;
+    }
+
+    .action-link.edit {
+        color: #4355b9;
+    }
+
+    .action-link.edit:hover {
+        color: #3949a3;
+    }
+
+    .action-link.delete {
+        color: #f44336;
+    }
+
+    .action-link.delete:hover {
+        color: #e53935;
+    }
+
+    .table-row:hover {
+        background-color: #f5f5f5;
+    }
+
+    /* Loading y No data */
+    .loading-shade {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.8);
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .no-data {
+        padding: 2rem;
+        text-align: center;
+        color: #666;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .no-data-icon {
+        font-family: 'Material Icons';
+        font-size: 48px;
+        width: 48px;
+        height: 48px;
+        margin-bottom: 1rem;
+        color: #1a237e;
+    }
+
+    .no-data-text {
+        font-size: 16px;
+        margin-bottom: 1rem;
+    }
+
+    .first-animal-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        color: #4355b9;
+        border: 1px solid #4355b9;
+        padding: 0 16px;
+        height: 36px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .page-container {
+            padding: 1rem;
+        }
+
+        .header-section {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .main-title {
+            font-size: 1.5rem;
+        }
+
+        .add-button {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .actions-cell {
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .action-link {
+            margin-left: 12px;
+        }
+    }
+</style>

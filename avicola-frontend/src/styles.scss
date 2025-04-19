@@ -1,9 +1,40 @@
+@use '@angular/material' as mat;
+
 /* Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+// Material theme setup
+@include mat.core();
+
+// Define una paleta personalizada
+$primary-palette: mat.define-palette(mat.$indigo-palette);
+$accent-palette: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
+
+// Crea el tema
+$theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: mat.define-typography-config(),
+  density: 0,
+));
+
+// Aplica el tema
+@include mat.all-component-themes($theme);
+
 /* Estilos globales */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: #f5f5f5;
+}
+
 body {
   font-family: 'Montserrat', sans-serif;
   @apply bg-white;
@@ -24,4 +55,27 @@ body {
 /* Estilos específicos de la página de inicio */
 .text-primary {
   @apply text-blue-600;
+}
+
+// Estilos Material Design
+.mat-typography {
+  font: 400 14px/20px Roboto, "Helvetica Neue", sans-serif;
+  letter-spacing: normal;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-form-field-appearance-outline .mat-mdc-form-field-wrapper {
+  margin: 0;
+}
+
+.mat-mdc-raised-button {
+  height: 48px !important;
+}
+
+.mat-mdc-button, .mat-mdc-raised-button {
+  text-transform: uppercase;
+  font-weight: 500 !important;
 }
