@@ -4,18 +4,338 @@
     <p class="text-gray-600 mt-2">Gestiona los lotes de producción avícola</p>
   </div>
   
-  <div class="bg-blue-50 p-6 rounded-lg border border-blue-100 mb-6">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-semibold text-blue-700">Lotes Activos</h2>
-      <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm">
-        + Nuevo Lote
-      </button>
-    </div>
-    <p class="mt-2 text-gray-600">Aquí se mostrará la información de los lotes actualmente en producción</p>
+  <!-- Sección de error general -->
+  <div *ngIf="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+    <span class="block sm:inline">{{ errorMessage }}</span>
+    <span class="absolute top-0 bottom-0 right-0 px-4 py-3" (click)="errorMessage = ''">
+      <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <title>Cerrar</title>
+        <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+      </svg>
+    </span>
   </div>
   
-  <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
-    <h2 class="text-xl font-semibold text-gray-700">Historial de Lotes</h2>
-    <p class="mt-2 text-gray-600">Registro histórico de lotes completados</p>
+  <!-- Indicador de carga -->
+  <div *ngIf="loading" class="flex justify-center items-center py-4">
+    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
   </div>
-</div> 
+  
+  <!-- Mensaje de alerta cuando no hay razas disponibles -->
+  <div *ngIf="races.length === 0" class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
+    <strong class="font-bold">¡Atención! </strong>
+    <span class="block sm:inline">No hay razas disponibles en el sistema. Debe crear al menos una raza antes de poder registrar lotes.</span>
+    <div class="mt-3">
+      <a routerLink="/admin/configuracion" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">
+        Ir a crear razas
+      </a>
+    </div>
+  </div>
+  
+  <!-- Formulario para crear/editar lote - DISEÑO MEJORADO -->
+  <div *ngIf="showForm" class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200 shadow-md mb-6">
+    <div class="flex items-center border-b border-blue-200 pb-3 mb-4">
+      <div class="bg-blue-100 p-2 rounded-full mr-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-blue-800">{{ isEditing ? 'Editar Lote' : 'Nuevo Lote' }}</h2>
+    </div>
+    
+    <form [formGroup]="loteForm" (ngSubmit)="onSubmit()" class="space-y-6">
+      <!-- Campo Nombre -->
+      <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+        <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Nombre del Lote*</label>
+        <input 
+          type="text" 
+          id="name" 
+          formControlName="name" 
+          placeholder="Ingrese un nombre descriptivo para el lote"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+        <div *ngIf="loteForm.get('name')?.invalid && loteForm.get('name')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          El nombre del lote es obligatorio y debe tener al menos 3 caracteres
+        </div>
+        <p class="text-xs text-gray-500 mt-2 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Este nombre se utilizará para identificar fácilmente el lote. El código se generará automáticamente.
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Campo Cantidad -->
+        <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+          <label for="quantity" class="block text-sm font-semibold text-gray-700 mb-1">Cantidad de Animales*</label>
+          <div class="relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+              </svg>
+            </div>
+            <input 
+              type="number" 
+              id="quantity" 
+              formControlName="quantity"
+              min="1"
+              placeholder="Cantidad"
+              class="pl-10 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+          </div>
+          <div *ngIf="loteForm.get('quantity')?.invalid && loteForm.get('quantity')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Cantidad es requerida y debe ser mayor a 0
+          </div>
+        </div>
+        
+        <!-- Campo Fecha de Nacimiento -->
+        <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+          <label for="birthdate" class="block text-sm font-semibold text-gray-700 mb-1">Fecha de Nacimiento*</label>
+          <div class="relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <input 
+              type="date" 
+              id="birthdate" 
+              formControlName="birthdate" 
+              class="pl-10 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+          </div>
+          <div *ngIf="loteForm.get('birthdate')?.invalid && loteForm.get('birthdate')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Fecha de nacimiento es requerida
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Campo Costo -->
+        <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+          <label for="cost" class="block text-sm font-semibold text-gray-700 mb-1">Costo*</label>
+          <div class="relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span class="text-gray-500 sm:text-sm">$</span>
+            </div>
+            <input 
+              type="number" 
+              step="0.01"
+              id="cost" 
+              formControlName="cost" 
+              placeholder="0.00"
+              class="pl-7 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+          </div>
+          <div *ngIf="loteForm.get('cost')?.invalid && loteForm.get('cost')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Costo es requerido y debe ser mayor o igual a 0
+          </div>
+        </div>
+      
+        <!-- Campo Raza -->
+        <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+          <label for="raceId" class="block text-sm font-semibold text-gray-700 mb-1">Raza*</label>
+          <div class="relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+            <select 
+              id="raceId" 
+              formControlName="raceId" 
+              class="pl-10 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors appearance-none">
+              <option [ngValue]="">Seleccione una raza</option>
+              <option *ngFor="let race of races" [value]="race.id">{{ race.name }} ({{ race.animal.name }})</option>
+            </select>
+            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </div>
+          </div>
+          <div *ngIf="loteForm.get('raceId')?.invalid && loteForm.get('raceId')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Raza es requerida
+          </div>
+        </div>
+      </div>
+      
+      <!-- Botones del formulario -->
+      <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+        <button 
+          type="button" 
+          class="px-5 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+          (click)="toggleForm()">
+          <div class="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Cancelar
+          </div>
+        </button>
+        <button 
+          type="submit" 
+          [disabled]="!loteForm.valid"
+          class="px-5 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed transition-all duration-200">
+          <div class="flex items-center">
+            <svg *ngIf="!isEditing" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <svg *ngIf="isEditing" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            {{ isEditing ? 'Actualizar Lote' : 'Guardar Lote' }}
+          </div>
+        </button>
+      </div>
+    </form>
+  </div>
+  
+  <!-- Sección de Estadísticas mejorada - solo visible cuando no está activo el formulario -->
+  <div *ngIf="!showForm" class="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6">
+    <h2 class="text-xl font-semibold text-gray-700 mb-4">Resumen de Lotes</h2>
+    
+    <!-- Estadísticas generales -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <p class="text-sm text-gray-500">Total de Lotes</p>
+        <p class="text-2xl font-bold text-blue-700">{{ lotes.length }}</p>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <p class="text-sm text-gray-500">Total de Animales</p>
+        <p class="text-2xl font-bold text-blue-700">{{ getTotalAnimales() }}</p>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <p class="text-sm text-gray-500">Inversión Total</p>
+        <p class="text-2xl font-bold text-blue-700">{{ getTotalInversion() | currency }}</p>
+      </div>
+    </div>
+    
+    <!-- Estadísticas dinámicas por tipo de animal -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Panel dinámico para cada tipo de animal -->
+      <div *ngFor="let tipo of tiposAnimales" 
+           [ngClass]="'bg-' + tipo.color + '-50 p-4 rounded-lg shadow-sm border border-' + tipo.color + '-200'">
+        <h3 class="text-lg font-semibold" 
+            [ngClass]="'text-' + tipo.color + '-800'">{{ tipo.nombre }}</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Lotes</p>
+            <p class="text-xl font-bold"
+               [ngClass]="'text-' + tipo.color + '-700'">
+              {{ metricasPorAnimal.get(tipo.id)?.total || 0 }}
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Animales</p>
+            <p class="text-xl font-bold"
+               [ngClass]="'text-' + tipo.color + '-700'">
+              {{ metricasPorAnimal.get(tipo.id)?.cantidad || 0 }}
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Inversión</p>
+            <p class="text-xl font-bold"
+               [ngClass]="'text-' + tipo.color + '-700'">
+              {{ metricasPorAnimal.get(tipo.id)?.inversion | currency }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Sección de Lotes Activos con filtros dinámicos -->
+  <div class="bg-blue-50 p-6 rounded-lg border border-blue-100">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-blue-700">Lotes Activos</h2>
+      <div class="flex items-center gap-4">
+        <!-- Filtros dinámicos por tipo de animal -->
+        <div class="flex rounded-lg overflow-hidden border border-blue-200">
+          <button 
+            (click)="filtrarPorTipoAnimal('all')" 
+            [ngClass]="{'bg-blue-600 text-white': filtroAnimalActual === 'all', 'bg-white text-blue-600': filtroAnimalActual !== 'all'}"
+            class="px-4 py-2 font-medium transition-colors duration-200">
+            Todos
+          </button>
+          <button 
+            *ngFor="let tipo of tiposAnimales"
+            (click)="filtrarPorTipoAnimal(tipo.id)" 
+            [ngClass]="{'bg-blue-600 text-white': filtroAnimalActual === tipo.id, 'bg-white text-blue-600': filtroAnimalActual !== tipo.id}"
+            class="px-4 py-2 font-medium transition-colors duration-200">
+            {{ tipo.nombre }}
+          </button>
+        </div>
+        
+        <!-- Botón nuevo lote -->
+        <button 
+          (click)="toggleForm()" 
+          *ngIf="!showForm"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm">
+          + Nuevo Lote
+        </button>
+      </div>
+    </div>
+    
+    <!-- Tabla de lotes -->
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Nacimiento</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr *ngIf="lotesFiltrados.length === 0">
+            <td colspan="8" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
+          </tr>
+          <tr *ngFor="let lote of lotesFiltrados" class="hover:bg-gray-50">
+            <td class="py-4 px-4">{{ lote.codigo || lote.id }}</td>
+            <td class="py-4 px-4">{{ lote.name }}</td>
+            <td class="py-4 px-4">{{ lote.quantity }}</td>
+            <td class="py-4 px-4">{{ lote.birthdate | date:'dd/MM/yyyy' }}</td>
+            <td class="py-4 px-4">{{ lote.cost | currency }}</td>
+            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
+            <td class="py-4 px-4">{{ lote.race.animal.name || 'No asignado' }}</td>
+            <td class="py-4 px-4">
+              <div class="flex space-x-2">
+                <button 
+                  (click)="editLote(lote)"
+                  class="text-blue-600 hover:text-blue-800">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button 
+                  (click)="deleteLote(lote.id!)"
+                  class="text-red-600 hover:text-red-800">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

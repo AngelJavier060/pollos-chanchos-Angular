@@ -27,7 +27,8 @@ public class ControllerAdvice extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error -> {
             errors.put(error.getField(), error.getDefaultMessage());
         });
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(errors);
+        // Cambiamos de METHOD_NOT_ALLOWED (405) a BAD_REQUEST (400)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 
     @ExceptionHandler(RequestException.class)

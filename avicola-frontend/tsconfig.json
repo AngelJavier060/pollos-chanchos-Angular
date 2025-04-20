@@ -25,10 +25,13 @@
       "dom"
     ]
   },
+  "files": [
+    "src/main.ts",
+    "src/server.ts"
+  ],
   "exclude": [
     "src/main.server.ts",
-    "src/app.config.server.ts",
-    "src/server.ts"
+    "src/app.config.server.ts"
   ],
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

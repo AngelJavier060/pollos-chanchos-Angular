@@ -4,6 +4,7 @@ import { LoginComponent } from './features/auth/login/login.component';
 import { ServicesComponent } from './features/services/services.component';
 import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { AuthGuard } from './core/guards/auth.guard';
+import { LoteTestComponent } from './features/lotes/lote-test.component';
 
 export const routes: Routes = [
   { 
@@ -22,6 +23,10 @@ export const routes: Routes = [
   { 
     path: 'servicios', 
     component: ServicesComponent 
+  },
+  { 
+    path: 'lote-test', 
+    component: LoteTestComponent 
   },
   { 
     path: '**', 

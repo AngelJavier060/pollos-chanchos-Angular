@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wil.avicola_backend.model.Lote;
@@ -27,10 +28,31 @@ public class LoteController {
     public ResponseEntity<?> findLotes() {
         return loteService.findLotes();
     }
+    
+    @GetMapping("/codigo/{codigo}")
+    public ResponseEntity<Lote> findByCodigo(@PathVariable String codigo) {
+        return loteService.findByCodigo(codigo);
+    }
+    
+    @GetMapping("/check-duplicate")
+    public ResponseEntity<Boolean> checkDuplicateName(@RequestParam String name, @RequestParam long animalId) {
+        boolean exists = loteService.existsByNameAndAnimalId(name, animalId);
+        return ResponseEntity.ok(exists);
+    }
 
     @PostMapping("/{id_race}")
     public ResponseEntity<Lote> saveLote(@PathVariable long id_race, @Valid @RequestBody Lote lote) {
         return loteService.saveLote(id_race, lote);
+    }
+    
+    @PostMapping("/nuevo")
+    public ResponseEntity<Lote> crearNuevoLote(@Valid @RequestBody Lote lote) {
+        if (lote.getRace() == null || lote.getRace().getId() == 0) {
+            throw new com.wil.avicola_backend.error.RequestException("Se requiere una raza válida");
+        }
+        
+        long raceId = lote.getRace().getId();
+        return loteService.saveLote(raceId, lote);
     }
 
     @PutMapping
