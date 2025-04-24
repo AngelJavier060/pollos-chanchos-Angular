@@ -1,9 +1,268 @@
 <div class="p-4">
     <h2 class="text-2xl font-bold mb-4">Configuración General</h2>
+    
+    <!-- Navegación de tabs para diferentes tipos de configuración -->
+    <div class="mb-6 border-b border-gray-200">
+        <nav class="flex space-x-6" aria-label="Tabs">
+            <button (click)="cambiarTab('stage')" 
+                    [ngClass]="activeTab === 'stage' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Etapas
+            </button>
+            <button (click)="cambiarTab('provider')" 
+                    [ngClass]="activeTab === 'provider' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Proveedores
+            </button>
+            <button (click)="cambiarTab('typefood')" 
+                    [ngClass]="activeTab === 'typefood' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Tipos de Alimento
+            </button>
+            <button (click)="cambiarTab('unitmeasurement')" 
+                    [ngClass]="activeTab === 'unitmeasurement' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Unidades de Medida
+            </button>
+        </nav>
+    </div>
+    
+    <!-- Contenido de las tabs -->
     <div class="bg-white rounded-lg shadow p-6">
-        <div class="space-y-4">
-            <!-- Aquí irá el contenido de la configuración general -->
-            <p class="text-gray-600">Configuración general del sistema</p>
+        <!-- Tab de Etapas -->
+        <div *ngIf="activeTab === 'stage'" class="space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Gestión de Etapas</h3>
+                <button (click)="openForm('stage')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Nueva Etapa
+                </button>
+            </div>
+            
+            <div *ngIf="loading" class="flex justify-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+            </div>
+            
+            <div *ngIf="!loading && stages.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                <p class="text-gray-500">No hay etapas registradas</p>
+                <button (click)="openForm('stage')" class="mt-2 text-blue-600 hover:text-blue-800">Agregar la primera etapa</button>
+            </div>
+            
+            <table *ngIf="!loading && stages.length > 0" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr *ngFor="let stage of stages" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{stage.id}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{stage.name}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{stage.description || 'N/A'}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button (click)="editItem('stage', stage)" class="text-blue-600 hover:text-blue-900 mr-3">Editar</button>
+                            <button (click)="deleteItem('stage', stage.id)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Tab de Proveedores -->
+        <div *ngIf="activeTab === 'provider'" class="space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Gestión de Proveedores</h3>
+                <button (click)="openForm('provider')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Nuevo Proveedor
+                </button>
+            </div>
+            
+            <div *ngIf="loading" class="flex justify-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+            </div>
+            
+            <div *ngIf="!loading && providers.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                <p class="text-gray-500">No hay proveedores registrados</p>
+                <button (click)="openForm('provider')" class="mt-2 text-blue-600 hover:text-blue-800">Agregar el primer proveedor</button>
+            </div>
+            
+            <table *ngIf="!loading && providers.length > 0" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr *ngFor="let provider of providers" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{provider.id}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{provider.name}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{provider.contact || 'N/A'}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button (click)="editItem('provider', provider)" class="text-blue-600 hover:text-blue-900 mr-3">Editar</button>
+                            <button (click)="deleteItem('provider', provider.id)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Tab de Tipos de Alimento -->
+        <div *ngIf="activeTab === 'typefood'" class="space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Gestión de Tipos de Alimento</h3>
+                <button (click)="openForm('typefood')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Nuevo Tipo de Alimento
+                </button>
+            </div>
+            
+            <div *ngIf="loading" class="flex justify-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+            </div>
+            
+            <div *ngIf="!loading && typefoods.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                <p class="text-gray-500">No hay tipos de alimento registrados</p>
+                <button (click)="openForm('typefood')" class="mt-2 text-blue-600 hover:text-blue-800">Agregar el primer tipo de alimento</button>
+            </div>
+            
+            <table *ngIf="!loading && typefoods.length > 0" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr *ngFor="let typefood of typefoods" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{typefood.id}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{typefood.name}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button (click)="editItem('typefood', typefood)" class="text-blue-600 hover:text-blue-900 mr-3">Editar</button>
+                            <button (click)="deleteItem('typefood', typefood.id)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Tab de Unidades de Medida -->
+        <div *ngIf="activeTab === 'unitmeasurement'" class="space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Gestión de Unidades de Medida</h3>
+                <button (click)="openForm('unitmeasurement')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Nueva Unidad de Medida
+                </button>
+            </div>
+            
+            <div *ngIf="loading" class="flex justify-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+            </div>
+            
+            <div *ngIf="!loading && unitmeasurements.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                <p class="text-gray-500">No hay unidades de medida registradas</p>
+                <button (click)="openForm('unitmeasurement')" class="mt-2 text-blue-600 hover:text-blue-800">Agregar la primera unidad de medida</button>
+            </div>
+            
+            <table *ngIf="!loading && unitmeasurements.length > 0" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Abreviatura</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr *ngFor="let unit of unitmeasurements" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{unit.id}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{unit.name}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{unit.name_short || 'N/A'}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button (click)="editItem('unitmeasurement', unit)" class="text-blue-600 hover:text-blue-900 mr-3">Editar</button>
+                            <button (click)="deleteItem('unitmeasurement', unit.id)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Modal para crear/editar -->
+    <div *ngIf="showModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">{{ isEditing ? 'Editar' : 'Crear' }} {{ getEntityTitle() }}</h3>
+                <form [formGroup]="entityForm" (ngSubmit)="saveItem()" class="mt-4 text-left">
+                    <!-- Campo de Nombre (común para todas las entidades) -->
+                    <div class="mb-4">
+                        <label for="name" class="block text-sm font-medium text-gray-700">Nombre</label>
+                        <input type="text" formControlName="name" id="name" 
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <p *ngIf="entityForm.get('name')?.invalid && entityForm.get('name')?.touched" class="text-red-500 text-xs mt-1">
+                            El nombre es obligatorio
+                        </p>
+                    </div>
+                    
+                    <!-- Campos específicos según la entidad -->
+                    <ng-container [ngSwitch]="activeTab">
+                        <!-- Campos específicos para Stage -->
+                        <div *ngSwitchCase="'stage'" class="mb-4">
+                            <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
+                            <textarea formControlName="description" id="description" rows="3"
+                                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                        
+                        <!-- Campos específicos para Provider -->
+                        <div *ngSwitchCase="'provider'" class="mb-4">
+                            <label for="contact" class="block text-sm font-medium text-gray-700">Contacto</label>
+                            <input type="text" formControlName="contact" id="contact"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <!-- Campos específicos para TypeFood -->
+                        <div *ngSwitchCase="'typefood'" class="mb-4"></div>
+                        
+                        <!-- Campos específicos para UnitMeasurement -->
+                        <div *ngSwitchCase="'unitmeasurement'" class="mb-4">
+                            <label for="name_short" class="block text-sm font-medium text-gray-700">Abreviatura <span class="text-red-500">*</span></label>
+                            <input type="text" formControlName="name_short" id="name_short"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <p *ngIf="entityForm.get('name_short')?.invalid && entityForm.get('name_short')?.touched" class="text-red-500 text-xs mt-1">
+                                La abreviatura es obligatoria
+                            </p>
+                        </div>
+                    </ng-container>
+                    
+                    <!-- Botones de acción -->
+                    <div class="mt-5 flex justify-end">
+                        <button type="button" (click)="closeModal()" 
+                                class="mr-2 inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+                            Cancelar
+                        </button>
+                        <button type="submit" [disabled]="entityForm.invalid || submitting"
+                                class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none disabled:opacity-50">
+                            {{ isEditing ? 'Actualizar' : 'Guardar' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
