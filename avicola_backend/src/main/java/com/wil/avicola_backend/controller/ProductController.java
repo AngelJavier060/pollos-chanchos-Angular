@@ -28,14 +28,16 @@ public class ProductController {
         return productService.findProducts();
     }
 
-    @PostMapping("/{id_provider}/{id_type_food}/{id_unit_measurement}/{id_animal}")
+    @PostMapping("/{id_provider}/{id_type_food}/{id_unit_measurement}/{id_animal}/{id_stage}/{id_category}")
     public ResponseEntity<Product> saveProduct(
             @PathVariable long id_provider,
             @PathVariable long id_type_food,
             @PathVariable long id_unit_measurement,
             @PathVariable long id_animal,
+            @PathVariable long id_stage,
+            @PathVariable long id_category,
             @Valid @RequestBody Product product) {
-        return productService.saveProduct(id_provider, id_type_food, id_unit_measurement, id_animal, product);
+        return productService.saveProduct(id_provider, id_type_food, id_unit_measurement, id_animal, id_stage, id_category, product);
     }
 
     @PutMapping

@@ -60,5 +60,13 @@ public class Product {
     @ManyToOne
     @JoinColumn(name = "unitMeasurement_id")
     private UnitMeasurement unitMeasurement;
+    
+    @ManyToOne
+    @JoinColumn(name = "stage_id")
+    private Stage stage;
+    
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category;
 
 }

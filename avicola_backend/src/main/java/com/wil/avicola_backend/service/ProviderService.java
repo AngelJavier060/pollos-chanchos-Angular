@@ -41,6 +41,7 @@ public class ProviderService {
 
             Provider provider_old = providerRepository.findById(provider.getId()).get();
             provider_old.setName(provider.getName());
+            provider_old.setContact(provider.getContact());
             providerRepository.save(provider_old);
             return ResponseEntity.status(HttpStatus.OK).body(provider_old);
         }

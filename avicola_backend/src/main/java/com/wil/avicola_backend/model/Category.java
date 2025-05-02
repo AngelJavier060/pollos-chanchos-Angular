@@ -23,15 +23,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-public class Provider {
+public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    @NotBlank(message = "Por favor, ingrese nombre del proveedor.")
+    @NotBlank(message = "Por favor, ingrese nombre de la categoria.")
     private String name;
-    
-    private String contact;
 
     @CreatedDate
     LocalDateTime create_date;

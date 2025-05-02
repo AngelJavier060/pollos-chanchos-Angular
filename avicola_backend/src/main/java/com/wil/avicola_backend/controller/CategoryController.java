@@ -11,36 +11,36 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wil.avicola_backend.model.Stage;
-import com.wil.avicola_backend.service.StageService;
+import com.wil.avicola_backend.model.Category;
+import com.wil.avicola_backend.service.CategoryService;
 
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/stage")
-public class StageController {
+@RequestMapping("/category")
+public class CategoryController {
 
     @Autowired
-    private StageService stageService;
+    private CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<?> findStages() {
-        return stageService.findStages();
+    public ResponseEntity<?> findCategories() {
+        return categoryService.findCategories();
     }
 
     @PostMapping
-    public ResponseEntity<Stage> saveStage(@Valid @RequestBody Stage stage) {
-        return stageService.saveStage(stage);
+    public ResponseEntity<Category> saveCategory(@Valid @RequestBody Category category) {
+        return categoryService.saveCategory(category);
     }
 
     @PutMapping
-    public ResponseEntity<Stage> updateStage(
-            @Valid @RequestBody Stage stage) {
-        return stageService.updateStage(stage);
+    public ResponseEntity<Category> updateCategory(
+            @Valid @RequestBody Category category) {
+        return categoryService.updateCategory(category);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Stage> deleteStage(@PathVariable long id) {
-        return stageService.deleteStage(id);
+    public ResponseEntity<Category> deleteCategory(@PathVariable long id) {
+        return categoryService.deleteCategory(id);
     }
 }

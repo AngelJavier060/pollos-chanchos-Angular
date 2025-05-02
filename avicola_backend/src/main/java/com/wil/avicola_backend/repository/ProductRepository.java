@@ -27,4 +27,12 @@ public interface ProductRepository extends CrudRepository<Product, Long> {
     // relacion con animal
     @Query("SELECT case when count(product)> 0 then true else false end FROM Product product WHERE product.animal.id = ?1")
     boolean existsByAnimal(long animal_id);
+    
+    // relacion con etapa
+    @Query("SELECT case when count(product)> 0 then true else false end FROM Product product WHERE product.stage.id = ?1")
+    boolean existsByStage(long stage_id);
+    
+    // relacion con categoria
+    @Query("SELECT case when count(product)> 0 then true else false end FROM Product product WHERE product.category.id = ?1")
+    boolean existsByCategory(long category_id);
 }
