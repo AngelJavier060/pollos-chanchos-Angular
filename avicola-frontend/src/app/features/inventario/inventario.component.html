@@ -1,28 +1,281 @@
-<div class="p-8 bg-white rounded-lg shadow-md">
-  <div class="text-center mb-8">
-    <h1 class="text-3xl font-bold text-blue-800">¡Bienvenido al Inventario!</h1>
-    <p class="text-gray-600 mt-2">Gestiona los productos e insumos del sistema avícola</p>
+<div class="p-6 bg-white rounded-lg shadow-md">
+  <!-- Encabezado -->
+  <div class="text-center mb-6">
+    <h1 class="text-3xl font-bold text-blue-800">Gestión de Inventario</h1>
+    <p class="text-gray-600 mt-2">Administra los productos e insumos del sistema avícola</p>
   </div>
   
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-    <div class="bg-green-50 p-6 rounded-lg border border-green-100">
-      <div class="flex justify-between items-center">
-        <h2 class="text-xl font-semibold text-green-700">Productos Disponibles</h2>
-        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm">
-          + Nuevo Producto
+  <!-- Indicador de carga -->
+  <div *ngIf="isLoading" class="flex justify-center my-4">
+    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
+  
+  <!-- Panel de búsqueda/filtros -->
+  <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
+    <h2 class="text-lg font-medium text-blue-800 mb-3">Filtros de búsqueda</h2>
+    <form [formGroup]="searchForm" (ngSubmit)="searchProducts()" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">Nombre</label>
+        <input type="text" formControlName="name" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Buscar por nombre...">
+      </div>
+      
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">Proveedor</label>
+        <select formControlName="providerId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <option [ngValue]="null">Todos</option>
+          <option *ngFor="let provider of providers" [value]="provider.id">{{ provider.name }}</option>
+        </select>
+      </div>
+      
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">Tipo de Alimento</label>
+        <select formControlName="typeFoodId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <option [ngValue]="null">Todos</option>
+          <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
+        </select>
+      </div>
+      
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">Animal</label>
+        <select formControlName="animalId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <option [ngValue]="null">Todos</option>
+          <option *ngFor="let animal of animals" [value]="animal.id">{{ animal.name }}</option>
+        </select>
+      </div>
+      
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">Etapa</label>
+        <select formControlName="stageId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <option [ngValue]="null">Todos</option>
+          <option *ngFor="let stage of stages" [value]="stage.id">{{ stage.name }}</option>
+        </select>
+      </div>
+      
+      <div class="flex items-end space-x-2">
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+          Buscar
+        </button>
+        <button type="button" (click)="resetFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+          Limpiar
         </button>
       </div>
-      <p class="mt-2 text-gray-600">Listado de productos en inventario</p>
+    </form>
+  </div>
+  
+  <!-- Panel principal de productos -->
+  <div class="mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-blue-800">Listado de Productos</h2>
+      <button 
+        (click)="openForm(false)" 
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
+        <span class="mr-1">+</span> Nuevo Producto
+      </button>
     </div>
     
-    <div class="bg-orange-50 p-6 rounded-lg border border-orange-100">
-      <div class="flex justify-between items-center">
-        <h2 class="text-xl font-semibold text-orange-700">Insumos</h2>
-        <button class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm">
-          + Nuevo Insumo
-        </button>
-      </div>
-      <p class="mt-2 text-gray-600">Gestión de insumos y materias primas</p>
+    <!-- Tabla de productos -->
+    <div class="overflow-x-auto bg-white rounded-lg shadow">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Unitario</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Alimento</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
+            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngIf="filteredProducts.length === 0 && !isLoading" class="hover:bg-gray-50">
+            <td colspan="7" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
+          </tr>
+          <tr *ngFor="let product of filteredProducts" class="hover:bg-gray-50">
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ product.name }}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.quantity }}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.price_unit }}</td>
+            <!-- Mostramos el nombre del provider directo si está disponible, sino usamos el helper -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+              {{ product.provider?.name || getProviderName(product.provider_id) }}
+            </td>
+            <!-- Mostramos el nombre del typeFood directo si está disponible, sino usamos el helper -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+              {{ product.typeFood?.name || getTypeFoodName(product.typeFood_id) }}
+            </td>
+            <!-- Mostramos el nombre del animal directo si está disponible, sino usamos el helper -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+              {{ product.animal?.name || getAnimalName(product.animal_id) }}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
+              <div class="flex justify-center space-x-2">
+                <button 
+                  (click)="openForm(true, product)" 
+                  class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button 
+                  (click)="deleteProduct(product.id)" 
+                  class="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-100 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
-</div> 
+  
+  <!-- Modal de formulario -->
+  <div *ngIf="showForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-semibold text-gray-900">
+            {{ isEditMode ? 'Editar Producto' : 'Nuevo Producto' }}
+          </h3>
+          <button (click)="closeForm()" class="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <form [formGroup]="productForm" (ngSubmit)="saveProduct()" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- COLUMNA 1 - Según la imagen -->
+            <div class="space-y-4">
+              <!-- Nombre -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Nombre *</label>
+                <input type="text" formControlName="name" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre del producto">
+                <div *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Tipo de Alimento -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Tipo de Alimento *</label>
+                <select formControlName="typeFood_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <option [ngValue]="null">Seleccione un tipo</option>
+                  <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('typeFood_id')?.invalid && productForm.get('typeFood_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Cantidad -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Cantidad *</label>
+                <input type="number" formControlName="quantity" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Cantidad">
+                <div *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Precio Unitario -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Precio Unitario *</label>
+                <input type="number" step="0.01" formControlName="price_unit" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Precio unitario">
+                <div *ngIf="productForm.get('price_unit')?.invalid && productForm.get('price_unit')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Fecha de Compra -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Fecha de Compra</label>
+                <input type="date" formControlName="date_compra" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              
+              <!-- Nivel Mínimo -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Nivel Mínimo</label>
+                <input type="number" step="0.01" formControlName="level_min" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Nivel mínimo">
+              </div>
+            </div>
+            
+            <!-- COLUMNA 2 - Según la imagen -->
+            <div class="space-y-4">
+              <!-- Animal -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Animal *</label>
+                <select formControlName="animal_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <option [ngValue]="null">Seleccione un animal</option>
+                  <option *ngFor="let animal of animals" [value]="animal.id">{{ animal.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('animal_id')?.invalid && productForm.get('animal_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Etapa -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Etapa *</label>
+                <select formControlName="stage_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <option [ngValue]="null">Seleccione una etapa</option>
+                  <option *ngFor="let stage of stages" [value]="stage.id">{{ stage.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('stage_id')?.invalid && productForm.get('stage_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Unidad de Medida -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Unidad de Medida *</label>
+                <select formControlName="unitMeasurement_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <option [ngValue]="null">Seleccione una unidad</option>
+                  <option *ngFor="let unit of unitMeasurements" [value]="unit.id">{{ unit.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('unitMeasurement_id')?.invalid && productForm.get('unitMeasurement_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Número de Factura -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Número de Factura</label>
+                <input type="number" formControlName="number_facture" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Número de factura">
+              </div>
+              
+              <!-- Proveedor -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Proveedor *</label>
+                <select formControlName="provider_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <option [ngValue]="null">Seleccione un proveedor</option>
+                  <option *ngFor="let provider of providers" [value]="provider.id">{{ provider.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('provider_id')?.invalid && productForm.get('provider_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Nivel Máximo -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Nivel Máximo</label>
+                <input type="number" step="0.01" formControlName="level_max" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Nivel máximo">
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex justify-end space-x-3 mt-6">
+            <button type="button" (click)="closeForm()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+              Cancelar
+            </button>
+            <button type="submit" [disabled]="productForm.invalid" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+              {{ isEditMode ? 'Actualizar' : 'Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

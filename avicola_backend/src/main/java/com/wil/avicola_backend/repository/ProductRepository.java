@@ -2,9 +2,11 @@ package com.wil.avicola_backend.repository;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.stereotype.Repository;
 
 import com.wil.avicola_backend.model.Product;
 
+@Repository
 public interface ProductRepository extends CrudRepository<Product, Long> {
 
     boolean existsByName(String name);
