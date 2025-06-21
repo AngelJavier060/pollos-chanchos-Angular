@@ -1,0 +1,97 @@
+// Estilos específicos para el módulo de usuarios
+
+// Estilo para mejorar la adaptabilidad en dispositivos móviles
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  .user-table {
+    min-width: 700px;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+// Animación para mensajes
+.message {
+  animation: fadeInOut 5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+// Estilo para el modal
+.modal-overlay {
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+// Estilos para estados de usuario
+.status-badge {
+  transition: all 0.3s ease;
+  
+  &.active {
+    background-color: rgba(0, 200, 0, 0.2);
+    color: #007700;
+  }
+  
+  &.inactive {
+    background-color: rgba(200, 0, 0, 0.2);
+    color: #770000;
+  }
+}
+
+// Mejorar los botones de acción
+.action-button {
+  padding: 0.25rem;
+  border-radius: 9999px;
+  transition: all 0.2s;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Animaciones para mensajes de éxito
+.success-message {
+  animation: slideDown 0.5s ease-in-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+// Estilo para resaltar la fila actualizada
+.updated-row {
+  animation: highlight 2s ease-in-out;
+}
+
+@keyframes highlight {
+  0% { background-color: #e5e7eb; }
+  50% { background-color: #93c5fd; }
+  100% { background-color: #e5e7eb; }
+}

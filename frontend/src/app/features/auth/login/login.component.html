@@ -1,0 +1,65 @@
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-800 to-indigo-900 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8 bg-white rounded-xl shadow-2xl p-8">
+    <div class="text-center">
+      <img class="mx-auto h-24 w-auto" src="assets/logo.webp" alt="Logo Granja Elvita">
+      <h2 class="mt-6 text-3xl font-bold text-gray-900">
+        {{ pageTitle }}
+      </h2>
+    </div>
+
+    <form class="mt-8 space-y-6" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <div>
+        <label for="username" class="block text-sm font-medium text-gray-700">Usuario</label>
+        <input 
+          id="username" 
+          name="username" 
+          type="text" 
+          formControlName="username"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Ingrese su usuario">
+        <div *ngIf="usernameControl?.touched && usernameControl?.invalid" class="mt-1 text-sm text-red-600">
+          {{ getErrorMessage('username') }}
+        </div>
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-medium text-gray-700">Contraseña</label>
+        <input 
+          id="password"
+          name="password"
+          type="password"
+          formControlName="password"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Ingrese su contraseña">
+        <div *ngIf="passwordControl?.touched && passwordControl?.invalid" class="mt-1 text-sm text-red-600">
+          {{ getErrorMessage('password') }}
+        </div>
+      </div>
+
+      <div *ngIf="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+        <p class="text-red-600 text-sm text-center">{{ error }}</p>
+      </div>
+
+      <div>
+        <button 
+          type="submit" 
+          [disabled]="loading || loginForm.invalid"
+          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400">
+          {{ loading ? 'Iniciando sesión...' : 'Iniciar sesión' }}
+        </button>
+      </div>
+    </form>    <div class="text-center space-y-2">
+      <a routerLink="/" class="text-sm text-blue-600 hover:text-blue-500">
+        Volver a la página principal
+      </a>
+      <div *ngIf="error">
+        <button 
+          type="button"
+          (click)="testBackendConnection()"
+          class="mt-2 text-xs text-gray-500 hover:text-blue-500">
+          Probar conexión con el servidor
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

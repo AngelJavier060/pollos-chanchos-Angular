@@ -1,0 +1,61 @@
+// Estilos para el componente de usuarios
+.user-photo {
+  &.placeholder {
+    background-color: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    svg {
+      width: 60%;
+      height: 60%;
+      color: #9ca3af;
+    }
+  }
+}
+
+// Animaciones
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Mejoras visuales para la tabla
+.table-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+.user-row {
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateX(4px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+}
+
+// Estilos para los botones de acción
+.action-button {
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: scale(1.05);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}

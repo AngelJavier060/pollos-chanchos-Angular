@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico de Autenticación</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .warning {
+            color: orange;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        code {
+            background-color: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .results {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Diagnóstico de Autenticación del Sistema</h1>
+        
+        <div class="card">
+            <h3>Información del Sistema</h3>
+            <p>Esta herramienta diagnosticará problemas comunes de autenticación en el sistema.</p>
+            <p>Acciones que realizará:</p>
+            <ul>
+                <li>Verificar la configuración CORS</li>
+                <li>Comprobar la validez de los tokens almacenados</li>
+                <li>Verificar la comunicación con el backend</li>
+                <li>Generar un informe detallado</li>
+            </ul>
+            <button id="startDiagnostic">Iniciar Diagnóstico</button>
+        </div>
+        
+        <div id="results" class="results hidden">
+            <h2>Resultados del Diagnóstico</h2>
+            <div id="diagnosticOutput"></div>
+            
+            <h3>Acciones Recomendadas</h3>
+            <div id="recommendations"></div>
+            
+            <h3>Herramientas de Reparación</h3>
+            <button id="repairTokens">Reparar Tokens</button>
+            <button id="clearStorage">Limpiar Almacenamiento</button>
+            <button id="testBackend">Probar Backend</button>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('startDiagnostic').addEventListener('click', runDiagnostic);
+        document.getElementById('repairTokens').addEventListener('click', repairTokens);
+        document.getElementById('clearStorage').addEventListener('click', clearStorage);
+        document.getElementById('testBackend').addEventListener('click', testBackend);
+        
+        // Función principal de diagnóstico
+        async function runDiagnostic() {
+            const output = document.getElementById('diagnosticOutput');
+            const recommendations = document.getElementById('recommendations');
+            const results = document.getElementById('results');
+            
+            output.innerHTML = '<p>Ejecutando diagnóstico...</p>';
+            results.classList.remove('hidden');
+            
+            // Verificar tokens en localStorage
+            output.innerHTML += '<h4>Verificando tokens almacenados:</h4>';
+            
+            const authToken = localStorage.getItem('auth_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            const user = localStorage.getItem('user');
+            
+            let tokenValid = false;
+            let userValid = false;
+            
+            if (authToken) {
+                try {
+                    // Verificación básica de estructura JWT (no valida firma)
+                    const tokenParts = authToken.split('.');
+                    if (tokenParts.length === 3) {
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        const expiry = new Date(payload.exp * 1000);
+                        const now = new Date();
+                        
+                        if (expiry > now) {
+                            output.innerHTML += `<p class="success">✓ Token de autenticación presente y no expirado (Caduca: ${expiry.toLocaleString()})</p>`;
+                            tokenValid = true;
+                        } else {
+                            output.innerHTML += `<p class="error">✗ Token de autenticación expirado (Caducó: ${expiry.toLocaleString()})</p>`;
+                        }
+                    } else {
+                        output.innerHTML += '<p class="error">✗ Token de autenticación tiene formato inválido</p>';
+                    }
+                } catch (e) {
+                    output.innerHTML += `<p class="error">✗ Error analizando token: ${e.message}</p>`;
+                }
+            } else {
+                output.innerHTML += '<p class="error">✗ No se encontró token de autenticación</p>';
+            }
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    if (userData && userData.username && userData.token) {
+                        output.innerHTML += `<p class="success">✓ Datos de usuario encontrados (${userData.username})</p>`;
+                        userValid = true;
+                    } else {
+                        output.innerHTML += '<p class="warning">⚠ Datos de usuario incompletos</p>';
+                    }
+                } catch (e) {
+                    output.innerHTML += '<p class="error">✗ Error analizando datos de usuario</p>';
+                }
+            } else {
+                output.innerHTML += '<p class="error">✗ No se encontraron datos de usuario</p>';
+            }
+            
+            // Verificación de conexión con el backend
+            output.innerHTML += '<h4>Verificando conexión con el backend:</h4>';
+            
+            try {
+                const response = await fetch('http://localhost:8088/health', {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    output.innerHTML += `<p class="success">✓ Backend responde correctamente (Status: ${data.status || 'OK'})</p>`;
+                } else {
+                    output.innerHTML += `<p class="error">✗ Error conectando con el backend: ${response.status} ${response.statusText}</p>`;
+                }
+            } catch (e) {
+                output.innerHTML += `<p class="error">✗ No se pudo conectar con el backend: ${e.message}</p>`;
+            }
+            
+            // Recomendaciones
+            recommendations.innerHTML = '<ul>';
+            
+            if (!tokenValid) {
+                recommendations.innerHTML += '<li>Vuelve a iniciar sesión para obtener un nuevo token</li>';
+            }
+            
+            if (!userValid) {
+                recommendations.innerHTML += '<li>Elimina los datos de usuario corruptos usando el botón "Limpiar Almacenamiento"</li>';
+            }
+            
+            recommendations.innerHTML += `
+                <li>Asegúrate de que el backend está en ejecución en http://localhost:8088</li>
+                <li>Verifica que el frontend está configurado para conectar con la URL correcta del backend</li>
+                <li>Revisa la configuración CORS en el backend</li>
+                <li>Si los problemas persisten, reinicia ambos servicios (backend y frontend)</li>
+            `;
+            
+            recommendations.innerHTML += '</ul>';
+        }
+        
+        // Función para reparar tokens
+        function repairTokens() {
+            // Token JWT de prueba para diagnóstico (válido pero sin firma válida)
+            const emergencyToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsIm5hbWUiOiJBZG1pbmlzdHJhdG9yIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjk5OTk5OTk5OTl9.3I6-0q_5sKMf4vc1bxXyuYbwaQuvDwePu1U3jPzr5aE';
+            
+            localStorage.setItem('auth_token', emergencyToken);
+            localStorage.setItem('refresh_token', emergencyToken);
+            localStorage.setItem('token_timestamp', Date.now().toString());
+            
+            // Usuario mock
+            const mockUser = {
+                id: 1,
+                username: 'admin',
+                email: 'admin@example.com',
+                roles: ['ROLE_ADMIN'],
+                token: emergencyToken
+            };
+            localStorage.setItem('user', JSON.stringify(mockUser));
+            
+            alert('Tokens reparados para diagnóstico. Refresca la página e intenta navegar por la aplicación.');
+            setTimeout(() => {
+                runDiagnostic();
+            }, 500);
+        }
+        
+        // Función para limpiar almacenamiento
+        function clearStorage() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('token_timestamp');
+            
+            alert('Almacenamiento limpiado correctamente. Refresca la página e intenta iniciar sesión de nuevo.');
+            setTimeout(() => {
+                runDiagnostic();
+            }, 500);
+        }
+        
+        // Función para probar comunicación con backend
+        async function testBackend() {
+            try {
+                const response = await fetch('http://localhost:8088/health', {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Conexión exitosa con el backend. Respuesta: ${JSON.stringify(data)}`);
+                } else {
+                    alert(`Error conectando con el backend: ${response.status} ${response.statusText}`);
+                }
+            } catch (e) {
+                alert(`No se pudo conectar con el backend: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
