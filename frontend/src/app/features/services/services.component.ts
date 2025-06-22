@@ -3,13 +3,14 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
+import { NavbarComponent } from '../../shared/components/navbar/navbar.component';
 
 @Component({
   selector: 'app-services',
   templateUrl: './services.component.html',
   styleUrls: ['./services.component.scss'],
   standalone: true,
-  imports: [CommonModule, RouterModule, SharedModule],
+  imports: [CommonModule, RouterModule, SharedModule, NavbarComponent],
   animations: [
     trigger('fadeInUp', [
       transition(':enter', [

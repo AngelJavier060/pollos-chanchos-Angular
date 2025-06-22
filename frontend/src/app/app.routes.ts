@@ -13,7 +13,11 @@ export const routes: Routes = [
     component: HomeLayoutComponent,
     children: [
       { path: '', component: HomeComponent, title: 'Inicio' },
-      { path: 'servicios', component: ServicesComponent, title: 'Servicios' }
+      { path: 'servicios', component: ServicesComponent, title: 'Servicios' },
+      {
+        path: 'diagnostics',
+        loadComponent: () => import('./features/diagnostics/auth-flow-debug.component').then(m => m.AuthFlowDebugComponent)
+      }
     ]
   },  { 
     path: 'login', 
@@ -39,6 +43,23 @@ export const routes: Routes = [
     loadComponent: () => import('./features/diagnostics/auth-flow-debug.component').then(m => m.AuthFlowDebugComponent),
     title: 'Depurador de Flujo de Autenticación'
   },
+  {
+    path: 'pollos',
+    loadChildren: () => import('./features/pollos/pollos.module').then(m => m.PollosModule),
+    canActivate: [AuthGuard],
+    title: 'Panel de Pollos',
+    data: { roles: [ERole.ROLE_POULTRY] }
+  },
+  {
+    path: 'chanchos',
+    loadChildren: () => import('./features/chanchos/chanchos.module').then(m => m.ChanchosModule),
+    canActivate: [AuthGuard],
+    title: 'Panel de Chanchos',
+    data: { roles: [ERole.ROLE_PORCINE] }
+  },
+  { path: 'auth/login', component: LoginComponent, title: 'Iniciar Sesión' },
+  { path: 'auth/login/pollos', component: LoginComponent, title: 'Iniciar Sesión Pollos' },
+  { path: 'auth/login/chanchos', component: LoginComponent, title: 'Iniciar Sesión Chanchos' },
   { 
     path: '**', 
     redirectTo: '',

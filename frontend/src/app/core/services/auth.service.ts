@@ -1,39 +1,22 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { Observable } from 'rxjs';
 import { AuthDirectService } from './auth-direct.service';
-import { map } from 'rxjs/operators';
+import { LoginRequest, AuthResponse } from '../../shared/models/auth.model';
 import { User } from '../../shared/models/user.model';
-import { ERole } from '../../shared/models/role.model';
-import { LoginRequest } from '../../shared/models/auth.model';
 
-/**
- * SERVICIO TEMPORAL - Solo para compatibilidad durante migración
- * Este servicio redirige todas las llamadas al AuthDirectService
- */
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  // Agregar propiedades adicionales necesarias para compatibilidad
-  private apiUrl = environment.apiUrl;
-    constructor(
-    private authDirectService: AuthDirectService,
-    private http: HttpClient,
-    private router: Router
+  public currentUser$: Observable<User | null>;
+
+  constructor(
+    private authDirectService: AuthDirectService
   ) {
-    console.warn('AuthService está en desuso. Use AuthDirectService directamente.');
+    this.currentUser$ = this.authDirectService.currentUser;
   }
 
-  // Propiedades reenviadas
-  get currentUserValue(): User | null {
-    return this.authDirectService.getCurrentUser();
-  }
-
-  // Métodos reenviados
-  login(credentials: LoginRequest): Observable<User> {
+  login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.authDirectService.login(credentials);
   }
 
@@ -41,64 +24,62 @@ export class AuthService {
     this.authDirectService.logout();
   }
 
-  logoutPublic(): void {
-    this.authDirectService.logout();
+  refreshToken(): Observable<AuthResponse> {
+    return this.authDirectService.refreshToken();
+  }
+  
+  isAuthenticated(): boolean {
+    return this.authDirectService.isAuthenticated();
   }
 
-  refreshToken(): Observable<any> {
-    return this.authDirectService.refreshToken();
+  getCurrentUser(): User | null {
+    return this.authDirectService.currentUserValue;
+  }
+  
+  hasRole(role: string): boolean {
+    return this.authDirectService.hasRole(role);
+  }
+
+  isAdmin(): boolean {
+    return this.authDirectService.isAdmin();
   }
 
   getToken(): string | null {
     return this.authDirectService.getToken();
   }
 
+  // Métodos de compatibilidad para componentes existentes
+  clearAuth(): void {
+    this.authDirectService.logout();
+  }
+
+  hasRolePublic(role: any): boolean {
+    return this.authDirectService.hasRole(role);
+  }
+  
   isTokenValidPublic(token: string): boolean {
-    // Implementación básica para asegurar compatibilidad
-    return token != null && token.length > 0;
-  }
-
-  isAuthenticated(): boolean {
-    return this.authDirectService.isAuthenticated();
-  }
-  cleanupStorage(): void {
-    this.authDirectService.logout();
-  }
-
-  cleanupStoragePublic(): void {
-    this.authDirectService.logout();
-  }
-
-  // Métodos faltantes requeridos por los componentes
-  hasRole(role: ERole): boolean {
-    return this.authDirectService.hasRole(role);
-  }
-  hasRolePublic(role: ERole): boolean {
-    return this.authDirectService.hasRole(role);
-  }
-
-  // Métodos adicionales para compatibilidad
-  getApiUrl(): string {
-    return this.apiUrl;
-  }
-  // Agregar un BehaviorSubject para currentUser$
-  public get currentUser$() {
-    return this.authDirectService.authStatus.pipe(
-      map(isAuthenticated => {
-        if (isAuthenticated) {
-          const user = this.authDirectService.getCurrentUser();
-          if (user) {
-            return user;
-          }
+    if (!token) return false;
+    
+    try {
+      const tokenExpiry = localStorage.getItem('token_expiry');
+      if (tokenExpiry) {
+        const expiryTime = parseInt(tokenExpiry);
+        if (!isNaN(expiryTime)) {
+          return expiryTime > Date.now();
         }
-        return null;
-      })
-    );
+      }
+      return true;
+    } catch (e) {
+      console.error('Error al verificar validez del token:', e);
+      return false;
+    }
   }
-
-  // Método para prueba de conexión al servidor
-  testServerConnection(): Observable<any> {
-    console.log('Probando conexión al servidor...');
-    return this.http.get(`${this.apiUrl}/api/health`);
+  
+  cleanupStorage(): void {
+    this.clearAuth();
   }
-}
+  
+  cleanupStoragePublic(): void {
+    this.clearAuth();
+  }
+} 

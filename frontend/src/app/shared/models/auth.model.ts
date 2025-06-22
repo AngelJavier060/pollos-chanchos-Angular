@@ -1,14 +1,20 @@
 export interface LoginRequest {
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
 }
 
 export interface AuthResponse {
-  user: {
-    id: number;
-    username: string;
-    email: string;
-    roles: string[];
-  };
   token: string;
+  refreshToken: string;
+  type: string;
+  id: number;
+  username: string;
+  email: string;
+  name: string;
+  profilePicture: string | null;
+  roles: string[];
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
 } 

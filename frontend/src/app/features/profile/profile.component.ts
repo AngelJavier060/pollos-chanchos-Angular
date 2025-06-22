@@ -2,6 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AuthDirectService } from '../../core/services/auth-direct.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-profile',
@@ -20,13 +24,14 @@ export class ProfileComponent implements OnInit {
   expirationDate = new Date('2026-06-16');
   photoUrl = 'assets/alexandra.png';
   showSecretKey = false;
+  currentUserId: number | null = null;
 
-  constructor(private fb: FormBuilder) {
+  constructor(private fb: FormBuilder, private authService: AuthDirectService, private http: HttpClient, private snackBar: MatSnackBar) {
     this.profileForm = this.fb.group({
-      nombre: ['Alexandra', [Validators.required]],
-      email: ['admin@granjaelvita.com', [Validators.required, Validators.email]],
-      telefono: ['', [Validators.pattern(/^\+?[0-9]{9,12}$/)]],
-      cargo: ['Administrador', [Validators.required]]
+      nombre: ['', [Validators.required]],
+      email: ['', [Validators.required, Validators.email]],
+      telefono: ['', [Validators.pattern(/^[+]?\d{9,12}$/)]],
+      cargo: ['', [Validators.required]]
     });
 
     this.securityForm = this.fb.group({
@@ -44,7 +49,34 @@ export class ProfileComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Aquí podrías cargar los datos del perfil desde un servicio
+    // Obtener el usuario autenticado actual para todos los paneles
+    const user = this.authService.currentUserValue;
+    if (user) {
+      this.currentUserId = user.id || null;
+      this.profileForm.patchValue({
+        nombre: user.name || user.username,
+        email: user.email,
+        telefono: user.phone || '',
+        cargo: user.roles?.[0] || '',
+      });
+      this.photoUrl = user.profilePicture || 'assets/img/default-avatar.png';
+    }
+
+    this.http.get<any>(`${environment.apiUrl}/api/users/me`).subscribe({
+      next: (user) => {
+        this.currentUserId = user.id || null;
+        this.profileForm.patchValue({
+          nombre: user.name || user.username || '',
+          email: user.email || '',
+          telefono: user.phone || '',
+          cargo: user.roles?.includes('ROLE_ADMIN') ? 'Administrador' : 'Usuario'
+        });
+        this.photoUrl = user.profilePicture || 'assets/img/default-avatar.png';
+      },
+      error: (err) => {
+        console.error('Error al cargar el perfil:', err);
+      }
+    });
   }
 
   passwordMatchValidator(g: FormGroup) {
@@ -77,13 +109,31 @@ export class ProfileComponent implements OnInit {
   }
 
   onSubmitProfile() {
-    if (this.profileForm.valid) {
+    if (this.profileForm.valid && this.currentUserId) {
       this.loading = true;
-      // Aquí implementarías la lógica para guardar los cambios del perfil
-      setTimeout(() => {
-        this.loading = false;
-        console.log('Perfil actualizado:', this.profileForm.value);
-      }, 1000);
+      const updateData = {
+        name: this.profileForm.get('nombre')?.value,
+        email: this.profileForm.get('email')?.value,
+        phone: this.profileForm.get('telefono')?.value,
+        // Puedes agregar más campos si es necesario
+      };
+      this.http.put(`${environment.apiUrl}/api/users/${this.currentUserId}`, updateData).subscribe({
+        next: (res) => {
+          this.loading = false;
+          const user = this.authService.currentUserValue;
+          if (user) {
+            user.name = updateData.name;
+            user.email = updateData.email;
+            user.phone = updateData.phone;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+          }
+          this.snackBar.open('Perfil actualizado correctamente', 'Cerrar', { duration: 3000, panelClass: 'snackbar-success' });
+        },
+        error: (err) => {
+          this.loading = false;
+          this.snackBar.open('Error al actualizar el perfil', 'Cerrar', { duration: 3000, panelClass: 'snackbar-error' });
+        }
+      });
     }
   }
 

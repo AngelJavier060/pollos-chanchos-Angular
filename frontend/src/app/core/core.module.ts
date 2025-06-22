@@ -1,10 +1,13 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
-import { AuthInterceptor } from './interceptors/auth.interceptor';
+import { HttpClientModule } from '@angular/common/http';
 import { AuthGuard } from './guards/auth.guard';
 import { AuthService } from './services/auth.service';
 
+/**
+ * NOTA: El interceptor AuthInterceptor se registra en app.config.ts,
+ * no lo registramos aquí para evitar que se aplique dos veces.
+ */
 @NgModule({
   declarations: [],
   imports: [
@@ -13,12 +16,8 @@ import { AuthService } from './services/auth.service';
   ],
   providers: [
     AuthService,
-    AuthGuard,
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: AuthInterceptor,
-      multi: true
-    }
+    AuthGuard
+    // El interceptor se registra en app.config.ts
   ]
 })
 export class CoreModule {

@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { User } from '../../shared/models/user.model';
 
 @Component({
   selector: 'app-admin',
@@ -14,6 +15,7 @@ export class AdminComponent implements OnInit {
 
   adminName: string = '';
   isUserMenuOpen: boolean = false;
+  currentUser: User | null = null;
 
   constructor(
     private authService: AuthService,
@@ -21,10 +23,13 @@ export class AdminComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    const currentUser = this.authService.currentUserValue;
+    const currentUser = this.authService.getCurrentUser();
     if (currentUser) {
       this.adminName = currentUser.username;
     }
+    this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+    });
   }
 
   toggleUserMenu(): void {

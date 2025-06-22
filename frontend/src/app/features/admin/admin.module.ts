@@ -20,11 +20,10 @@ const routes: Routes = [
     component: AdminComponent,
     canActivate: [AuthGuard],
     data: { roles: [ERole.ROLE_ADMIN] },
-    children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+    children: [      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent, title: 'Dashboard' },      { 
         path: 'usuarios', 
-        loadComponent: () => import('./usuarios-directo/usuarios-directo.component').then(m => m.UsuariosDirectoComponent),
+        loadComponent: () => import('../../features/usuarios/usuarios.component').then(m => m.UsuariosComponent),
         title: 'Gestión de Usuarios',
         canActivate: [AuthGuard],
         data: { 
@@ -53,8 +52,8 @@ const routes: Routes = [
   imports: [
     CommonModule,
     RouterModule.forChild(routes),
-    ReactiveFormsModule,
-    AdminComponent,
+    ReactiveFormsModule
+    // AdminComponent es un componente standalone y no debe importarse aquí
   ]
 })
 export class AdminModule { }

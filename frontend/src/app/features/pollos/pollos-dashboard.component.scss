@@ -1,0 +1,27 @@
+.pollos-dashboard {
+  h1 {
+    color: #388e3c;
+    margin-bottom: 1rem;
+  }
+}
+
+.pollos-dashboard-dashboard {
+  font-family: 'Inter', sans-serif;
+  .dashboard-header {
+    border-bottom: 2px solid #ffe066;
+    margin-bottom: 2rem;
+  }
+  .summary-card {
+    transition: box-shadow 0.2s;
+    &:hover {
+      box-shadow: 0 4px 24px 0 #ffe06633;
+    }
+  }
+  table th {
+    font-weight: 700;
+    border-bottom: 2px solid #ffe066;
+  }
+  table td {
+    border-bottom: 1px solid #fef9c3;
+  }
+} 

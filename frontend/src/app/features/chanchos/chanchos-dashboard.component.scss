@@ -1,0 +1,27 @@
+.chanchos-dashboard {
+  h1 {
+    color: #ad1457;
+    margin-bottom: 1rem;
+  }
+}
+
+.chanchos-dashboard-dashboard {
+  font-family: 'Inter', sans-serif;
+  .dashboard-header {
+    border-bottom: 2px solid #f48fb1;
+    margin-bottom: 2rem;
+  }
+  .summary-card {
+    transition: box-shadow 0.2s;
+    &:hover {
+      box-shadow: 0 4px 24px 0 #f48fb133;
+    }
+  }
+  table th {
+    font-weight: 700;
+    border-bottom: 2px solid #f48fb1;
+  }
+  table td {
+    border-bottom: 1px solid #fce4ec;
+  }
+} 

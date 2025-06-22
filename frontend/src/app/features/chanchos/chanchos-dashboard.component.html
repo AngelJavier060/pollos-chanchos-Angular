@@ -1,0 +1,158 @@
+<div class="chanchos-dashboard-layout flex min-h-screen bg-gray-50">
+  <!-- Sidebar -->
+  <aside class="sidebar w-72 bg-white shadow-xl flex flex-col p-6 border-r border-pink-100">
+    <div class="flex flex-col items-center mb-8">
+      <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="h-20 w-20 rounded-full border-4 border-pink-400 mb-2">
+      <div class="text-center">
+        <div class="font-bold text-lg text-pink-700">{{ user?.name || user?.username }}</div>
+        <div class="text-sm text-gray-500">{{ user?.email }}</div>
+        <div class="text-xs text-pink-600 font-semibold mt-1">{{ user?.roles?.[0] }}</div>
+      </div>
+    </div>
+    <nav class="flex-1">
+      <ul class="space-y-2">
+        <li>
+          <a class="flex items-center px-4 py-2 rounded-lg text-pink-700 bg-pink-50 font-semibold hover:bg-pink-100 transition" href="#">
+            <span class="material-icons mr-2">dashboard</span> Dashboard
+          </a>
+        </li>
+        <li>
+          <a class="flex items-center px-4 py-2 rounded-lg text-pink-700 hover:bg-pink-50 font-semibold transition" href="#">
+            <span class="material-icons mr-2">restaurant</span> Alimentación Diaria
+          </a>
+        </li>
+        <li>
+          <a class="flex items-center px-4 py-2 rounded-lg text-pink-700 hover:bg-pink-50 font-semibold transition" routerLink="/chanchos/perfil">
+            <span class="material-icons mr-2">person</span> Mi Perfil
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <div class="mt-8">
+      <div class="font-semibold text-pink-700 mb-2">Perfil</div>
+      <div class="bg-pink-50 rounded-lg p-4 text-sm space-y-2">
+        <div><span class="font-bold">Nombre:</span> {{ user?.name || user?.username }}</div>
+        <div><span class="font-bold">Correo:</span> {{ user?.email }}</div>
+        <div><span class="font-bold">Rol:</span> {{ user?.roles?.[0] }}</div>
+        <hr class="my-2 border-pink-200">
+        <div class="font-semibold text-pink-700">Información</div>
+        <div>Usuario activo desde: 2023-10-01</div>
+        <div>Último acceso: 2024-06-10</div>
+        <hr class="my-2 border-pink-200">
+        <div class="font-semibold text-pink-700">Seguridad y Credencial</div>
+        <div>Contraseña actualizada: Sí</div>
+        <div>2FA: No habilitado</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Contenido principal -->
+  <main class="flex-1 p-8">
+    <!-- Barra superior -->
+    <header class="flex items-center justify-between px-8 py-4 bg-white shadow-sm border-b border-pink-100">
+      <div></div>
+      <div class="relative">
+        <button (click)="isUserMenuOpen = !isUserMenuOpen" class="flex items-center space-x-2 focus:outline-none">
+          <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-pink-400">
+          <div class="text-right">
+            <div class="font-semibold text-pink-800">{{ user?.name || user?.username }}</div>
+            <div class="text-xs text-pink-600">{{ user?.roles?.[0] }}</div>
+          </div>
+          <svg class="w-4 h-4 ml-1 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div *ngIf="isUserMenuOpen" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 z-50 border border-pink-100">
+          <div class="px-4 py-3 border-b border-pink-100">
+            <div class="font-semibold text-pink-800">{{ user?.name || user?.username }}</div>
+            <div class="text-xs text-gray-500">{{ user?.email }}</div>
+          </div>
+          <a routerLink="/chanchos/perfil" (click)="isUserMenuOpen = false" class="flex items-center px-4 py-2 text-pink-700 hover:bg-pink-50 transition-colors">
+            <span class="material-icons mr-2">person</span> Mi Perfil
+          </a>
+          <button (click)="logout(); isUserMenuOpen = false" class="flex items-center w-full px-4 py-2 text-red-600 hover:bg-pink-50 transition-colors">
+            <span class="material-icons mr-2">logout</span> Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    </header>
+    <router-outlet></router-outlet>
+  </main>
+
+  <ng-template #dashboardContent>
+    <!-- Tarjetas de resumen -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="summary-card bg-pink-100 border-l-4 border-pink-400 p-4 rounded-xl shadow">
+        <div class="text-3xl font-bold text-pink-700">120</div>
+        <div class="text-gray-700">Total Lotes</div>
+      </div>
+      <div class="summary-card bg-pink-100 border-l-4 border-pink-400 p-4 rounded-xl shadow">
+        <div class="text-3xl font-bold text-pink-700">$3,210</div>
+        <div class="text-gray-700">Total Pagos</div>
+      </div>
+      <div class="summary-card bg-pink-100 border-l-4 border-pink-400 p-4 rounded-xl shadow">
+        <div class="text-3xl font-bold text-pink-700">85</div>
+        <div class="text-gray-700">Total Ventas</div>
+      </div>
+      <div class="summary-card bg-pink-100 border-l-4 border-pink-400 p-4 rounded-xl shadow">
+        <div class="text-3xl font-bold text-pink-700">44</div>
+        <div class="text-gray-700">Órdenes</div>
+      </div>
+    </div>
+    <!-- Gráfico central (simulado) -->
+    <div class="bg-white rounded-xl shadow p-6 mb-8">
+      <h2 class="text-lg font-semibold text-pink-700 mb-4">Producción Mensual</h2>
+      <div class="h-48 flex items-center justify-center text-pink-400">
+        <span>[Gráfico de ejemplo aquí]</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Actividades recientes -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-md font-semibold text-pink-700 mb-4">Actividades Recientes</h3>
+        <ul class="space-y-3">
+          <li class="flex items-center">
+            <span class="h-3 w-3 bg-pink-400 rounded-full mr-2"></span>
+            Nuevo lote registrado
+          </li>
+          <li class="flex items-center">
+            <span class="h-3 w-3 bg-pink-400 rounded-full mr-2"></span>
+            Venta realizada
+          </li>
+          <li class="flex items-center">
+            <span class="h-3 w-3 bg-pink-400 rounded-full mr-2"></span>
+            Actualización de inventario
+          </li>
+        </ul>
+      </div>
+      <!-- Tabla de datos -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-md font-semibold text-pink-700 mb-4">Últimos Lotes</h3>
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-pink-700">
+              <th class="py-2">ID</th>
+              <th class="py-2">Nombre</th>
+              <th class="py-2">Fecha</th>
+              <th class="py-2">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="py-1">1</td>
+              <td class="py-1">Lote X</td>
+              <td class="py-1">2024-06-01</td>
+              <td class="py-1 text-pink-600">Activo</td>
+            </tr>
+            <tr>
+              <td class="py-1">2</td>
+              <td class="py-1">Lote Y</td>
+              <td class="py-1">2024-05-20</td>
+              <td class="py-1 text-pink-600">Finalizado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-template>
+</div> 

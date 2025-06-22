@@ -4,6 +4,17 @@ import { HttpClient, HttpErrorResponse, HttpHeaders, HttpClientModule } from '@a
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { ApiDiagnosticsService } from '../../shared/services/api-diagnostics.service';
+import { AuthService } from '../../core/services/auth.service';
+import { User } from '../../shared/models/user.model';
+import { Observable, forkJoin } from 'rxjs';
+
+interface DiagnosticCheck {
+  name: string;
+  status: 'success' | 'failure' | 'pending';
+  details: string;
+  run: () => Observable<any>;
+}
 
 @Component({
   selector: 'app-auth-flow-debug',
@@ -112,9 +123,14 @@ export class AuthFlowDebugComponent implements OnInit {
   
   token: string | null = null;
   
+  loading = false;
+  diagnostics: DiagnosticCheck[] = [];
+  
   constructor(
     private http: HttpClient,
-    private router: Router
+    private router: Router,
+    private apiDiagnosticsService: ApiDiagnosticsService,
+    private authService: AuthService
   ) {}
   
   ngOnInit(): void {
@@ -129,6 +145,43 @@ export class AuthFlowDebugComponent implements OnInit {
         details: { tokenLength: savedToken.length, tokenStart: savedToken.substring(0, 20) + '...' }
       });
     }
+
+    this.initializeChecks();
+  }
+  
+  initializeChecks() {
+    this.diagnostics = [
+      {
+        name: '1. Verificación de Salud del Backend',
+        status: 'pending',
+        details: 'Pendiente de ejecución.',
+        run: () => this.apiDiagnosticsService.checkApiHealth()
+      },
+      {
+        name: '2. Verificación de Endpoint Público',
+        status: 'pending',
+        details: 'Pendiente de ejecución.',
+        run: () => this.apiDiagnosticsService.checkPublicEndpoint()
+      },
+      {
+        name: '3. Obtener Token del Local Storage',
+        status: 'pending',
+        details: 'Pendiente de ejecución.',
+        run: () => this.apiDiagnosticsService.checkLocalStorageToken()
+      },
+      {
+        name: '4. Verificación de Endpoint Protegido (Admin)',
+        status: 'pending',
+        details: 'Pendiente de ejecución.',
+        run: () => this.apiDiagnosticsService.checkAdminEndpoint()
+      },
+      {
+        name: '5. Verificación de Endpoint de Usuarios',
+        status: 'pending',
+        details: 'Pendiente de ejecución.',
+        run: () => this.apiDiagnosticsService.checkUsersEndpoint()
+      }
+    ];
   }
   
   /**
@@ -140,7 +193,7 @@ export class AuthFlowDebugComponent implements OnInit {
     this.isRunning = true;
     
     // Iniciar el flujo de pruebas
-    this.probarConexionBackend();
+    this.runDiagnostics();
   }
   
   /**
@@ -602,5 +655,38 @@ export class AuthFlowDebugComponent implements OnInit {
    */
   irADiagnosticoCompleto(): void {
     this.router.navigate(['/diagnostico']);
+  }
+
+  runDiagnostics(): void {
+    this.loading = true;
+    this.initializeChecks();
+
+    const runCheck = (index: number) => {
+      if (index >= this.diagnostics.length) {
+        this.loading = false;
+        return;
+      }
+
+      const currentCheck = this.diagnostics[index];
+      currentCheck.run().subscribe({
+        next: (result) => {
+          currentCheck.status = 'success';
+          currentCheck.details = JSON.stringify(result, null, 2);
+        },
+        error: (err) => {
+          currentCheck.status = 'failure';
+          currentCheck.details = JSON.stringify({
+            message: err.message,
+            status: err.status,
+            error: err.error
+          }, null, 2);
+        },
+        complete: () => {
+          runCheck(index + 1);
+        }
+      });
+    };
+
+    runCheck(0);
   }
 }

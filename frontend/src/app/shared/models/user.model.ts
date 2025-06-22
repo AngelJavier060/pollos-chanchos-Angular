@@ -4,10 +4,11 @@ export interface User {
   id?: number;
   username: string;
   email: string;
-  roles?: ERole[];
+  roles?: string[];
   active?: boolean;
   token?: string;
   refreshToken?: string;
+  tokenExpiry?: number;  // Timestamp de expiración del token
   name?: string;
   phone?: string;
   profilePicture?: string;

@@ -70,6 +70,16 @@
           </svg>
         </button>
       </div>
+
+      <!-- Foto y nombre del usuario actual -->
+      <div *ngIf="isAuthenticated && currentUser && router.url.includes('/admin')" class="flex items-center space-x-2">
+        <img
+          [src]="currentUser.profilePicture || 'assets/img/default-avatar.png'"
+          alt="Avatar"
+          class="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
+        />
+        <span class="font-medium text-gray-800">{{ currentUser.name || currentUser.username }}</span>
+      </div>
     </div>
 
     <!-- Menú Móvil -->

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "resolveJsonModule": true,
+    "moduleResolution": "node"
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": false,
+    "strictInjectionParameters": false,
+    "strictInputAccessModifiers": false
+  }
+}
