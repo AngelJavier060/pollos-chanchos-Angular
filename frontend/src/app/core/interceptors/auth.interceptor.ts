@@ -24,15 +24,18 @@ export class AuthInterceptor implements HttpInterceptor {
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     const token = this.authService.getToken();
 
-    if (token) {
+    if (token && token.trim() !== '') {
       const authReq = request.clone({
         setHeaders: {
           Authorization: `Bearer ${token}`
         }
       });
       return next.handle(authReq);
+    } else {
+      if (!token) {
+        console.warn('[AuthInterceptor] No se encontró token JWT para la petición:', request.url);
+      }
+      return next.handle(request);
     }
-
-    return next.handle(request);
   }
 }

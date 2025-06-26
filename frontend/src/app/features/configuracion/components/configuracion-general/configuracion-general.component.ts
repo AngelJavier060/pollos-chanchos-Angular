@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { environment } from '../../../../../environments/environment';
+import { HttpClient } from '@angular/common/http';
 
 // Interfaces
 import { Stage } from '../../interfaces/stage.interface';
@@ -43,6 +45,9 @@ export class ConfiguracionGeneralComponent implements OnInit {
   
   // ID de la entidad en edición
   currentEntityId: number | null = null;
+  backendUrl = environment.apiUrl;
+  backendConfig: any = null;
+  backendConfigError: string = '';
   
   constructor(
     private fb: FormBuilder,
@@ -50,14 +55,16 @@ export class ConfiguracionGeneralComponent implements OnInit {
     private providerService: ProviderService,
     private typeFoodService: TypeFoodService,
     private unitMeasurementService: UnitMeasurementService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private http: HttpClient
   ) { }
 
   ngOnInit(): void {
     this.initForm();
     this.loadData(this.activeTab);
+    this.loadBackendConfig();
   }
-  
+
   // Inicialización del formulario según el tipo de entidad activa
   private initForm(): void {
     // Definir la configuración base del formulario
@@ -473,5 +480,18 @@ export class ConfiguracionGeneralComponent implements OnInit {
       case 'unitmeasurement': return 'Unidad de Medida';
       default: return '';
     }
+  }
+
+  loadBackendConfig(): void {
+    this.http.get(`${this.backendUrl}/config`).subscribe({
+      next: (data) => {
+        this.backendConfig = data;
+        this.backendConfigError = '';
+      },
+      error: (err) => {
+        this.backendConfigError = 'No se pudo obtener la configuración del backend';
+        this.backendConfig = null;
+      }
+    });
   }
 }

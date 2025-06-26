@@ -1,6 +1,20 @@
 <div class="p-4">
     <h2 class="text-2xl font-bold mb-4">Configuración General</h2>
     
+    <!-- Visualización de la URL del backend -->
+    <div class="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-sm">
+        <strong>Backend URL actual:</strong> {{ backendUrl }}
+    </div>
+    <div *ngIf="backendConfig" class="mb-4 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-sm">
+        <strong>Configuración real del backend:</strong><br>
+        Puerto: {{ backendConfig.serverPort }}<br>
+        Base de datos: {{ backendConfig.datasourceUrl }}<br>
+        Usuario DB: {{ backendConfig.datasourceUser }}
+    </div>
+    <div *ngIf="backendConfigError" class="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+        {{ backendConfigError }}
+    </div>
+    
     <!-- Navegación de tabs para diferentes tipos de configuración -->
     <div class="mb-6 border-b border-gray-200">
         <nav class="flex space-x-6" aria-label="Tabs">
