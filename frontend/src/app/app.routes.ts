@@ -13,11 +13,7 @@ export const routes: Routes = [
     component: HomeLayoutComponent,
     children: [
       { path: '', component: HomeComponent, title: 'Inicio' },
-      { path: 'servicios', component: ServicesComponent, title: 'Servicios' },
-      {
-        path: 'diagnostics',
-        loadComponent: () => import('./features/diagnostics/auth-flow-debug.component').then(m => m.AuthFlowDebugComponent)
-      }
+      { path: 'servicios', component: ServicesComponent, title: 'Servicios' }
     ]
   },  { 
     path: 'login', 
@@ -32,16 +28,6 @@ export const routes: Routes = [
       roles: [ERole.ROLE_ADMIN],
       skipAuthCheck: environment.production === false // En desarrollo saltamos la verificación
     }
-  },
-  {
-    path: 'diagnostico', 
-    loadComponent: () => import('./diagnostico.component').then(m => m.DiagnosticoComponent),
-    title: 'Diagnóstico de Autenticación'
-  },
-  {
-    path: 'debug-auth',
-    loadComponent: () => import('./features/diagnostics/auth-flow-debug.component').then(m => m.AuthFlowDebugComponent),
-    title: 'Depurador de Flujo de Autenticación'
   },
   {
     path: 'pollos',

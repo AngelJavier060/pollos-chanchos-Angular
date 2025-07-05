@@ -10,7 +10,6 @@ import { InventarioComponent } from '../inventario/inventario.component';
 import { PlanNutricionalComponent } from '../plan-nutricional/plan-nutricional.component';
 import { ReportesComponent } from '../reportes/reportes.component';
 import { ProfileComponent } from '../profile/profile.component';
-import { SystemStatusComponent } from '../../shared/components/system-status.component';
 import { AuthGuard } from '../../core/guards/auth.guard';
 import { ERole } from '../../shared/models/role.model';
 
@@ -36,7 +35,6 @@ const routes: Routes = [
       { path: 'plan-nutricional', component: PlanNutricionalComponent, title: 'Plan Nutricional' },
       { path: 'reportes', component: ReportesComponent, title: 'Reportes' },
       { path: 'profile', component: ProfileComponent, title: 'Perfil' },
-      { path: 'diagnostico', component: SystemStatusComponent, title: 'Diagnóstico del Sistema' },
       { 
         path: 'configuracion',
         loadChildren: () => import('../configuracion/configuracion.module').then(m => m.ConfiguracionModule),

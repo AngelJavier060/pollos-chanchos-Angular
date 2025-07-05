@@ -12,7 +12,6 @@ import { takeUntil, finalize } from 'rxjs/operators';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
-import { ApiDiagnosticsService, ApiDiagnosticResult } from '../../shared/services/api-diagnostics.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
 @Component({
@@ -45,7 +44,6 @@ export class UsuariosComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private subscriptions = new Subscription();
 
-  apiStatus: ApiDiagnosticResult | null = null;
   currentUser: User | null = null;
 
   // Exponer el enum ERole para usarlo en la plantilla
@@ -54,7 +52,6 @@ export class UsuariosComponent implements OnInit, OnDestroy {
     private userService: UserService,
     private router: Router,
     private authService: AuthService,
-    private apiDiagnostics: ApiDiagnosticsService,
     private http: HttpClient
   ) {
     // Verificar que tenemos acceso a HttpClient para el método de emergencia
@@ -629,66 +626,6 @@ export class UsuariosComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Verifica el estado de la conexión con la API
-   * Útil para diagnosticar problemas de conectividad
-   */  checkApiStatus(): void {
-    console.log('Verificando estado de la API...');
-    
-    this.apiDiagnostics.checkApiStatus().subscribe({
-      next: (result: ApiDiagnosticResult) => {
-        console.log('Resultado de diagnóstico:', result);
-        this.apiStatus = result;
-        
-        if (!result.authValid) {
-          this.authService.logout();
-          this.router.navigate(['/auth/login/admin']);
-        }
-      },
-      error: (error: HttpErrorResponse) => {
-        console.error('Error al verificar API:', error);
-        this.apiStatus = {
-          serverAvailable: false,
-          apiAvailable: false,
-          authValid: false,
-          error: 'Error al verificar el estado de la API'
-        };
-      }
-    });
-  }
-  
-  /**
-   * Verifica los permisos de administrador
-   */
-  private checkAdminPermissions(): void {
-    this.apiDiagnostics.checkAdminPermissions()
-      .pipe(finalize(() => this.loading = false))
-      .subscribe({
-        next: (result) => {
-          console.log('Resultado verificación de admin:', result);
-          
-          if (result.hasAdminPermission) {
-            this.successMessage = 'Verificación completa: Tienes permisos de administrador. Cargando usuarios...';
-            setTimeout(() => this.loadUsers(), 1000);
-          } else {
-            this.error = `Problema de permisos: ${result.error}`;
-            this.successMessage = '';
-              // Información adicional para desarrollo
-            if (!environment.production) {
-              console.group('Información del Token');
-              console.log('Token actual:', this.authService.getToken()?.substring(0, 20) + '...');
-              console.log('Roles:', this.currentUser?.roles);
-              console.groupEnd();
-            }
-          }
-        },        error: (err: any) => {
-          console.error('Error al verificar permisos de administrador:', err);
-          this.error = 'Error al verificar permisos: ' + (err.message || 'Error desconocido');
-          this.successMessage = '';
-        }
-      });
-  }
-
-  /**
    * Maneja la carga de archivos de imagen para la foto de perfil
    * @param event Evento del input de tipo file
    */
@@ -732,18 +669,6 @@ export class UsuariosComponent implements OnInit, OnDestroy {
     this.selectedFile = null;
     this.userForm.patchValue({
       profilePicture: ''
-    });
-  }
-
-  getDiagnosticInfo(): void {
-    this.apiDiagnostics.getDiagnosticInfo().subscribe({
-      next: (info: any) => {
-        console.log('Información de diagnóstico API');
-        console.log('Informe completo:', info);
-      },
-      error: (error: HttpErrorResponse) => {
-        console.error('Error al obtener información de diagnóstico:', error);
-      }
     });
   }
 

@@ -27,6 +27,11 @@ export class AnimalService {
     );
   }
 
+  // Alias para mantener compatibilidad
+  getAllAnimals(): Observable<Animal[]> {
+    return this.getAnimals();
+  }
+
   createAnimal(animal: Animal): Observable<Animal> {
     return this.http.post<Animal>(this.apiUrl, animal, this.httpOptions).pipe(
       retry(1),

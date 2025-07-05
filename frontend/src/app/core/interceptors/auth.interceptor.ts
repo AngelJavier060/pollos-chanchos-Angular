@@ -7,7 +7,7 @@ import {
 } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { catchError, switchMap, tap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthDirectService } from '../services/auth-direct.service';
@@ -21,21 +21,120 @@ import { AuthDirectService } from '../services/auth-direct.service';
 export class AuthInterceptor implements HttpInterceptor {
   constructor(private authService: AuthDirectService) {}
 
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Math.floor(new Date().getTime() / 1000);
+      console.log('[AuthInterceptor] Token exp:', payload.exp, 'Now:', now, 'Expired:', payload.exp < now);
+      return payload.exp < now;
+    } catch (e) {
+      console.error('[AuthInterceptor] Error decodificando token:', e);
+      return true;
+    }
+  }
+
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     const token = this.authService.getToken();
+    
+    // Lista de rutas públicas que NO necesitan token
+    const publicPaths = [
+      '/api/auth/',
+      '/api/plan-alimentacion/',
+      '/api/public/',
+      '/health',
+      '/uploads/'
+    ];
+    
+    // Verificar si es una ruta pública
+    const isPublicPath = publicPaths.some(path => request.url.includes(path));
 
+    // Solo mostrar logs detallados en desarrollo
+    if (!environment.production) {
+      console.log('[AuthInterceptor] 🔄 Interceptando:', request.method, request.url);
+      console.log('[AuthInterceptor] Es ruta pública:', isPublicPath);
+      console.log('[AuthInterceptor] Token presente:', !!token);
+      console.log('[AuthInterceptor] Usuario:', this.authService.currentUserValue?.username || 'No usuario');
+      
+      if (token) {
+        const isExpired = this.isTokenExpired(token);
+        console.log('[AuthInterceptor] Token expirado:', isExpired);
+        
+        if (isExpired) {
+          console.warn('[AuthInterceptor] ⚠️ TOKEN EXPIRADO - Esto puede causar 401');
+        }
+      }
+    }
+
+    // Si es ruta pública, NO enviar token (evita errores 401)
+    if (isPublicPath) {
+      if (!environment.production) {
+        console.log('[AuthInterceptor] 🟢 SALTANDO token para ruta pública:', request.url);
+      }
+      
+      return next.handle(request).pipe(
+        tap(event => {
+          if (event.type === 4 && !environment.production) { // HttpEventType.Response
+            console.log('[AuthInterceptor] ✅ Respuesta exitosa (ruta pública):', (event as any).status);
+          }
+        }),
+        catchError(error => {
+          console.error('[AuthInterceptor] ❌ Error en ruta pública:', request.url);
+          console.error('[AuthInterceptor] Status:', error.status);
+          return throwError(() => error);
+        })
+      );
+    }
+
+    // Para rutas protegidas, enviar token si existe
     if (token && token.trim() !== '') {
       const authReq = request.clone({
         setHeaders: {
           Authorization: `Bearer ${token}`
         }
       });
-      return next.handle(authReq);
-    } else {
-      if (!token) {
-        console.warn('[AuthInterceptor] No se encontró token JWT para la petición:', request.url);
+      
+      if (!environment.production) {
+        console.log('[AuthInterceptor] 🔑 Agregando header Authorization');
       }
-      return next.handle(request);
+      
+      return next.handle(authReq).pipe(
+        tap(event => {
+          if (event.type === 4 && !environment.production) { // HttpEventType.Response
+            console.log('[AuthInterceptor] ✅ Respuesta exitosa:', (event as any).status);
+          }
+        }),
+        catchError(error => {
+          console.error('[AuthInterceptor] ❌ Error en petición:', request.url);
+          console.error('[AuthInterceptor] Status:', error.status);
+          
+          if (error.status === 401) {
+            console.error('[AuthInterceptor] 🔐 ERROR 401: Token rechazado por el backend');
+            
+            // Verificar si el token está expirado
+            if (token && this.isTokenExpired(token)) {
+              console.error('[AuthInterceptor] 💀 CAUSA: Token expirado');
+            }
+          }
+          
+          return throwError(() => error);
+        })
+      );
+    } else {
+      if (!token && !environment.production) {
+        console.warn('[AuthInterceptor] ⚠️ No se encontró token JWT para:', request.url);
+      }
+      return next.handle(request).pipe(
+        tap(event => {
+          if (event.type === 4 && !environment.production) { // HttpEventType.Response
+            console.log('[AuthInterceptor] ✅ Respuesta exitosa (sin token):', (event as any).status);
+          }
+        }),
+        catchError(error => {
+          console.error('[AuthInterceptor] ❌ Error en petición (sin token):', request.url);
+          console.error('[AuthInterceptor] Status:', error.status);
+          return throwError(() => error);
+        })
+      );
     }
   }
 }

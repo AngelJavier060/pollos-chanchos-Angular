@@ -20,4 +20,4 @@ export class PollosDashboardComponent implements OnInit {
   logout(): void {
     this.authService.logout();
   }
-} 
+}
