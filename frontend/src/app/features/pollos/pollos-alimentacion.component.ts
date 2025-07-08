@@ -183,6 +183,195 @@ export class PollosAlimentacionComponent implements OnInit {
     animalesVivos: 0
   };
 
+  // ========== NUEVO: CONSUMO DIRECTO DEL PLAN NUTRICIONAL DEL ADMINISTRADOR ==========
+  
+  // Variables para mostrar etapas del plan nutricional
+  etapasPlanAdministrador: any[] = [];
+  planActivoAdministrador: any = null;
+  etapasDisponiblesLote: any[] = []; // 🔥 NUEVA: Todas las etapas disponibles para el lote
+  
+  /**
+   * Cargar etapas directamente del plan nutricional del administrador
+   */
+  private async cargarEtapasPlanAdministrador(): Promise<void> {
+    try {
+      console.log('📋 Cargando etapas del plan nutricional del administrador...');
+      
+      // Obtener todos los planes
+      const planes = await this.planService.getAllPlanes().toPromise();
+      
+      console.log('🔍 Planes obtenidos:', planes);
+      
+      if (!planes || planes.length === 0) {
+        console.warn('⚠️ No se encontraron planes nutricionales');
+        return;
+      }
+      
+      // 🔧 SIMPLIFICAR: Buscar el plan "Plan 1-20" específicamente
+      let planSeleccionado = planes.find(plan => 
+        plan.name && plan.name.toLowerCase().includes('1-20')
+      );
+      
+      // Si no encuentra el plan específico, buscar cualquier plan para pollos
+      if (!planSeleccionado) {
+        console.log('🔍 Buscando planes para pollos en general...');
+        
+        // Log todos los planes para depuración
+        planes.forEach((plan, index) => {
+          console.log(`Plan ${index + 1}:`, {
+            id: plan.id,
+            name: plan.name,
+            animal: plan.animal,
+            animalName: plan.animalName,
+            active: plan.active
+          });
+        });
+        
+        planSeleccionado = planes.find(plan => {
+          const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
+          const includes = animalName.includes('pollo') || animalName.includes('pollos');
+          console.log(`🐔 Plan "${plan.name}" - Animal: "${animalName}" - Incluye pollos: ${includes}`);
+          return includes;
+        });
+      }
+      
+      if (!planSeleccionado) {
+        console.warn('⚠️ No se encontraron planes para pollos');
+        // Usar el primer plan disponible como fallback
+        planSeleccionado = planes[0];
+        console.log('🔄 Usando primer plan disponible como fallback:', planSeleccionado?.name);
+      }
+      
+      this.planActivoAdministrador = planSeleccionado;
+      
+      if (this.planActivoAdministrador) {
+        console.log('✅ Plan seleccionado:', {
+          id: this.planActivoAdministrador.id,
+          name: this.planActivoAdministrador.name,
+          active: this.planActivoAdministrador.active
+        });
+        
+        // Obtener las etapas (detalles) del plan
+        const etapas = await this.planService.getDetallesByPlan(this.planActivoAdministrador.id).toPromise();
+        
+        console.log('🔍 Etapas raw del backend:', etapas);
+        
+        if (etapas && etapas.length > 0) {
+          this.etapasPlanAdministrador = etapas.map(etapa => ({
+            id: etapa.id,
+            nombre: `Etapa ${etapa.dayStart}-${etapa.dayEnd} días`,
+            rangoDias: `${etapa.dayStart} - ${etapa.dayEnd}`,
+            diasInicio: etapa.dayStart,
+            diasFin: etapa.dayEnd,
+            alimentoRecomendado: etapa.product?.name || 'No especificado',
+            cantidadPorAnimal: etapa.quantityPerAnimal || 0,
+            unidad: 'kg',
+            frecuencia: etapa.frequency || 'Diaria',
+            observaciones: etapa.instructions || '',
+            productoId: etapa.product?.id
+          }));
+          
+          console.log('✅ Etapas del plan procesadas:', {
+            planNombre: this.planActivoAdministrador.name,
+            totalEtapas: this.etapasPlanAdministrador.length,
+            etapas: this.etapasPlanAdministrador
+          });
+        } else {
+          console.warn('⚠️ El plan no tiene etapas definidas');
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al cargar etapas del plan del administrador:', error);
+    }
+  }
+  
+  /**
+   * Obtener etapa correspondiente según la edad del lote
+   */
+  obtenerEtapaParaLote(diasVida: number): any | null {
+    console.log('🔍 Buscando etapas para lote con', diasVida, 'días de vida');
+    
+    if (!this.etapasPlanAdministrador || this.etapasPlanAdministrador.length === 0) {
+      console.warn('⚠️ No hay etapas del plan del administrador cargadas');
+      console.log('📊 Estado actual:', {
+        etapasPlanAdministrador: this.etapasPlanAdministrador,
+        planActivoAdministrador: this.planActivoAdministrador
+      });
+      return null;
+    }
+    
+    console.log('📋 Etapas disponibles:', this.etapasPlanAdministrador.map(e => ({
+      nombre: e.nombre,
+      diasInicio: e.diasInicio,
+      diasFin: e.diasFin,
+      alimento: e.alimentoRecomendado,
+      cantidad: e.cantidadPorAnimal
+    })));
+    
+    // 🔥 BUSCAR TODAS las etapas que correspondan al rango de días
+    const etapasCorrespondientes = this.etapasPlanAdministrador.filter(etapa => 
+      diasVida >= etapa.diasInicio && diasVida <= etapa.diasFin
+    );
+    
+    if (etapasCorrespondientes.length > 0) {
+      console.log(`🎯 Encontradas ${etapasCorrespondientes.length} etapas para ${diasVida} días:`, 
+        etapasCorrespondientes.map(e => `${e.alimentoRecomendado} (${e.cantidadPorAnimal} kg)`));
+      
+      // Crear información combinada de todas las etapas
+      const alimentosCombinados = etapasCorrespondientes.map(etapa => 
+        `${etapa.alimentoRecomendado} (${etapa.cantidadPorAnimal} kg/animal)`
+      ).join(' + ');
+      
+      const cantidadTotal = etapasCorrespondientes.reduce((total, etapa) => 
+        total + (etapa.cantidadPorAnimal || 0), 0
+      );
+      
+      return {
+        ...etapasCorrespondientes[0], // Usar la primera como base
+        nombre: `Etapa ${etapasCorrespondientes[0].diasInicio}-${etapasCorrespondientes[0].diasFin} días`,
+        alimentoRecomendado: alimentosCombinados,
+        cantidadPorAnimal: cantidadTotal,
+        alimentosIndividuales: etapasCorrespondientes, // Lista completa para el selector
+        esActual: true
+      };
+    }
+    
+    console.warn(`⚠️ No se encontró etapa para ${diasVida} días en las etapas disponibles`);
+    return null;
+  }
+
+  /**
+   * Obtener TODAS las etapas correspondientes al rango de días del lote
+   */
+  obtenerTodasLasEtapasParaLote(diasVida: number): any[] {
+    if (!this.etapasPlanAdministrador || this.etapasPlanAdministrador.length === 0) {
+      console.warn('❌ No hay etapas del plan del administrador cargadas');
+      return [];
+    }
+    
+    const etapasCorrespondientes = this.etapasPlanAdministrador.filter(etapa => 
+      diasVida >= etapa.diasInicio && diasVida <= etapa.diasFin
+    );
+    
+    if (etapasCorrespondientes.length > 0) {
+      console.log(`🎯 ${etapasCorrespondientes.length} etapas encontradas para ${diasVida} días:`, 
+                  etapasCorrespondientes.map(e => e.alimentoRecomendado));
+      return etapasCorrespondientes.map(etapa => ({ ...etapa, esActual: true }));
+    }
+    
+    console.warn(`⚠️ No se encontraron etapas para ${diasVida} días`);
+    return [];
+  }
+
+  /**
+   * Formatear cantidad con 2 decimales
+   */
+  formatearCantidad(cantidad: number): string {
+    if (cantidad == null) return '0.00';
+    return cantidad.toFixed(2);
+  }
+
   constructor(
     private authService: AuthDirectService,
     private loteService: LoteService,
@@ -213,7 +402,8 @@ export class PollosAlimentacionComponent implements OnInit {
       await Promise.all([
         this.cargarLotesPollos(),
         this.cargarInventarioPollos(),
-        this.cargarPlanNutricional()
+        this.cargarPlanNutricional(),
+        this.cargarEtapasPlanAdministrador() // 🔥 NUEVO: Cargar etapas del administrador
       ]);
       
       // Después de cargar todo, actualizar las etapas con el plan integrado
@@ -338,6 +528,13 @@ export class PollosAlimentacionComponent implements OnInit {
    */
   trackByLote(index: number, lote: Lote): number {
     return lote.id || index;
+  }
+
+  /**
+   * TrackBy function para las etapas
+   */
+  trackByEtapa(index: number, etapa: any): any {
+    return etapa.id || index;
   }
 
   /**
@@ -667,14 +864,37 @@ export class PollosAlimentacionComponent implements OnInit {
   private inicializarRegistroCompleto(): void {
     if (!this.loteSeleccionado) return;
     
-    const etapa = this.getEtapaActual(this.loteSeleccionado);
-    const cantidadSugerida = this.getCantidadTotalHoyNum();
+    // 🔥 USAR DATOS DEL PLAN NUTRICIONAL DEL ADMINISTRADOR
+    const diasVida = this.calcularDiasDeVida(this.loteSeleccionado.birthdate);
+    const etapaAdministrador = this.obtenerEtapaParaLote(diasVida);
+    
+    // Calcular cantidad basada en la etapa del administrador
+    let cantidadSugerida = 0;
+    let tipoAlimento = 'Sin alimento definido';
+    
+    if (etapaAdministrador) {
+      // Cantidad = cantidad por animal * número de animales vivos
+      const animalesVivos = this.getAnimalesVivosActuales();
+      cantidadSugerida = etapaAdministrador.cantidadPorAnimal * animalesVivos;
+      tipoAlimento = etapaAdministrador.alimentoRecomendado;
+      
+      console.log('✅ Etapa del administrador encontrada:', {
+        etapa: etapaAdministrador.nombre,
+        diasVida: diasVida,
+        cantidadPorAnimal: etapaAdministrador.cantidadPorAnimal,
+        animalesVivos: animalesVivos,
+        cantidadTotal: cantidadSugerida,
+        alimento: tipoAlimento
+      });
+    } else {
+      console.warn('⚠️ No se encontró etapa del administrador para', diasVida, 'días');
+    }
     
     this.registroCompleto = {
       fecha: this.getSelectedDateString(),
       hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      cantidadAplicada: cantidadSugerida, // Inicializar con la cantidad sugerida
-      tipoAlimento: this.getAlimentoAsignado().toLowerCase(),
+      cantidadAplicada: cantidadSugerida,
+      tipoAlimento: tipoAlimento,
       animalesVivos: this.getAnimalesVivosActuales(),
       animalesMuertos: 0,
       animalesEnfermos: 0,
@@ -693,10 +913,11 @@ export class PollosAlimentacionComponent implements OnInit {
       motivoCierre: ''
     };
     
-    console.log('📝 Registro inicializado:', {
+    console.log('📝 Registro inicializado con datos del administrador:', {
+      diasVida: diasVida,
+      etapa: etapaAdministrador?.nombre || 'Sin etapa',
       cantidadSugerida: cantidadSugerida,
-      alimento: this.getAlimentoAsignado(),
-      etapa: etapa ? this.generarNombreEtapa(etapa) : 'Sin etapa',
+      alimento: tipoAlimento,
       animalesVivos: this.getAnimalesVivosActuales()
     });
   }
@@ -710,6 +931,16 @@ export class PollosAlimentacionComponent implements OnInit {
     console.log('🔥 modalAbierto ANTES:', this.modalAbierto);
     
     this.loteSeleccionado = lote;
+    
+    // Calcular días de vida una sola vez
+    const diasVida = this.calcularDiasDeVida(lote.birthdate);
+    
+    // Obtener etapas disponibles para este lote (una sola vez)
+    this.etapasDisponiblesLote = this.obtenerTodasLasEtapasParaLote(diasVida);
+    this.etapaActualLote = this.obtenerEtapaParaLote(diasVida);
+    
+    console.log('🎯 Etapas calculadas para', diasVida, 'días:', this.etapasDisponiblesLote);
+    console.log('🎯 Etapa actual:', this.etapaActualLote);
     
     // Inicializar el conteo de animales vivos si no existe
     const loteId = lote.id || 0;
@@ -1175,7 +1406,7 @@ export class PollosAlimentacionComponent implements OnInit {
     }
   }
 
-  /**
+  /** 
    * Registrar animales enfermos para seguimiento
    */
   private registrarAnimalesEnfermos(animalesEnfermos: number, observaciones: string): void {
@@ -1190,22 +1421,18 @@ export class PollosAlimentacionComponent implements OnInit {
     // this.saludService.registrarAnimalesEnfermos(...)
   }
 
-  // ✅ MÉTODO ELIMINADO: Métodos duplicados removidos para evitar conflictos
-
   /**
    * Cargar etapas de alimentación integradas del módulo admin
    */
   async cargarEtapasAlimentacion(): Promise<void> {
     try {
-      console.log('� Cargando etapas desde el módulo admin...');
+      console.log('🔄 Cargando etapas desde el módulo admin...');
       
-      // Usar el servicio integrado en lugar de datos hardcodeados
       if (this.planNutricionalActivo?.etapas) {
         this.etapasAlimentacion = this.planNutricionalActivo.etapas.map(etapa => ({
-          id: etapa.id || 0,
           dayStart: etapa.diasEdad.min,
           dayEnd: etapa.diasEdad.max,
-          quantityPerAnimal: etapa.quantityPerAnimal,
+          quantityPerAnimal: etapa.quantityPerAnimal || 0,
           frequency: (etapa.frequency as 'DIARIA' | 'INTERDIARIA' | 'SEMANAL') || 'DIARIA',
           instructions: etapa.instructions || etapa.descripcion,
           product: etapa.producto,
@@ -1281,7 +1508,7 @@ export class PollosAlimentacionComponent implements OnInit {
     if (!lote.id) {
       return;
     }
-
+    
     const diasVida = this.calcularDiasDeVida(lote.birthdate);
     
     // TODO: Implementar servicio para obtener asignaciones de planes
@@ -1316,7 +1543,7 @@ export class PollosAlimentacionComponent implements OnInit {
     }
   }
 
-  /**
+  /** 
    * Generar nombre de etapa basado en el rango de días
    */
   private generarNombreEtapa(detalle: PlanDetalle): string {
@@ -1347,8 +1574,6 @@ export class PollosAlimentacionComponent implements OnInit {
     this.modalData.etapaNombre = this.determinarEtapaLote(lote);
     this.modalData.animalesVivos = lote.quantity;
   }
-
-  // ✅ MÉTODO ELIMINADO: Implementación duplicada removida
 
   /**
    * Obtener lista de productos disponibles para mostrar en la UI
@@ -1468,6 +1693,4 @@ export class PollosAlimentacionComponent implements OnInit {
       console.warn(`⚠️ Lote ${lote.codigo}: ${diasVida} días → No se encontró etapa`);
     }
   }
-
-  // ✅ MÉTODO ELIMINADO: getCicloTotal() ya no es necesario sin la sección de plan completo
 }
