@@ -1,4 +1,69 @@
 <div class="alimentacion-container max-w-7xl mx-auto p-6">
+  <!-- 🔧 BOTÓN DE DIAGNÓSTICO TEMPORAL -->
+  <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+    <h4 class="text-sm font-semibold text-yellow-800 mb-2">🔧 Diagnóstico del Sistema</h4>
+    <div class="flex gap-2 flex-wrap">
+      <button 
+        (click)="mostrarDiagnostico()" 
+        class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+        📋 Ver Datos Actuales
+      </button>
+      <button 
+        (click)="recargarDatos()" 
+        class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+        🔄 Recargar Todo
+      </button>
+      <button 
+        (click)="realizarAnalisisCompleto()" 
+        class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
+        🔍 Análisis Completo
+      </button>
+    </div>
+    <!-- Estado del Sistema -->
+    <div class="mt-3 p-2 bg-white rounded border">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-semibold text-gray-700">Estado del Sistema:</span>
+        <span [class]="estadoSistema.color" class="font-medium">{{ estadoSistema.mensaje }}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <span class="text-gray-500">Lotes:</span> 
+          <span class="font-medium">{{ estadoSistema.lotesCargados }}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">Plan:</span> 
+          <span [class]="estadoSistema.planEncontrado ? 'text-green-600' : 'text-red-600'" class="font-medium">
+            {{ estadoSistema.planEncontrado ? 'Encontrado' : 'No encontrado' }}
+          </span>
+        </div>
+        <div>
+          <span class="text-gray-500">Etapas:</span> 
+          <span [class]="estadoSistema.etapasCubiertas ? 'text-green-600' : 'text-red-600'" class="font-medium">
+            {{ etapasPlanAdministrador?.length || 0 }}
+          </span>
+        </div>
+        <div>
+          <span class="text-gray-500">Problemas:</span> 
+          <span [class]="estadoSistema.problemasDetectados === 0 ? 'text-green-600' : 'text-red-600'" class="font-medium">
+            {{ estadoSistema.problemasDetectados }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="diagnosticoVisible" class="mt-3 text-xs">
+      <div class="bg-white p-2 rounded border">
+        <strong>Plan Encontrado:</strong> {{ planActivoAdministrador?.name || 'Ninguno' }}<br>
+        <strong>Total Etapas:</strong> {{ etapasPlanAdministrador?.length || 0 }}<br>
+        <strong>Lote 01 - Edad:</strong> {{ obtenerEdadLote(1) }} días<br>
+        <strong>Etapa Actual:</strong> {{ obtenerEtapaActual(1)?.nombre || 'No encontrada' }}<br>
+        <div class="mt-2 text-xs text-gray-600">
+          💡 <strong>Tip:</strong> Haz clic en "🔍 Análisis Completo" y abre la consola (F12) para ver un reporte detallado
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Header Minimalista -->
   <div class="header-section mb-8">
     <div class="flex items-center justify-between">
@@ -190,17 +255,28 @@
         <!-- Información del Lote -->
         <div class="mt-4 bg-green-500 bg-opacity-20 rounded-lg p-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p class="text-green-100">Edad del lote</p>
-              <p class="font-bold text-white">{{ calcularDiasDeVida(loteSeleccionado?.birthdate) }} días</p>
+            <!-- Edad del lote (animales) - ÁREA VERDE -->
+            <div class="bg-green-100 border border-green-300 rounded-lg p-3">
+              <p class="text-green-700 font-medium">Edad de Lote</p>
+              <p class="font-bold text-green-900 text-lg">{{ getInfoEdadLote(loteSeleccionado)?.edadTexto }}</p>
+              <p class="text-green-600 text-xs">{{ getInfoEdadLote(loteSeleccionado)?.cantidadTexto }}</p>
+              <p class="text-green-500 text-xs">Actualizado: {{ getInfoEdadLote(loteSeleccionado)?.actualizado }}</p>
             </div>
-            <div>
-              <p class="text-green-100">Animales</p>
-              <p class="font-bold text-white">{{ loteSeleccionado?.quantity }} pollos</p>
+            
+            <!-- Información de Lotes Activos -->
+            <div class="bg-blue-100 border border-blue-300 rounded-lg p-3">
+              <p class="text-blue-700 font-medium">Lotes de Pollos</p>
+              <p class="font-bold text-blue-900 text-lg">{{ lotesActivos.length }} activos</p>
+              <p class="text-blue-600 text-xs">Total: {{ getTotalAnimales() }} pollos</p>
+              <p class="text-blue-500 text-xs">Razas: {{ getRazasActivas() }}</p>
             </div>
-            <div>
-              <p class="text-green-100">Fecha</p>
-              <p class="font-bold text-white">{{ formatearFecha(selectedDate) }}</p>
+            
+            <!-- Fecha del registro -->
+            <div class="bg-gray-100 border border-gray-300 rounded-lg p-3">
+              <p class="text-gray-700 font-medium">Fecha del Registro</p>
+              <p class="font-bold text-gray-900">{{ formatearFecha(selectedDate) }}</p>
+              <p class="text-gray-600 text-xs">Fecha de nacimiento:</p>
+              <p class="text-gray-500 text-xs">{{ getInfoEdadLote(loteSeleccionado)?.fechaNacimiento }}</p>
             </div>
           </div>
         </div>
@@ -213,62 +289,78 @@
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div class="flex items-center space-x-3 mb-3">
             <i class="fas fa-chart-line text-blue-600"></i>
-            <h3 class="font-semibold text-blue-900">Etapa Actual</h3>
+            <h3 class="font-semibold text-blue-900">Etapa Actual del Plan Nutricional</h3>
           </div>
           
-          <!-- Mostrar etapa del plan del administrador -->
-          <!-- ✅ MOSTRAR TODAS LAS ETAPAS DEL RANGO ACTUAL -->
-          <div *ngIf="etapasDisponiblesLote && etapasDisponiblesLote.length > 0" class="space-y-3">
-            
-            <!-- Información del rango -->
+          <!-- Información detallada de la etapa actual -->
+          <div *ngIf="getInfoEtapaActual(loteSeleccionado)?.tieneEtapa; else sinEtapaDefinida">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
               <div>
-                <p class="text-blue-700">Etapa:</p>
-                <p class="font-medium text-blue-900">{{ etapasDisponiblesLote[0].nombre }}</p>
+                <p class="text-blue-700 font-medium">Etapa:</p>
+                <p class="font-bold text-blue-900">{{ getInfoEtapaActual(loteSeleccionado)?.nombre }}</p>
               </div>
               <div>
-                <p class="text-blue-700">Rango de días:</p>
-                <p class="font-medium text-blue-900">{{ etapasDisponiblesLote[0].rangoDias }}</p>
+                <p class="text-blue-700 font-medium">Rango de días:</p>
+                <p class="font-bold text-blue-900">{{ getInfoEtapaActual(loteSeleccionado)?.rangoDias }}</p>
+              </div>
+              <div>
+                <p class="text-blue-700 font-medium">Días actuales:</p>
+                <p class="font-bold text-green-700">{{ getInfoEtapaActual(loteSeleccionado)?.diasVida }} días</p>
+              </div>
+              <div>
+                <p class="text-blue-700 font-medium">Alimento recomendado:</p>
+                <p class="font-bold text-green-800">{{ getInfoEtapaActual(loteSeleccionado)?.alimentoRecomendado }}</p>
               </div>
             </div>
             
-            <!-- Lista de TODOS los alimentos del rango -->
-            <div class="space-y-2">
-              <p class="text-blue-700 font-medium">Alimentos registrados para este rango:</p>
-              <div *ngFor="let etapa of etapasDisponiblesLote; let i = index" 
-                   class="bg-white border border-green-200 rounded-lg p-3 hover:bg-green-50 transition-colors">
-                <div class="flex items-center justify-between">
-                  <div class="flex-1">
-                    <p class="font-semibold text-green-800">{{ etapa.alimentoRecomendado }}</p>
-                    <p class="text-sm text-gray-600">
-                      <i class="fas fa-weight mr-1"></i>
-                      {{ formatearCantidad(etapa.cantidadPorAnimal) }} {{ etapa.unidad }}/animal/día
-                    </p>
-                  </div>
-                  <div class="text-right">
-                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
-                      Opción {{ i + 1 }}
-                    </span>
-                  </div>
+            <!-- Información de cantidad por animal -->
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-green-700 font-medium">Cantidad por animal:</p>
+                  <p class="font-bold text-green-900">
+                    {{ formatearCantidad(getInfoEtapaActual(loteSeleccionado)?.cantidadPorAnimal) }} 
+                    {{ getInfoEtapaActual(loteSeleccionado)?.unidad }}/animal/día
+                  </p>
                 </div>
-                
-                <!-- Observaciones específicas del alimento -->
-                <div *ngIf="etapa.observaciones" class="mt-2 pt-2 border-t border-green-100">
-                  <p class="text-green-700 text-xs italic">
-                    <i class="fas fa-comment mr-1"></i>
-                    {{ etapa.observaciones }}
+                <div class="text-right">
+                  <p class="text-green-600 text-sm">Total sugerido:</p>
+                  <p class="font-bold text-green-800">
+                    {{ formatearCantidad(getInfoEtapaActual(loteSeleccionado)?.cantidadPorAnimal * (loteSeleccionado?.quantity || 0)) }} kg
                   </p>
                 </div>
               </div>
             </div>
+            
+            <!-- Advertencia si la etapa no es exacta -->
+            <div *ngIf="getInfoEtapaActual(loteSeleccionado)?.advertencia" 
+                 class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+              <div class="flex items-center space-x-2">
+                <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                <p class="text-yellow-800 text-sm font-medium">
+                  {{ getInfoEtapaActual(loteSeleccionado)?.advertencia }}
+                </p>
+              </div>
+            </div>
           </div>
           
-          <!-- Si no hay etapas del administrador -->
-          <div *ngIf="!etapasDisponiblesLote || etapasDisponiblesLote.length === 0" class="text-yellow-700">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            No se encontraron etapas configuradas en el plan nutricional para {{ calcularDiasDeVida(loteSeleccionado?.birthdate) }} días
-            <p class="text-xs mt-1">Verifique el plan nutricional en el módulo de administrador</p>
-          </div>
+          <!-- Si no hay etapa definida -->
+          <ng-template #sinEtapaDefinida>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div class="flex items-center space-x-3 mb-2">
+                <i class="fas fa-exclamation-triangle text-red-600"></i>
+                <h4 class="font-semibold text-red-900">Sin Etapa Definida</h4>
+              </div>
+              <p class="text-red-700 mb-2">
+                {{ getInfoEtapaActual(loteSeleccionado)?.mensaje }}
+              </p>
+              <div class="text-red-600 text-sm">
+                <p>• Verifique el plan nutricional en el módulo de administrador</p>
+                <p>• Asegúrese de que existan etapas para {{ getInfoEtapaActual(loteSeleccionado)?.diasVida }} días</p>
+                <p>• Contacte al administrador del sistema si el problema persiste</p>
+              </div>
+            </div>
+          </ng-template>
         </div>
 
         <!-- Formulario de Registro -->

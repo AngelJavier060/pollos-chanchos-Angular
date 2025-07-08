@@ -1,19 +1,23 @@
-// VARIABLES DE DISEÑO PROFESIONAL
-$primary-color: #f59e0b;
-$primary-light: #fbbf24;
-$primary-dark: #d97706;
-$secondary-color: #10b981;
-$accent-color: #6366f1;
-$gray-50: #f9fafb;
-$gray-100: #f3f4f6;
-$gray-200: #e5e7eb;
-$gray-300: #d1d5db;
-$gray-400: #9ca3af;
-$gray-500: #6b7280;
-$gray-600: #4b5563;
-$gray-700: #374151;
-$gray-800: #1f2937;
-$gray-900: #111827;
+// VARIABLES DE DISEÑO PROFESIONAL - PALETA AZUL-TURQUESA
+$primary-color: #7986cb;        // Azul púrpura principal
+$primary-light: #9fa8da;        // Azul púrpura claro
+$primary-dark: #5c6bc0;         // Azul púrpura oscuro
+$secondary-color: #7fbcb3;      // Azul verdoso turquesa
+$secondary-light: #a7d0c9;      // Turquesa claro
+$secondary-dark: #66a599;       // Turquesa oscuro
+$accent-color: #81c784;         // Verde suave como acento
+$accent-light: #a5d6a7;        // Verde claro
+$accent-dark: #66bb6a;         // Verde oscuro
+$gray-50: #f8fafc;
+$gray-100: #f1f5f9;
+$gray-200: #e2e8f0;
+$gray-300: #cbd5e1;
+$gray-400: #94a3b8;
+$gray-500: #64748b;
+$gray-600: #475569;
+$gray-700: #334155;
+$gray-800: #1e293b;
+$gray-900: #0f172a;
 
 // MIXINS PROFESIONALES
 @mixin glass-effect {
@@ -59,9 +63,9 @@ $gray-900: #111827;
     right: 0;
     bottom: 0;
     background-image: 
-      radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(99, 102, 241, 0.05) 0%, transparent 50%);
+      radial-gradient(circle at 20% 80%, rgba(121, 134, 203, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(127, 188, 179, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(129, 199, 132, 0.05) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
@@ -94,9 +98,9 @@ $gray-900: #111827;
     background: linear-gradient(
       to bottom,
       transparent 0%,
-      rgba(245, 158, 11, 0.3) 20%,
-      rgba(245, 158, 11, 0.5) 50%,
-      rgba(245, 158, 11, 0.3) 80%,
+      rgba(121, 134, 203, 0.3) 20%,
+      rgba(121, 134, 203, 0.5) 50%,
+      rgba(121, 134, 203, 0.3) 80%,
       transparent 100%
     );
   }
@@ -129,7 +133,7 @@ $gray-900: #111827;
     left: 0;
     width: 0;
     height: 0;
-    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(121, 134, 203, 0.2) 0%, transparent 70%);
     transform: translate(-50%, -50%);
     border-radius: 50%;
     @include smooth-transition(0.6s);
@@ -148,15 +152,15 @@ $gray-900: #111827;
 
   // Indicador de estado activo
   &.active {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(121, 134, 203, 0.1) 0%, rgba(159, 168, 218, 0.1) 100%);
     border-left: 3px solid $primary-color;
     transform: translateX(2px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    box-shadow: 0 4px 12px rgba(121, 134, 203, 0.2);
 
     .nav-icon {
       background: linear-gradient(135deg, $primary-color, $primary-light);
       color: white;
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      box-shadow: 0 4px 12px rgba(121, 134, 203, 0.3);
     }
   }
 
@@ -201,7 +205,7 @@ $gray-900: #111827;
     left: 0;
     right: 0;
     height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.6), transparent);
+    background: linear-gradient(90deg, transparent, rgba(121, 134, 203, 0.6), transparent);
     @include smooth-transition(0.3s);
     transform: translateX(-100%);
   }
@@ -221,7 +225,7 @@ $gray-900: #111827;
 
   .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
+    background: linear-gradient(90deg, #7fbcb3, #a7d0c9, #66a599);
     border-radius: 12px;
     @include smooth-transition(1s);
     position: relative;
@@ -267,7 +271,7 @@ $gray-900: #111827;
       top: 0;
       bottom: 0;
       width: 0;
-      background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent);
+      background: linear-gradient(90deg, rgba(121, 134, 203, 0.1), transparent);
       @include smooth-transition(0.3s);
     }
 
@@ -283,10 +287,10 @@ $gray-900: #111827;
 
 // ESTILOS PARA ENLACES ACTIVOS DEL ROUTER
 .nav-item.active {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(251, 191, 36, 0.9)) !important;
+  background: linear-gradient(135deg, rgba(121, 134, 203, 0.9), rgba(159, 168, 218, 0.9)) !important;
   color: white !important;
   transform: translateX(4px);
-  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 8px 25px rgba(121, 134, 203, 0.4);
   border-left: 4px solid rgba(255, 255, 255, 0.3);
   
   span {
@@ -312,7 +316,7 @@ $gray-900: #111827;
   
   // Efecto de hover en estado activo
   &:hover {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 1), rgba(251, 191, 36, 1)) !important;
+    background: linear-gradient(135deg, rgba(121, 134, 203, 1), rgba(159, 168, 218, 1)) !important;
     transform: translateX(6px);
   }
 }
@@ -330,7 +334,7 @@ header {
     left: 5%;
     right: 5%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(121, 134, 203, 0.3), transparent);
   }
 }
 
@@ -343,9 +347,9 @@ header {
   
   &:focus {
     background: rgba(255, 255, 255, 0.95);
-    border-color: rgba(245, 158, 11, 0.5);
+    border-color: rgba(121, 134, 203, 0.5);
     box-shadow: 
-      0 0 0 3px rgba(245, 158, 11, 0.1),
+      0 0 0 3px rgba(121, 134, 203, 0.1),
       0 4px 12px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
   }
@@ -375,7 +379,7 @@ header {
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 8px 25px rgba(121, 134, 203, 0.3);
     
     &::before {
       left: 100%;
