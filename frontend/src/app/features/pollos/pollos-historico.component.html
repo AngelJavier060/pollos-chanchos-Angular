@@ -1,0 +1,257 @@
+<!-- Histórico de Lotes Cerrados -->
+<div class="lotes-historico-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">📚 Histórico de Lotes Cerrados</h1>
+      <p class="page-subtitle">Registro completo de lotes finalizados con métricas de rendimiento</p>
+    </div>
+    <div class="header-actions">
+      <button (click)="exportarDatos()" class="btn btn-export">
+        <i class="fas fa-download"></i>
+        Exportar Datos
+      </button>
+    </div>
+  </div>
+
+  <!-- Estadísticas Generales -->
+  <div class="estadisticas-generales">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon bg-blue-500">
+          <i class="fas fa-archive"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().totalLotes }}</h3>
+          <p>Lotes Cerrados</p>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon bg-green-500">
+          <i class="fas fa-dollar-sign"></i>
+        </div>
+        <div class="stat-content">
+          <h3>${{ getEstadisticasGenerales().totalVentas.toFixed(2) }}</h3>
+          <p>Ventas Totales</p>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon bg-yellow-500">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-content">
+          <h3>${{ getEstadisticasGenerales().rentabilidadTotal.toFixed(2) }}</h3>
+          <p>Rentabilidad Total</p>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon bg-red-500">
+          <i class="fas fa-percentage"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().tasaMortalidad.toFixed(1) }}%</h3>
+          <p>Tasa de Mortalidad</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros-container">
+    <div class="filtros-grid">
+      <div class="filtro-group">
+        <label class="filtro-label">🔍 Buscar por código o motivo</label>
+        <input 
+          type="text" 
+          [(ngModel)]="busqueda"
+          placeholder="Ej: POL-2024-001"
+          class="filtro-input">
+      </div>
+      
+      <div class="filtro-group">
+        <label class="filtro-label">📅 Fecha de cierre desde</label>
+        <input 
+          type="date" 
+          [(ngModel)]="filtroFecha"
+          class="filtro-input">
+      </div>
+      
+      <div class="filtro-group">
+        <label class="filtro-label">💰 Rentabilidad</label>
+        <select [(ngModel)]="filtroRentabilidad" class="filtro-select">
+          <option value="">Todas</option>
+          <option value="alta">Alta (≥$1000)</option>
+          <option value="media">Media ($500-$999)</option>
+          <option value="baja">Baja (<$500)</option>
+        </select>
+      </div>
+      
+      <div class="filtro-group">
+        <label class="filtro-label">&nbsp;</label>
+        <button (click)="limpiarFiltros()" class="btn btn-secondary">
+          <i class="fas fa-eraser"></i>
+          Limpiar Filtros
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de Lotes Históricos -->
+  <div class="tabla-historico">
+    <div class="table-header">
+      <h2>📋 Lotes Cerrados ({{ getLotesFiltrados().length }})</h2>
+    </div>
+    
+    <div class="table-responsive">
+      <table class="historico-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Período</th>
+            <th>Duración</th>
+            <th>Animales</th>
+            <th>Ventas</th>
+            <th>Mortalidad</th>
+            <th>Consumo</th>
+            <th>Rentabilidad</th>
+            <th>Supervivencia</th>
+            <th>Motivo Cierre</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let lote of getLotesPaginados(); trackBy: trackByLote" class="table-row">
+            <td class="codigo-cell">
+              <strong>{{ lote.codigo }}</strong>
+            </td>
+            
+            <td class="periodo-cell">
+              <div class="fecha-info">
+                <div class="fecha-inicio">{{ formatearFecha(lote.fechaInicio) }}</div>
+                <div class="fecha-cierre">{{ formatearFecha(lote.fechaCierre) }}</div>
+              </div>
+            </td>
+            
+            <td class="duracion-cell">
+              <span class="duracion-badge">
+                {{ calcularDuracion(lote.fechaInicio, lote.fechaCierre) }} días
+              </span>
+            </td>
+            
+            <td class="animales-cell">
+              <div class="animales-info">
+                <div class="animales-iniciales">
+                  <i class="fas fa-egg text-blue-500"></i>
+                  {{ lote.animalesIniciales }}
+                </div>
+              </div>
+            </td>
+            
+            <td class="ventas-cell">
+              <div class="ventas-info">
+                <div class="cantidad-vendida">
+                  <i class="fas fa-shopping-cart text-green-500"></i>
+                  {{ lote.animalesVendidos }}
+                </div>
+                <div class="valor-venta">
+                  ${{ lote.valorTotalVentas.toFixed(2) }}
+                </div>
+              </div>
+            </td>
+            
+            <td class="mortalidad-cell">
+              <div class="mortalidad-info">
+                <div class="cantidad-muerta">
+                  <i class="fas fa-skull text-red-500"></i>
+                  {{ lote.animalesMuertos }}
+                </div>
+                <div class="porcentaje-mortalidad">
+                  {{ (lote.animalesMuertos / lote.animalesIniciales * 100).toFixed(1) }}%
+                </div>
+              </div>
+            </td>
+            
+            <td class="consumo-cell">
+              <div class="consumo-info">
+                <div class="consumo-total">
+                  {{ lote.consumoTotalAlimento.toFixed(2) }} kg
+                </div>
+                <div class="consumo-promedio">
+                  {{ (lote.consumoTotalAlimento / lote.animalesIniciales).toFixed(2) }} kg/animal
+                </div>
+              </div>
+            </td>
+            
+            <td class="rentabilidad-cell">
+              <div class="rentabilidad-info" [class]="getColorRentabilidad(lote.rentabilidad)">
+                <i [class]="getIconoRentabilidad(lote.rentabilidad)"></i>
+                <div class="rentabilidad-valor">
+                  ${{ lote.rentabilidad.toFixed(2) }}
+                </div>
+              </div>
+            </td>
+            
+            <td class="supervivencia-cell">
+              <div class="supervivencia-info">
+                <div class="progress-bar">
+                  <div class="progress-fill" 
+                       [style.width.%]="calcularTasaSupervivencia(lote.animalesIniciales, lote.animalesMuertos)">
+                  </div>
+                </div>
+                <div class="supervivencia-porcentaje">
+                  {{ calcularTasaSupervivencia(lote.animalesIniciales, lote.animalesMuertos).toFixed(1) }}%
+                </div>
+              </div>
+            </td>
+            
+            <td class="motivo-cell">
+              <span class="motivo-badge">
+                {{ lote.motivoCierre }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Paginación -->
+    <div class="paginacion-container" *ngIf="getTotalPaginas() > 1">
+      <div class="paginacion-info">
+        Mostrando {{ (paginaActual - 1) * itemsPorPagina + 1 }} - 
+        {{ Math.min(paginaActual * itemsPorPagina, getLotesFiltrados().length) }} 
+        de {{ getLotesFiltrados().length }} lotes
+      </div>
+      
+      <div class="paginacion-controles">
+        <button 
+          (click)="cambiarPagina(paginaActual - 1)"
+          [disabled]="paginaActual === 1"
+          class="btn btn-page">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <span class="pagina-actual">
+          {{ paginaActual }} de {{ getTotalPaginas() }}
+        </span>
+        
+        <button 
+          (click)="cambiarPagina(paginaActual + 1)"
+          [disabled]="paginaActual === getTotalPaginas()"
+          class="btn btn-page">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensaje si no hay datos -->
+  <div class="no-data" *ngIf="getLotesFiltrados().length === 0">
+    <div class="no-data-icon">
+      <i class="fas fa-archive"></i>
+    </div>
+    <h3>Sin lotes cerrados</h3>
+    <p>No se encontraron lotes cerrados con los filtros aplicados.</p>
+  </div>
+</div> 

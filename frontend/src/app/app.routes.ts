@@ -46,6 +46,12 @@ export const routes: Routes = [
   { path: 'auth/login', component: LoginComponent, title: 'Iniciar Sesión' },
   { path: 'auth/login/pollos', component: LoginComponent, title: 'Iniciar Sesión Pollos' },
   { path: 'auth/login/chanchos', component: LoginComponent, title: 'Iniciar Sesión Chanchos' },
+  {
+    path: 'profile',
+    loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
+    canActivate: [AuthGuard],
+    title: 'Mi Perfil'
+  },
   { 
     path: '**', 
     redirectTo: '',

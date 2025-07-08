@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compilar Backend Avícola",
+			"type": "shell",
+			"command": "cd backend && mvn clean compile",
+			"group": "build",
+			"isBackground": false
+		}
+	]
+}

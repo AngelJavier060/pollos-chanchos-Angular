@@ -42,6 +42,11 @@ export interface PlanDetalle {
   product: {
     id: number;
     name: string;
+    stock?: number;
+  };
+  animal?: {
+    id: number;
+    name: string;
   };
   quantityPerAnimal: number;
   frequency: 'DIARIA' | 'INTERDIARIA' | 'SEMANAL';
@@ -181,14 +186,56 @@ export class PlanAlimentacionService {
    * Obtener detalles de un plan
    */
   getDetallesByPlan(planId: number): Observable<PlanDetalle[]> {
-    return this.http.get<PlanDetalle[]>(`${this.apiUrl}/${planId}/detalles`);
+    const url = `${this.apiUrl}/${planId}/detalles`;
+    console.log(`🔍 [Service] getDetallesByPlan - URL: ${url}`);
+    console.log(`🔍 [Service] getDetallesByPlan - Plan ID: ${planId}`);
+    
+    return this.http.get<PlanDetalle[]>(url).pipe(
+      tap(response => {
+        console.log(`✅ [Service] getDetallesByPlan - Respuesta recibida:`, response);
+        console.log(`✅ [Service] getDetallesByPlan - Cantidad de detalles: ${response?.length || 0}`);
+        response?.forEach((detalle, index) => {
+          console.log(`  📋 [Service] Detalle ${index + 1}:`, {
+            id: detalle.id,
+            dayStart: detalle.dayStart,
+            dayEnd: detalle.dayEnd,
+            frequency: detalle.frequency,
+            quantityPerAnimal: detalle.quantityPerAnimal,
+            product: detalle.product,
+            animal: detalle.animal,
+            todasLasProps: Object.keys(detalle)
+          });
+        });
+      }),
+      catchError(error => {
+        console.error(`❌ [Service] getDetallesByPlan - Error:`, error);
+        throw error;
+      })
+    );
   }
 
   /**
    * Agregar detalle a un plan
    */
   addDetalleToPlan(planId: number, detalle: PlanDetalle): Observable<PlanDetalle> {
-    return this.http.post<PlanDetalle>(`${this.apiUrl}/${planId}/detalles`, detalle);
+    const url = `${this.apiUrl}/${planId}/detalles`;
+    console.log(`🚀 [Service] addDetalleToPlan - URL: ${url}`);
+    console.log(`🚀 [Service] addDetalleToPlan - Plan ID: ${planId}`);
+    console.log(`🚀 [Service] addDetalleToPlan - Detalle enviado:`, detalle);
+    console.log(`🚀 [Service] addDetalleToPlan - Frequency específico: ${detalle.frequency}`);
+    
+    return this.http.post<PlanDetalle>(url, detalle).pipe(
+      tap(response => {
+        console.log(`✅ [Service] addDetalleToPlan - Respuesta del backend:`, response);
+        console.log(`✅ [Service] addDetalleToPlan - Frequency en respuesta: ${response?.frequency}`);
+        console.log(`✅ [Service] addDetalleToPlan - Animal en respuesta:`, response?.animal);
+        console.log(`✅ [Service] addDetalleToPlan - Quantity en respuesta: ${response?.quantityPerAnimal}`);
+      }),
+      catchError(error => {
+        console.error(`❌ [Service] addDetalleToPlan - Error:`, error);
+        throw error;
+      })
+    );
   }
 
   /**
@@ -278,6 +325,34 @@ export class PlanAlimentacionService {
   }
 
   // ========== MÉTODOS PARA CONSULTA DE ALIMENTACIÓN DIARIA ==========
+
+  /**
+   * ✅ NUEVO: Obtener vista general de TODAS las etapas de TODOS los planes
+   */
+  getVistaGeneralEtapas(): Observable<PlanDetalle[]> {
+    console.log('🔍 Obteniendo vista general de todas las etapas...');
+    return this.http.get<PlanDetalle[]>(`${this.apiUrl}/etapas/vista-general`).pipe(
+      tap(etapas => console.log('✅ Vista general obtenida:', etapas.length, 'etapas')),
+      catchError(error => {
+        console.error('❌ Error obteniendo vista general:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * ✅ NUEVO: Obtener estadísticas generales de etapas
+   */
+  getEstadisticasEtapas(): Observable<any> {
+    console.log('📊 Obteniendo estadísticas de etapas...');
+    return this.http.get<any>(`${this.apiUrl}/etapas/estadisticas`).pipe(
+      tap(stats => console.log('✅ Estadísticas obtenidas:', stats)),
+      catchError(error => {
+        console.error('❌ Error obteniendo estadísticas:', error);
+        throw error;
+      })
+    );
+  }
 
   /**
    * Obtener productos para un día específico

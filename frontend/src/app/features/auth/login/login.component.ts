@@ -164,8 +164,7 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    this.error = 'Probando conexión con el servidor...';
-    
+    // Verificación silenciosa de conexión
     const apiUrl = environment.apiUrl;
     const healthUrl = `${apiUrl}/health`;
     
@@ -174,28 +173,31 @@ export class LoginComponent implements OnInit {
     this.http.get<any>(healthUrl).subscribe({
       next: (response: any) => {
         console.log('Conexión exitosa con el backend:', response);
-        this.error = `El servidor está en línea. Respuesta: ${JSON.stringify(response) || 'OK'}`;
+        // Conexión exitosa - no mostramos mensaje al usuario
+        this.error = '';
       },
       error: (err: any) => {
         console.error('Error al probar conexión:', err);
         if (err.status === 0) {
-          this.error = 'No se pudo conectar con el servidor. Verifique que el backend esté ejecutándose en ' + 
-                        apiUrl;
+          this.error = 'No se pudo conectar con el servidor. Verifique que el backend esté ejecutándose.';
           console.warn('No hay conexión con el backend. Verifique que esté en ejecución con start-backend.bat');
         } else {
-          this.error = `Error ${err.status}: ${err.statusText || 'Desconocido'}`;
+          this.error = `Error de conexión: ${err.statusText || 'Servidor no disponible'}`;
         }
         
+        // Intentar ruta alternativa
         const alternativeUrl = `${apiUrl}/api/health`;
         console.log(`Intentando ruta alternativa: ${alternativeUrl}`);
         
         this.http.get<any>(alternativeUrl).subscribe({
           next: (response: any) => {
             console.log('Conexión exitosa con ruta alternativa:', response);
-            this.error = `El servidor está en línea (ruta alternativa). Respuesta: ${JSON.stringify(response) || 'OK'}`;
+            // Conexión exitosa - limpiamos el mensaje de error
+            this.error = '';
           },
           error: (altErr: any) => {
             console.error('También falló la ruta alternativa:', altErr);
+            // Mantenemos el mensaje de error original
           }
         });
       }

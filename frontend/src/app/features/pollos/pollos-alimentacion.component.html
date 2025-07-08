@@ -1,0 +1,286 @@
+<div class="alimentacion-container max-w-7xl mx-auto p-6">
+  <!-- Header Minimalista -->
+  <div class="header-section mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Alimentación Diaria</h1>
+        <p class="text-gray-600">Gestión simplificada de alimentación</p>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <div class="date-selector bg-white rounded-lg border border-gray-200 px-4 py-2 shadow-sm">
+          <input 
+            type="date" 
+            [value]="getSelectedDateString()"
+            (change)="updateSelectedDate($event)"
+            class="border-none outline-none bg-transparent text-gray-700 font-medium">
+        </div>
+        <button 
+          (click)="cargarDatosIniciales()" 
+          class="refresh-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+    
+    <!-- Fecha e Información del Día -->
+    <div class="date-info mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-blue-100 rounded-lg">
+            <i class="fas fa-calendar-day text-blue-600"></i>
+          </div>
+          <div>
+            <p class="font-semibold text-blue-900">{{ formatearFecha(selectedDate) }}</p>
+            <p class="text-sm text-blue-700">{{ lotesActivos.length }} lotes activos • {{ getTotalAnimales() }} pollos total</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicador de carga -->
+  <div *ngIf="loading" class="flex justify-center items-center py-16">
+    <div class="loading-spinner">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <p class="mt-3 text-gray-600">Cargando lotes...</p>
+    </div>
+  </div>
+
+  <!-- Lotes de Alimentación - Diseño Optimizado -->
+  <div *ngIf="!loading" class="lotes-grid">
+    <div *ngIf="lotesActivos.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      
+      <div *ngFor="let lote of lotesActivos; trackBy: trackByLote" class="lote-card">
+        <!-- Card Principal -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6">
+          
+          <!-- Header del Lote -->
+          <div class="lote-header mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xl font-bold text-gray-900">{{ lote.codigo }}</h3>
+              <span class="status-badge bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                Activo
+              </span>
+            </div>
+            <p class="text-gray-600 font-medium uppercase tracking-wide text-sm">{{ lote.race?.animal?.name || 'POLLOS' }}</p>
+          </div>
+
+          <!-- Información Principal -->
+          <div class="lote-info space-y-3 mb-6">
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Edad:</span>
+              <span class="text-gray-900 font-bold">{{ calcularDiasDeVida(lote.birthdate) }} días</span>
+            </div>
+            
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Cantidad:</span>
+              <span class="text-gray-900 font-bold">{{ lote.quantity }} pollos</span>
+            </div>
+            
+            <div class="info-item flex items-center justify-between" *ngIf="lote.race?.name">
+              <span class="text-gray-600 font-medium">Raza:</span>
+              <span class="text-gray-900 font-semibold text-sm">{{ lote.race.name }}</span>
+            </div>
+          </div>
+
+          <!-- Botón de Acción Principal - Unificado -->
+          <div class="action-section">
+            <button 
+              (click)="abrirModalAlimentacion(lote)"
+              class="action-btn w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105">
+              <i class="fas fa-utensils mr-2"></i>
+              Ingresar Alimentos Diarios
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado Vacío -->
+    <div *ngIf="lotesActivos.length === 0" class="empty-state text-center py-16">
+      <div class="max-w-md mx-auto">
+        <div class="empty-icon mb-6">
+          <i class="fas fa-drumstick-bite text-gray-300 text-6xl"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-700 mb-3">No hay lotes activos</h3>
+        <p class="text-gray-500 mb-6">
+          No se encontraron lotes de pollos activos para registrar alimentación hoy.
+        </p>
+        <button 
+          (click)="cargarDatosIniciales()"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar datos
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Modal de Alimentación Completo -->
+  <div *ngIf="modalAbierto" 
+       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+       style="z-index: 9999 !important;"
+       (click)="cerrarModal()">
+    
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+         (click)="$event.stopPropagation()">
+      
+      <!-- Header del Modal -->
+      <div class="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-xl">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-utensils text-2xl"></i>
+            <div>
+              <h2 class="text-2xl font-bold">Registro de Alimentación</h2>
+              <p class="text-green-100">Lote: {{ loteSeleccionado?.codigo }}</p>
+            </div>
+          </div>
+          <button (click)="cerrarModal()" 
+                  class="text-white hover:text-red-200 transition-colors">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <!-- Información del Lote -->
+        <div class="mt-4 bg-green-500 bg-opacity-20 rounded-lg p-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p class="text-green-100">Edad del lote</p>
+              <p class="font-bold text-white">{{ calcularDiasDeVida(loteSeleccionado?.birthdate) }} días</p>
+            </div>
+            <div>
+              <p class="text-green-100">Animales</p>
+              <p class="font-bold text-white">{{ loteSeleccionado?.quantity }} pollos</p>
+            </div>
+            <div>
+              <p class="text-green-100">Fecha</p>
+              <p class="font-bold text-white">{{ formatearFecha(selectedDate) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido del Modal -->
+      <div class="p-6 space-y-6">
+        
+        <!-- Información de la Etapa Actual -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="flex items-center space-x-3 mb-3">
+            <i class="fas fa-chart-line text-blue-600"></i>
+            <h3 class="font-semibold text-blue-900">Etapa Actual</h3>
+          </div>
+          
+          <div *ngIf="getEtapaActual(loteSeleccionado)" class="space-y-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-blue-700">Etapa:</p>
+                <p class="font-medium text-blue-900">{{ generarNombreEtapa(getEtapaActual(loteSeleccionado)) }}</p>
+              </div>
+              <div>
+                <p class="text-blue-700">Rango de días:</p>
+                <p class="font-medium text-blue-900">{{ getEtapaActual(loteSeleccionado).dayStart }} - {{ getEtapaActual(loteSeleccionado).dayEnd }} días</p>
+              </div>
+              <div>
+                <p class="text-blue-700">Alimento recomendado:</p>
+                <p class="font-medium text-green-800">{{ getEtapaActual(loteSeleccionado).product?.name || 'No especificado' }}</p>
+              </div>
+              <div>
+                <p class="text-blue-700">Cantidad por animal:</p>
+                <p class="font-medium text-green-800">{{ getEtapaActual(loteSeleccionado).quantityPerAnimal || 0 }} kg/día</p>
+              </div>
+            </div>
+          </div>
+          
+          <div *ngIf="!getEtapaActual(loteSeleccionado)" class="text-yellow-700">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            No se encontró etapa configurada para {{ calcularDiasDeVida(loteSeleccionado?.birthdate) }} días
+          </div>
+        </div>
+
+        <!-- Formulario de Registro -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Registro de Alimentación</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Información de Alimentación -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad Total (kg)</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="registroCompleto.cantidadAplicada"
+                  [placeholder]="'Sugerida: ' + calcularCantidadTotal(loteSeleccionado, getEtapaActual(loteSeleccionado))"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Alimento</label>
+                <select [(ngModel)]="registroCompleto.tipoAlimento" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option value="">Seleccionar alimento</option>
+                  <option *ngFor="let producto of productosPollos" [value]="producto.name">
+                    {{ producto.name }} (Stock: {{ producto.quantity }})
+                  </option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+                <textarea 
+                  [(ngModel)]="registroCompleto.observacionesGenerales"
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                </textarea>
+              </div>
+            </div>
+
+            <!-- Información de Animales -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Animales Vivos</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="registroCompleto.animalesVivos"
+                  [value]="loteSeleccionado?.quantity"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Animales Muertos</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="registroCompleto.animalesMuertos"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Animales Enfermos</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="registroCompleto.animalesEnfermos"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+          <button (click)="cerrarModal()" 
+                  class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancelar
+          </button>
+          <button (click)="registrarAlimentacionCompleta()" 
+                  class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+            <i class="fas fa-save mr-2"></i>
+            Registrar Alimentación
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

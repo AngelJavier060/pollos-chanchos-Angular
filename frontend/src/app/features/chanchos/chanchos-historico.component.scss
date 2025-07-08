@@ -1,0 +1,241 @@
+// Estilos específicos para el histórico de chanchos
+.dashboard-header {
+  margin-bottom: 1.5rem;
+  
+  img {
+    border: 4px solid theme('colors.pink.400');
+    border-radius: 50%;
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: theme('colors.pink.700');
+    margin-bottom: 0.25rem;
+  }
+  
+  p {
+    color: theme('colors.gray.600');
+    font-size: 0.875rem;
+  }
+}
+
+// Animación de carga
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// Estilos para las tarjetas de estadísticas
+.estadisticas-card {
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+  .icon-container {
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    
+    i {
+      font-size: 1.25rem;
+    }
+  }
+  
+  .stat-value {
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+}
+
+// Estilos para la tabla
+.historico-table {
+  .table-header {
+    background: linear-gradient(135deg, theme('colors.pink.50'), theme('colors.pink.100'));
+    border-bottom: 1px solid theme('colors.pink.200');
+    padding: 1rem 1.5rem;
+    
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: theme('colors.pink.700');
+      
+      i {
+        margin-right: 0.5rem;
+      }
+    }
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    th {
+      background-color: theme('colors.gray.50');
+      padding: 0.75rem 1.5rem;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: theme('colors.gray.500');
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    td {
+      padding: 1rem 1.5rem;
+      white-space: nowrap;
+      font-size: 0.875rem;
+      border-bottom: 1px solid theme('colors.gray.200');
+    }
+    
+    tr:hover {
+      background-color: theme('colors.gray.50');
+    }
+  }
+}
+
+// Estilos para indicadores de progreso
+.progress-bar {
+  width: 4rem;
+  height: 0.5rem;
+  background-color: theme('colors.gray.200');
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-right: 0.5rem;
+  
+  .progress-fill {
+    height: 100%;
+    background-color: theme('colors.red.500');
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+}
+
+// Estilos para badges y etiquetas
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  &.badge-blue {
+    background-color: theme('colors.blue.100');
+    color: theme('colors.blue.800');
+  }
+  
+  &.badge-gray {
+    background-color: theme('colors.gray.100');
+    color: theme('colors.gray.800');
+  }
+}
+
+// Estilos para iconos en celdas
+.cell-icon {
+  margin-right: 0.25rem;
+  font-size: 0.75rem;
+  
+  &.icon-green { color: theme('colors.green.500'); }
+  &.icon-blue { color: theme('colors.blue.500'); }
+  &.icon-red { color: theme('colors.red.500'); }
+  &.icon-pink { color: theme('colors.pink.500'); }
+}
+
+// Estilos para valores monetarios
+.money-value {
+  font-weight: 500;
+  
+  &.positive { color: theme('colors.green.600'); }
+  &.negative { color: theme('colors.red.600'); }
+  &.neutral { color: theme('colors.yellow.600'); }
+}
+
+// Estilos para estados vacíos
+.empty-state {
+  text-align: center;
+  padding: 3rem 0;
+  
+  .empty-icon {
+    color: theme('colors.gray.400');
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: theme('colors.gray.600');
+    margin-bottom: 0.5rem;
+  }
+  
+  p {
+    color: theme('colors.gray.500');
+    font-size: 0.875rem;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    text-align: center;
+    
+    img {
+      margin-bottom: 1rem;
+    }
+  }
+  
+  .estadisticas-card {
+    .stat-value {
+      font-size: 1.5rem;
+    }
+  }
+  
+  .historico-table {
+    .table-header {
+      padding: 0.75rem 1rem;
+      
+      h3 {
+        font-size: 1.125rem;
+      }
+    }
+    
+    table {
+      th, td {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+      }
+    }
+  }
+}
+
+// Utilidades adicionales
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shadow-hover {
+  transition: box-shadow 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+} 

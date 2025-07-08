@@ -1,0 +1,392 @@
+<div class="modal-overlay" *ngIf="modalAbierto" (click)="cerrarModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    
+    <!-- Header -->
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-edit"></i>
+        Corregir Registro de Alimentación
+      </h3>
+      <button class="close-btn" (click)="cerrarModal()">×</button>
+    </div>
+
+    <!-- Información del registro original -->
+    <div class="registro-info" *ngIf="registroSeleccionado">
+      <h4>📋 Información Original</h4>
+      <div class="info-grid">
+        <div class="info-item">
+          <label>Fecha:</label>
+          <span>{{ registroSeleccionado.fecha | date:'dd/MM/yyyy' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Lote:</label>
+          <span>{{ registroSeleccionado.loteId }}</span>
+        </div>
+        <div class="info-item">
+          <label>Cantidad Original:</label>
+          <span>{{ registroSeleccionado.cantidadOriginal || registroSeleccionado.cantidad }} kg</span>
+        </div>
+        <div class="info-item">
+          <label>Observaciones:</label>
+          <span>{{ registroSeleccionado.observaciones || 'Sin observaciones' }}</span>
+        </div>
+      </div>
+
+      <!-- Historial de cambios si existe -->
+      <div *ngIf="registroSeleccionado.editado" class="historial-previo">
+        <h5>📜 Historial de Cambios</h5>
+        <div class="historial-item" *ngFor="let cambio of historialRegistro">
+          <span class="fecha">{{ cambio.fechaCambio | date:'dd/MM/yyyy HH:mm' }}</span>
+          <span class="campo">{{ cambio.campoModificado }}</span>
+          <span class="cambio">{{ cambio.valorAnterior }} → {{ cambio.valorNuevo }}</span>
+          <span class="motivo">{{ cambio.motivo }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario de corrección -->
+    <form (ngSubmit)="aplicarCorreccion()" #correccionForm="ngForm">
+      
+      <!-- Nueva cantidad -->
+      <div class="form-group">
+        <label for="nuevaCantidad">
+          <i class="fas fa-weight"></i>
+          Nueva Cantidad (kg)
+        </label>
+        <input 
+          type="number" 
+          id="nuevaCantidad"
+          name="nuevaCantidad"
+          class="form-control"
+          [(ngModel)]="correccionData.nuevaCantidad"
+          step="0.01"
+          min="0"
+          required
+          #cantidadInput="ngModel">
+        
+        <!-- Validación en tiempo real -->
+        <div class="validacion-info" *ngIf="cantidadInput.value">
+          <div class="validacion-item" [ngClass]="getValidacionClass()">
+            <i [class]="getValidacionIcon()"></i>
+            <span>{{ mensajeValidacion }}</span>
+          </div>
+          
+          <!-- Comparación con cantidad original -->
+          <div class="comparacion">
+            <span class="original">Original: {{ registroSeleccionado?.cantidad }} kg</span>
+            <span class="diferencia" [ngClass]="getDiferenciaClass()">
+              Diferencia: {{ getDiferencia() }} kg
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nuevas observaciones -->
+      <div class="form-group">
+        <label for="nuevasObservaciones">
+          <i class="fas fa-comment"></i>
+          Observaciones (opcional)
+        </label>
+        <textarea 
+          id="nuevasObservaciones"
+          name="nuevasObservaciones"
+          class="form-control"
+          [(ngModel)]="correccionData.nuevasObservaciones"
+          rows="3"
+          placeholder="Observaciones adicionales..."></textarea>
+      </div>
+
+      <!-- Motivo de corrección (obligatorio) -->
+      <div class="form-group">
+        <label for="motivoCorreccion">
+          <i class="fas fa-exclamation-triangle"></i>
+          Motivo de la Corrección *
+        </label>
+        <select 
+          id="motivoCorreccion"
+          name="motivoCorreccion"
+          class="form-control"
+          [(ngModel)]="correccionData.motivoCorreccion"
+          required>
+          <option value="">Seleccionar motivo...</option>
+          <option value="error_pesaje">Error en el pesaje</option>
+          <option value="producto_incorrecto">Producto incorrecto</option>
+          <option value="cantidad_incorrecta">Cantidad incorrecta registrada</option>
+          <option value="observaciones_faltantes">Faltaron observaciones</option>
+          <option value="error_calculo">Error de cálculo</option>
+          <option value="otro">Otro motivo</option>
+        </select>
+        
+        <!-- Campo para motivo personalizado -->
+        <textarea 
+          *ngIf="correccionData.motivoCorreccion === 'otro'"
+          name="motivoPersonalizado"
+          class="form-control mt-2"
+          [(ngModel)]="correccionData.motivoPersonalizado"
+          placeholder="Especifique el motivo..."
+          required></textarea>
+      </div>
+
+      <!-- Confirmación de impacto en stock -->
+      <div class="impacto-stock" *ngIf="tieneImpactoStock()">
+        <h5>
+          <i class="fas fa-warehouse"></i>
+          Impacto en Stock
+        </h5>
+        <div class="impacto-detalle">
+          <div class="impacto-item">
+            <span>Stock actual:</span>
+            <span>{{ stockActual }} kg</span>
+          </div>
+          <div class="impacto-item">
+            <span>Ajuste necesario:</span>
+            <span [ngClass]="getAjusteClass()">{{ getAjusteStock() }} kg</span>
+          </div>
+          <div class="impacto-item">
+            <span>Stock después del ajuste:</span>
+            <span>{{ getStockDespuesAjuste() }} kg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="modal-actions">
+        <button 
+          type="button" 
+          class="btn btn-secondary" 
+          (click)="cerrarModal()">
+          <i class="fas fa-times"></i>
+          Cancelar
+        </button>
+        
+        <button 
+          type="submit" 
+          class="btn btn-primary"
+          [disabled]="!correccionForm.valid || validandoCantidad">
+          <i class="fas fa-save"></i>
+          <span *ngIf="!validandoCantidad">Aplicar Corrección</span>
+          <span *ngIf="validandoCantidad">Validando...</span>
+        </button>
+      </div>
+
+      <!-- Advertencias -->
+      <div class="advertencias" *ngIf="tieneAdvertencias()">
+        <div class="advertencia-item" *ngFor="let advertencia of advertencias">
+          <i [class]="advertencia.icono"></i>
+          <span>{{ advertencia.mensaje }}</span>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Estilos del modal -->
+<style>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 0;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.registro-info {
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #eee;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item label {
+  font-weight: bold;
+  color: #666;
+  font-size: 12px;
+}
+
+.info-item span {
+  color: #333;
+  font-size: 14px;
+}
+
+.form-group {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.validacion-info {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  background: #f8f9fa;
+}
+
+.validacion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.validacion-item.success { color: #28a745; }
+.validacion-item.warning { color: #ffc107; }
+.validacion-item.error { color: #dc3545; }
+
+.comparacion {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+}
+
+.diferencia.positiva { color: #28a745; }
+.diferencia.negativa { color: #dc3545; }
+
+.impacto-stock {
+  padding: 20px;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.impacto-detalle {
+  margin-top: 10px;
+}
+
+.impacto-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+  border-top: 1px solid #eee;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advertencias {
+  padding: 20px;
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+}
+
+.advertencia-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #721c24;
+}
+
+.historial-previo {
+  margin-top: 15px;
+  padding: 15px;
+  background: #e9ecef;
+  border-radius: 4px;
+}
+
+.historial-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.historial-item:last-child {
+  border-bottom: none;
+}
+</style>

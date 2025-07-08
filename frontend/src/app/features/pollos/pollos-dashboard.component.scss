@@ -1,3 +1,598 @@
+// VARIABLES DE DISEÑO PROFESIONAL
+$primary-color: #f59e0b;
+$primary-light: #fbbf24;
+$primary-dark: #d97706;
+$secondary-color: #10b981;
+$accent-color: #6366f1;
+$gray-50: #f9fafb;
+$gray-100: #f3f4f6;
+$gray-200: #e5e7eb;
+$gray-300: #d1d5db;
+$gray-400: #9ca3af;
+$gray-500: #6b7280;
+$gray-600: #4b5563;
+$gray-700: #374151;
+$gray-800: #1f2937;
+$gray-900: #111827;
+
+// MIXINS PROFESIONALES
+@mixin glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@mixin hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
+}
+
+@mixin smooth-transition($duration: 0.3s) {
+  transition: all $duration cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@mixin gradient-text($color1, $color2) {
+  background: linear-gradient(135deg, $color1, $color2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// COMPONENTE PRINCIPAL
+.pollos-dashboard-layout {
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  letter-spacing: -0.01em;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  position: relative;
+
+  // Patrón de fondo sutil
+  &::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(99, 102, 241, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+// SIDEBAR ULTRA PROFESIONAL
+.sidebar {
+  @include smooth-transition(0.4s);
+  position: relative;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  
+  // Efectos de borde
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(245, 158, 11, 0.3) 20%,
+      rgba(245, 158, 11, 0.5) 50%,
+      rgba(245, 158, 11, 0.3) 80%,
+      transparent 100%
+    );
+  }
+
+  // Estados de hover para toda la sidebar
+  &:hover {
+    .nav-item {
+      &:not(:hover) {
+        opacity: 0.7;
+      }
+    }
+  }
+
+  // Animación de entrada
+  animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// NAVEGACIÓN PROFESIONAL
+.nav-item {
+  @include smooth-transition(0.25s);
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  
+  // Efecto de onda al hacer hover
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    @include smooth-transition(0.6s);
+    z-index: 0;
+  }
+
+  &:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  // Indicador de estado activo
+  &.active {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
+    border-left: 3px solid $primary-color;
+    transform: translateX(2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+
+    .nav-icon {
+      background: linear-gradient(135deg, $primary-color, $primary-light);
+      color: white;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+  }
+
+  // Efectos de hover mejorados
+  &:hover {
+    transform: translateX(4px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    
+    .nav-icon {
+      transform: rotate(5deg) scale(1.05);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+// ICONOS DE NAVEGACIÓN
+.nav-icon {
+  @include smooth-transition(0.3s);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  
+  i {
+    @include smooth-transition(0.2s);
+  }
+}
+
+// ESTADÍSTICAS EN TIEMPO REAL
+.stat-card {
+  @include glass-effect;
+  @include hover-lift;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.6), transparent);
+    @include smooth-transition(0.3s);
+    transform: translateX(-100%);
+  }
+
+  &:hover::before {
+    transform: translateX(100%);
+  }
+}
+
+// BARRA DE PROGRESO AVANZADA
+.progress-bar {
+  position: relative;
+  background: $gray-200;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 8px;
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
+    border-radius: 12px;
+    @include smooth-transition(1s);
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.4) 45%, 
+        rgba(255, 255, 255, 0.8) 50%, 
+        rgba(255, 255, 255, 0.4) 55%, 
+        transparent 100%
+      );
+      animation: shimmer 2s ease-in-out infinite;
+    }
+  }
+}
+
+// DROPDOWN MEJORADO
+.dropdown-menu {
+  @include glass-effect;
+  border-radius: 16px;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  animation: dropIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top right;
+
+  .dropdown-item {
+    @include smooth-transition(0.2s);
+    position: relative;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent);
+      @include smooth-transition(0.3s);
+    }
+
+    &:hover::before {
+      width: 100%;
+    }
+
+    &:hover {
+      transform: translateX(4px);
+    }
+  }
+}
+
+// ESTILOS PARA ENLACES ACTIVOS DEL ROUTER
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(251, 191, 36, 0.9)) !important;
+  color: white !important;
+  transform: translateX(4px);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+  border-left: 4px solid rgba(255, 255, 255, 0.3);
+  
+  span {
+    color: white !important;
+  }
+  
+  // Iconos y divs dentro del enlace activo
+  div {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    
+    i {
+      color: white !important;
+    }
+  }
+  
+  // Badges y badges numéricos
+  .bg-green-500, .bg-blue-500, .bg-red-500, .bg-yellow-500 {
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  // Efecto de hover en estado activo
+  &:hover {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 1), rgba(251, 191, 36, 1)) !important;
+    transform: translateX(6px);
+  }
+}
+
+// HEADER MEJORADO
+header {
+  @include glass-effect;
+  backdrop-filter: blur(20px);
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+  }
+}
+
+// BÚSQUEDA AVANZADA
+.search-input {
+  @include smooth-transition(0.3s);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  
+  &:focus {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 
+      0 0 0 3px rgba(245, 158, 11, 0.1),
+      0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+}
+
+// BOTONES PROFESIONALES
+.btn-professional {
+  @include smooth-transition(0.25s);
+  position: relative;
+  background: linear-gradient(135deg, $primary-color, $primary-light);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    @include smooth-transition(0.5s);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);
+    
+    &::before {
+      left: 100%;
+    }
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// NOTIFICACIONES
+.notification-badge {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  color: white;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+// INDICADORES DE ESTADO
+.status-indicator {
+  position: relative;
+  
+  &.online::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, #10b981, #34d399);
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+// ANIMACIONES PROFESIONALES
+@keyframes slideInLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes dropIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.5);
+  }
+}
+
+// ESTADOS ESPECIALES
+.loading-shimmer {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.success-glow {
+  animation: glow 3s ease-in-out;
+}
+
+// RESPONSIVIDAD AVANZADA
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    position: fixed;
+    z-index: 1000;
+    
+    &.open {
+      transform: translateX(0);
+    }
+  }
+  
+  .pollos-dashboard-layout {
+    &::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      @include smooth-transition(0.3s);
+    }
+    
+    &.sidebar-open::before {
+      opacity: 1;
+      pointer-events: all;
+    }
+  }
+}
+
+// MODO OSCURO (PREPARADO PARA FUTURO)
+@media (prefers-color-scheme: dark) {
+  .sidebar {
+    background: linear-gradient(145deg, #1f2937 0%, #111827 100%);
+    color: #f9fafb;
+    
+    .nav-item {
+      color: #e5e7eb;
+      
+      &:hover {
+        background: rgba(55, 65, 81, 0.5);
+        color: #f9fafb;
+      }
+    }
+  }
+}
+
+// EFECTOS DE MICROFEEDBACK
+.micro-interaction {
+  @include smooth-transition(0.15s);
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// TOOLTIPS PROFESIONALES
+.tooltip {
+  @include glass-effect;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray-700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// SCROLL PERSONALIZADO
+.sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.3) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.1));
+    border-radius: 10px;
+    @include smooth-transition(0.3s);
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, rgba(245, 158, 11, 0.5), rgba(245, 158, 11, 0.3));
+  }
+}
+
 .pollos-dashboard {
   h1 {
     color: #388e3c;
@@ -24,4 +619,642 @@
   table td {
     border-bottom: 1px solid #fef9c3;
   }
-} 
+}
+
+// ESTILOS PARA ALIMENTACIÓN OPTIMIZADA
+.alimentacion-container {
+  .header-section {
+    .date-selector {
+      @include smooth-transition;
+      
+      &:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+    }
+    
+    .refresh-btn {
+      @include smooth-transition;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      }
+      
+      &:active {
+        transform: translateY(0);
+      }
+    }
+    
+    .date-info {
+      @include smooth-transition;
+      border-left: 4px solid #3b82f6;
+      
+      &:hover {
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        transform: translateX(4px);
+      }
+    }
+  }
+  
+  .loading-spinner {
+    text-align: center;
+    
+    .animate-spin {
+      margin: 0 auto;
+    }
+  }
+}
+
+// TARJETAS DE LOTES OPTIMIZADAS
+.lotes-grid {
+  .lote-card {
+    @include smooth-transition(0.25s);
+    height: fit-content;
+    
+    &:hover {
+      transform: translateY(-4px) scale(1.02);
+    }
+    
+    .lote-header {
+      .status-badge {
+        @include smooth-transition;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        
+        &:hover {
+          transform: scale(1.05);
+        }
+      }
+    }
+    
+    .lote-info {
+      .info-item {
+        @include smooth-transition;
+        padding: 8px 0;
+        border-bottom: 1px solid transparent;
+        
+        &:hover {
+          border-bottom-color: #e5e7eb;
+          padding-left: 8px;
+        }
+      }
+    }
+    
+    .feeding-info {
+      @include smooth-transition;
+      position: relative;
+      overflow: hidden;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+        transition: left 0.5s ease;
+      }
+      
+      &:hover::before {
+        left: 100%;
+      }
+    }
+    
+    .action-section {
+      .action-btn {
+        @include smooth-transition(0.2s);
+        position: relative;
+        overflow: hidden;
+        
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          transition: left 0.4s ease;
+        }
+        
+        &:hover {
+          box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+          
+          &::before {
+            left: 100%;
+          }
+        }
+        
+        &:active {
+          transform: scale(0.98);
+        }
+      }
+    }
+  }
+}
+
+// ESTADO VACÍO
+.empty-state {
+  .empty-icon {
+    @include smooth-transition;
+    
+    &:hover {
+      transform: scale(1.1) rotate(5deg);
+    }
+  }
+}
+
+// ESTILOS PARA MODAL DE ALIMENTACIÓN MEJORADO
+.modal-overlay {
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out;
+  
+  .modal-content {
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    @include smooth-transition;
+    
+    .modal-header {
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      border-bottom: 1px solid #e2e8f0;
+      
+      h3 {
+        color: $gray-900;
+      }
+      
+      button {
+        @include smooth-transition;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
+        &:hover {
+          background: #fee2e2;
+          color: #dc2626;
+          transform: scale(1.1);
+        }
+      }
+    }
+    
+    .modal-body {
+      // Estilos para el grid de dos columnas
+      .form-column {
+        .form-section {
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 1.5rem;
+          @include smooth-transition;
+          
+          &:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          }
+          
+          h4 {
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            color: $gray-800;
+            
+            i {
+              margin-right: 0.5rem;
+              font-size: 1.25rem;
+            }
+          }
+          
+          // Estilos para campos de solo lectura
+          .bg-orange-100,
+          .bg-green-50,
+          .bg-gray-50 {
+            font-weight: 600;
+            text-align: center;
+            @include smooth-transition;
+            
+            &:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+          }
+          
+          // Inputs y textareas
+          input, textarea, select {
+            @include smooth-transition;
+            
+            &:focus {
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+            }
+            
+            &:disabled, &[readonly] {
+              background: #f9fafb;
+              color: #6b7280;
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+      
+      // Columna de información
+      .info-column {
+        .form-section {
+          background: rgba(255, 255, 255, 0.7);
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 1.5rem;
+          @include smooth-transition;
+          
+          &:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          }
+          
+          h4 {
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            color: $gray-800;
+            
+            i {
+              margin-right: 0.5rem;
+              font-size: 1.25rem;
+            }
+          }
+          
+          h5 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #7c3aed;
+            margin-bottom: 0.75rem;
+          }
+          
+          // Estilos para las métricas
+          .space-y-2 > div {
+            @include smooth-transition;
+            padding: 0.25rem 0;
+            
+            &:hover {
+              background: rgba(124, 58, 237, 0.05);
+              border-radius: 6px;
+              padding: 0.25rem 0.5rem;
+              margin: 0 -0.5rem;
+            }
+            
+            span:first-child {
+              color: #6b46c1;
+            }
+            
+            span:last-child {
+              color: #5b21b6;
+              font-weight: 700;
+            }
+          }
+        }
+      }
+    }
+    
+    .modal-footer {
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      
+      button {
+        @include smooth-transition;
+        font-weight: 600;
+        
+        &:hover {
+          transform: translateY(-1px);
+        }
+        
+        &:active {
+          transform: translateY(0);
+        }
+        
+        &:first-child:hover {
+          background: #d1d5db;
+        }
+        
+        &:last-child:hover {
+          box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+        }
+        
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          transform: none !important;
+        }
+      }
+    }
+  }
+}
+
+// ESTILOS ESPECÍFICOS PARA EL HISTORIAL
+.historial-registro {
+  .max-h-64 {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f9fafb;
+    
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #f9fafb;
+      border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+      
+      &:hover {
+        background: #9ca3af;
+      }
+    }
+  }
+  
+  .bg-white {
+    @include smooth-transition;
+    
+    &:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+      border-color: #93c5fd !important;
+    }
+    
+    h6 {
+      color: #1e40af;
+      font-weight: 700;
+    }
+    
+    .text-sm {
+      color: #3730a3;
+    }
+    
+    .text-xs {
+      color: #4338ca;
+    }
+  }
+}
+
+// ESTILOS PARA ALERTAS DE STOCK
+.stock-alert {
+  .bg-red-50 {
+    @include smooth-transition;
+    animation: pulseAlert 2s ease-in-out infinite;
+    
+    &:hover {
+      background: #fef2f2 !important;
+      transform: scale(1.02);
+    }
+    
+    i {
+      animation: bounce 1s ease-in-out infinite;
+    }
+  }
+}
+
+// ESTILOS PARA CAMPOS DE INFORMACIÓN
+.info-field {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 8px;
+  @include smooth-transition;
+  
+  &:hover {
+    background: linear-gradient(135deg, #fde68a, #fcd34d);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  }
+}
+
+// ESTILOS PARA CAMPOS DE ANIMALES VIVOS
+.animales-vivos-field {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border: 2px solid #22c55e;
+  color: #15803d;
+  font-weight: 700;
+  font-size: 1.125rem;
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 8px;
+  @include smooth-transition;
+  
+  &:hover {
+    background: linear-gradient(135deg, #bbf7d0, #86efac);
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+  }
+}
+
+// ANIMACIONES ESPECÍFICAS
+@keyframes pulseAlert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+// ANIMACIONES ORIGINALES
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// RESPONSIVE DESIGN PARA ALIMENTACIÓN
+@media (max-width: 768px) {
+  .alimentacion-container {
+    padding: 1rem;
+    
+    .header-section {
+      .flex {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+      }
+      
+      .date-info {
+        .flex {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+      }
+    }
+    
+    .lotes-grid {
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .alimentacion-container {
+    .lote-card {
+      .lote-info {
+        .info-item {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.25rem;
+        }
+      }
+    }
+  }
+}
+
+// RESPONSIVE PARA EL MODAL MEJORADO
+@media (max-width: 1024px) {
+  .modal-overlay {
+    .modal-content {
+      max-width: 95vw;
+      
+      .modal-body {
+        .grid {
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 0.5rem;
+    
+    .modal-content {
+      max-width: 100vw;
+      max-height: 95vh;
+      
+      .modal-body {
+        padding: 1rem;
+        
+        .form-section {
+          padding: 1rem;
+        }
+        
+        .grid {
+          gap: 1rem;
+        }
+      }
+      
+      .modal-footer {
+        padding: 1rem;
+        
+        .flex {
+          flex-direction: column;
+          gap: 0.75rem;
+          
+          button {
+            width: 100%;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    .modal-content {
+      .modal-header {
+        padding: 1rem;
+        
+        h3 {
+          font-size: 1.25rem;
+        }
+      }
+      
+      .modal-body {
+        .form-section {
+          h4 {
+            font-size: 1rem;
+          }
+          
+          .grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+          }
+        }
+        
+        .info-column {
+          .space-y-2 > div {
+            font-size: 0.875rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+// ESTADOS DE CARGA
+.loading-state {
+  .skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+  }
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Estilos optimizados - histórico movido a archivo separado */ 

@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Routes } from '@angular/router';
-import { ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 
 import { AdminComponent } from './admin.component';
 import { DashboardComponent } from '../dashboard/dashboard.component';
@@ -50,7 +50,8 @@ const routes: Routes = [
   imports: [
     CommonModule,
     RouterModule.forChild(routes),
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    FormsModule
     // AdminComponent es un componente standalone y no debe importarse aquí
   ]
 })

@@ -3,16 +3,15 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule]
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, HttpClientModule]
 })
 export class ProfileComponent implements OnInit {
   profileForm: FormGroup;
@@ -26,7 +25,7 @@ export class ProfileComponent implements OnInit {
   showSecretKey = false;
   currentUserId: number | null = null;
 
-  constructor(private fb: FormBuilder, private authService: AuthDirectService, private http: HttpClient, private snackBar: MatSnackBar) {
+  constructor(private fb: FormBuilder, private authService: AuthDirectService, private http: HttpClient) {
     this.profileForm = this.fb.group({
       nombre: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
@@ -127,11 +126,11 @@ export class ProfileComponent implements OnInit {
             user.phone = updateData.phone;
             localStorage.setItem('currentUser', JSON.stringify(user));
           }
-          this.snackBar.open('Perfil actualizado correctamente', 'Cerrar', { duration: 3000, panelClass: 'snackbar-success' });
+          alert('Perfil actualizado correctamente');
         },
         error: (err) => {
           this.loading = false;
-          this.snackBar.open('Error al actualizar el perfil', 'Cerrar', { duration: 3000, panelClass: 'snackbar-error' });
+          alert('Error al actualizar el perfil');
         }
       });
     }

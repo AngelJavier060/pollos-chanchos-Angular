@@ -39,14 +39,16 @@ export class AuthInterceptor implements HttpInterceptor {
     // Lista de rutas públicas que NO necesitan token
     const publicPaths = [
       '/api/auth/',
-      '/api/plan-alimentacion/',
       '/api/public/',
       '/health',
       '/uploads/'
     ];
     
+    // ✅ CORREGIDO: TODAS las rutas de plan-alimentacion son públicas (GET, POST, PUT, DELETE)
+    const isPublicPlanPath = request.url.includes('/api/plan-alimentacion/');
+    
     // Verificar si es una ruta pública
-    const isPublicPath = publicPaths.some(path => request.url.includes(path));
+    const isPublicPath = publicPaths.some(path => request.url.includes(path)) || isPublicPlanPath;
 
     // Solo mostrar logs detallados en desarrollo
     if (!environment.production) {
