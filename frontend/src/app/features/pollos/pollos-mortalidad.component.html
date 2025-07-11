@@ -1,0 +1,485 @@
+<div class="mortalidad-container max-w-7xl mx-auto p-6">
+  <!-- Header Principal -->
+  <div class="header-section mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-red-900 mb-2">
+          <i class="fas fa-skull mr-3 text-red-600"></i>
+          Control de Mortalidad
+        </h1>
+        <p class="text-gray-600">Registro y seguimiento detallado de mortalidad en lotes de pollos</p>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <button 
+          (click)="exportarDatos()" 
+          class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-download mr-2"></i>
+          Exportar Datos
+        </button>
+        <button 
+          (click)="cargarDatosIniciales()" 
+          class="refresh-btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadísticas Principales -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-red-600 text-sm font-medium mb-1">Total Muertes</p>
+          <p class="text-3xl font-bold text-red-900">{{ estadisticas?.totalMuertes || 0 }}</p>
+        </div>
+        <div class="p-3 bg-red-200 rounded-lg">
+          <i class="fas fa-skull text-red-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-orange-600 text-sm font-medium mb-1">Lotes Afectados</p>
+          <p class="text-3xl font-bold text-orange-900">{{ estadisticas?.totalLotes || 0 }}</p>
+        </div>
+        <div class="p-3 bg-orange-200 rounded-lg">
+          <i class="fas fa-clipboard-list text-orange-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-yellow-600 text-sm font-medium mb-1">Tasa Promedio</p>
+          <p class="text-3xl font-bold text-yellow-900">{{ (estadisticas?.tasaPromedioMortalidad || 0).toFixed(1) }}%</p>
+        </div>
+        <div class="p-3 bg-yellow-200 rounded-lg">
+          <i class="fas fa-percentage text-yellow-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-blue-600 text-sm font-medium mb-1">Alertas Activas</p>
+          <p class="text-3xl font-bold text-blue-900">{{ estadisticas?.alertas?.length || 0 }}</p>
+        </div>
+        <div class="p-3 bg-blue-200 rounded-lg">
+          <i class="fas fa-exclamation-triangle text-blue-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alertas Importantes -->
+  <div *ngIf="estadisticas?.alertas?.length && estadisticas.alertas.length > 0" class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🚨 Alertas y Notificaciones</h3>
+    <div class="space-y-3">
+      <div *ngFor="let alerta of estadisticas.alertas" 
+           class="p-4 rounded-lg border" [ngClass]="getClaseAlerta(alerta.tipo)">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+              <p class="font-medium">{{ alerta.titulo }}</p>
+              <p class="text-sm">{{ alerta.mensaje }}</p>
+            </div>
+          </div>
+          <span class="px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-50">
+            {{ alerta.tipo.toUpperCase() }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lotes Activos y Registro Rápido -->
+  <div class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🐔 Lotes Activos - Registro de Mortalidad</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div *ngFor="let lote of lotes" 
+           class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 bg-blue-100 rounded-lg">
+                <i class="fas fa-egg text-blue-600"></i>
+              </div>
+              <div>
+                <h4 class="font-semibold text-gray-800">{{ lote.codigo }}</h4>
+                <p class="text-sm text-gray-500">{{ lote.animal?.name }} - {{ lote.race?.name }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 mb-4">
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Pollos vivos:</span>
+              <span class="font-medium text-green-600">{{ lote.quantity }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Cantidad:</span>
+              <span class="font-medium">{{ lote.quantity }} pollos</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Estado:</span>
+              <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                {{ lote.status }}
+              </span>
+            </div>
+          </div>
+
+          <button 
+            (click)="abrirModalRegistro()"
+            class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+            <i class="fas fa-plus mr-2"></i>
+            Registrar Mortalidad
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros y Búsqueda -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros y Búsqueda</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Fecha desde:</label>
+        <input 
+          type="date" 
+          [(ngModel)]="filtroFechaInicio"
+          (change)="aplicarFiltros()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Causa de mortalidad:</label>
+        <select 
+          [(ngModel)]="filtroCausa"
+          (change)="aplicarFiltros()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Todas las causas</option>
+          <option *ngFor="let causa of causasMortalidad" [value]="causa">{{ causa }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Buscar lote:</label>
+        <input 
+          type="text" 
+          placeholder="Código del lote..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+      </div>
+    </div>
+  </div>
+
+  <!-- Principales Causas de Mortalidad -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Principales Causas</h3>
+      <div class="space-y-4">
+        <div *ngFor="let causa of estadisticas?.principalesCausas || []" class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex justify-between mb-1">
+              <span class="text-sm font-medium text-gray-700">{{ causa.causa }}</span>
+              <span class="text-sm text-gray-500">{{ causa.cantidad }} muertes</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-red-500 h-2 rounded-full transition-all duration-500" 
+                   [style.width.%]="causa.porcentaje"></div>
+            </div>
+          </div>
+          <span class="ml-4 text-sm font-semibold text-red-600">{{ causa.porcentaje.toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📈 Tendencia Semanal</h3>
+      <div class="space-y-3">
+        <div *ngFor="let dia of estadisticas.tendenciaSemanal" 
+             class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <span class="text-sm font-medium text-gray-700">
+            {{ dia.fecha | date:'dd/MM' }}
+          </span>
+          <div class="flex items-center space-x-2">
+            <div class="w-16 bg-gray-200 rounded-full h-2">
+              <div class="bg-red-500 h-2 rounded-full" 
+                   [style.width.%]="dia.muertes * 10"></div>
+            </div>
+            <span class="text-sm font-semibold text-red-600">{{ dia.muertes }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial de Registros -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Historial de Mortalidad</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Muertes</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Causa</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Mortalidad</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investigación</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let registro of getRegistrosFiltrados()" class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <div>
+                <div class="font-medium">{{ registro.fecha | date:'dd/MM/yyyy' }}</div>
+                <div class="text-gray-500">{{ registro.hora }}</div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              {{ getLoteNombre(registro.loteId) }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                {{ registro.cantidadMuertes }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">
+              <div class="max-w-xs truncate" [title]="registro.causaMortalidad">
+                {{ registro.causaMortalidad }}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {{ registro.porcentajeMortalidad.toFixed(2) }}%
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span *ngIf="registro.requiereInvestigacion" 
+                    class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                Requiere
+              </span>
+              <span *ngIf="!registro.requiereInvestigacion" 
+                    class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                No requiere
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ registro.usuarioRegistro }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div *ngIf="getRegistrosFiltrados().length === 0" 
+           class="text-center py-8 text-gray-500">
+        <i class="fas fa-clipboard-list text-4xl mb-4"></i>
+        <p>No se encontraron registros de mortalidad</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Registro de Mortalidad -->
+<div *ngIf="mostrarModalRegistro" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    
+    <!-- Header del Modal -->
+    <div class="bg-gradient-to-r from-red-600 to-red-700 text-white p-6 rounded-t-xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-white bg-opacity-20 rounded-lg">
+            <i class="fas fa-skull text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold">Registro de Mortalidad</h2>
+            <p class="text-red-100">{{ loteSeleccionado?.codigo }} - {{ loteSeleccionado?.animal?.name }}</p>
+          </div>
+        </div>
+        <button (click)="cerrarModalMortalidad()" 
+                class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenido del Modal -->
+    <div class="p-6">
+      
+      <!-- Información del Lote -->
+      <div class="bg-gray-50 rounded-lg p-4 mb-6">
+        <h4 class="font-semibold text-gray-800 mb-3">📊 Información del Lote</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Animales vivos actuales</label>
+            <div class="text-xl font-bold text-green-600">{{ nuevoRegistro.animalesVivosAntes }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Edad promedio</label>
+            <div class="text-xl font-bold text-blue-600">{{ nuevoRegistro.edadPromedio }} días</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Animales después</label>
+            <div class="text-xl font-bold text-orange-600">{{ nuevoRegistro.animalesVivosDespues }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">% Mortalidad</label>
+            <div class="text-xl font-bold text-red-600">{{ nuevoRegistro.porcentajeMortalidad.toFixed(2) }}%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formulario de Registro -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Información Básica -->
+        <div class="space-y-4">
+          <h4 class="font-semibold text-gray-800 border-b pb-2">📝 Información Básica</h4>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Fecha *</label>
+              <input 
+                type="date" 
+                [(ngModel)]="nuevoRegistro.fecha"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Hora *</label>
+              <input 
+                type="time" 
+                [(ngModel)]="nuevoRegistro.hora"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad de muertes *</label>
+            <input 
+              type="number" 
+              [(ngModel)]="nuevoRegistro.cantidadMuertes"
+              (ngModelChange)="calcularAnimalesVivos()"
+              min="1"
+              max="{{ nuevoRegistro.animalesVivosAntes }}"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Causa principal *</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.causaMortalidad"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">Seleccionar causa...</option>
+              <option *ngFor="let causa of causasMortalidad" [value]="causa">{{ causa }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Descripción detallada</label>
+            <textarea 
+              [(ngModel)]="nuevoRegistro.descripcionDetallada"
+              rows="3"
+              placeholder="Describe los síntomas, condiciones encontradas..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+          </div>
+        </div>
+
+        <!-- Información Complementaria -->
+        <div class="space-y-4">
+          <h4 class="font-semibold text-gray-800 border-b pb-2">🔬 Información Complementaria</h4>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Peso promedio (kg)</label>
+              <input 
+                type="number" 
+                [(ngModel)]="nuevoRegistro.pesoPromedio"
+                step="0.1"
+                min="0"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación en lote</label>
+              <input 
+                type="text" 
+                [(ngModel)]="nuevoRegistro.ubicacionLote"
+                placeholder="Ej: Galpón A - Sección 1"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Temperatura (°C)</label>
+              <input 
+                type="number" 
+                [(ngModel)]="nuevoRegistro.temperaturaAmbiente"
+                step="0.1"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Humedad (%)</label>
+              <input 
+                type="number" 
+                [(ngModel)]="nuevoRegistro.humedadRelativa"
+                min="0"
+                max="100"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones veterinario</label>
+            <textarea 
+              [(ngModel)]="nuevoRegistro.observacionesVeterinario"
+              rows="3"
+              placeholder="Observaciones técnicas del veterinario..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Acciones tomadas</label>
+            <textarea 
+              [(ngModel)]="nuevoRegistro.accionesTomadas"
+              rows="2"
+              placeholder="Medidas preventivas o correctivas aplicadas..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              [(ngModel)]="nuevoRegistro.requiereInvestigacion"
+              id="requiereInvestigacion"
+              class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500">
+            <label for="requiereInvestigacion" class="text-sm font-medium text-gray-700">
+              Requiere investigación adicional
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200 mt-6">
+        <button 
+          (click)="cerrarModalMortalidad()" 
+          class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancelar
+        </button>
+        <button 
+          (click)="registrarMortalidad()" 
+          class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+          <i class="fas fa-save mr-2"></i>
+          Registrar Mortalidad
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

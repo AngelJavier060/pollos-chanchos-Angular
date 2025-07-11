@@ -1,10 +1,10 @@
-<!-- Histórico de Lotes Cerrados -->
-<div class="lotes-historico-container">
+<!-- Histórico de Alimentación de Pollos -->
+<div class="historico-alimentacion-container">
   <!-- Header -->
   <div class="page-header">
     <div class="header-content">
-      <h1 class="page-title">📚 Histórico de Lotes Cerrados</h1>
-      <p class="page-subtitle">Registro completo de lotes finalizados con métricas de rendimiento</p>
+      <h1 class="page-title">📚 Historial de Alimentación</h1>
+      <p class="page-subtitle">Registro completo de alimentación con datos reales del sistema</p>
     </div>
     <div class="header-actions">
       <button (click)="exportarDatos()" class="btn btn-export">
@@ -14,244 +14,346 @@
     </div>
   </div>
 
+  <!-- Indicadores de Carga -->
+  <div *ngIf="cargandoRegistros || cargandoEstadisticas" class="loading-container">
+    <div class="loading-spinner">
+      <i class="fas fa-spinner fa-spin"></i>
+      <span>Cargando datos del historial...</span>
+    </div>
+  </div>
+
+  <!-- Error de Carga -->
+  <div *ngIf="errorCarga" class="error-container">
+    <div class="error-message">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span>{{ errorCarga }}</span>
+      <button (click)="cargarDatosHistoricos()" class="btn btn-retry">
+        <i class="fas fa-redo"></i>
+        Reintentar
+      </button>
+    </div>
+  </div>
+
   <!-- Estadísticas Generales -->
-  <div class="estadisticas-generales">
+  <div class="estadisticas-generales" *ngIf="!cargandoRegistros">
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon bg-blue-500">
-          <i class="fas fa-archive"></i>
+          <i class="fas fa-list"></i>
         </div>
         <div class="stat-content">
-          <h3>{{ getEstadisticasGenerales().totalLotes }}</h3>
-          <p>Lotes Cerrados</p>
+          <h3>{{ getEstadisticasGenerales().totalRegistros }}</h3>
+          <p>Registros Totales</p>
         </div>
       </div>
       
       <div class="stat-card">
         <div class="stat-icon bg-green-500">
-          <i class="fas fa-dollar-sign"></i>
+          <i class="fas fa-layer-group"></i>
         </div>
         <div class="stat-content">
-          <h3>${{ getEstadisticasGenerales().totalVentas.toFixed(2) }}</h3>
-          <p>Ventas Totales</p>
+          <h3>{{ getEstadisticasGenerales().totalLotes }}</h3>
+          <p>Lotes Involucrados</p>
         </div>
       </div>
       
       <div class="stat-card">
         <div class="stat-icon bg-yellow-500">
-          <i class="fas fa-chart-line"></i>
+          <i class="fas fa-weight-hanging"></i>
         </div>
         <div class="stat-content">
-          <h3>${{ getEstadisticasGenerales().rentabilidadTotal.toFixed(2) }}</h3>
-          <p>Rentabilidad Total</p>
+          <h3>{{ getEstadisticasGenerales().cantidadTotal.toFixed(2) }} kg</h3>
+          <p>Cantidad Total</p>
         </div>
       </div>
       
       <div class="stat-card">
-        <div class="stat-icon bg-red-500">
-          <i class="fas fa-percentage"></i>
+        <div class="stat-icon bg-purple-500">
+          <i class="fas fa-chart-line"></i>
         </div>
         <div class="stat-content">
-          <h3>{{ getEstadisticasGenerales().tasaMortalidad.toFixed(1) }}%</h3>
-          <p>Tasa de Mortalidad</p>
+          <h3>{{ getEstadisticasGenerales().promedioGeneral.toFixed(2) }} kg</h3>
+          <p>Promedio por Registro</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Filtros -->
-  <div class="filtros-container">
-    <div class="filtros-grid">
-      <div class="filtro-group">
-        <label class="filtro-label">🔍 Buscar por código o motivo</label>
-        <input 
-          type="text" 
-          [(ngModel)]="busqueda"
-          placeholder="Ej: POL-2024-001"
-          class="filtro-input">
-      </div>
-      
-      <div class="filtro-group">
-        <label class="filtro-label">📅 Fecha de cierre desde</label>
+  <!-- Controles de Rango de Fechas -->
+  <div class="rango-fechas-container">
+    <div class="rango-grid">
+      <div class="fecha-group">
+        <label class="fecha-label">📅 Fecha Inicio</label>
         <input 
           type="date" 
-          [(ngModel)]="filtroFecha"
-          class="filtro-input">
+          [(ngModel)]="fechaInicio"
+          class="fecha-input">
       </div>
       
-      <div class="filtro-group">
-        <label class="filtro-label">💰 Rentabilidad</label>
-        <select [(ngModel)]="filtroRentabilidad" class="filtro-select">
-          <option value="">Todas</option>
-          <option value="alta">Alta (≥$1000)</option>
-          <option value="media">Media ($500-$999)</option>
-          <option value="baja">Baja (<$500)</option>
-        </select>
+      <div class="fecha-group">
+        <label class="fecha-label">📅 Fecha Fin</label>
+        <input 
+          type="date" 
+          [(ngModel)]="fechaFin"
+          class="fecha-input">
       </div>
       
-      <div class="filtro-group">
-        <label class="filtro-label">&nbsp;</label>
-        <button (click)="limpiarFiltros()" class="btn btn-secondary">
-          <i class="fas fa-eraser"></i>
-          Limpiar Filtros
+      <div class="fecha-group">
+        <label class="fecha-label">&nbsp;</label>
+        <button (click)="actualizarRangoFechas()" class="btn btn-primary">
+          <i class="fas fa-sync-alt"></i>
+          Actualizar
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Tabla de Lotes Históricos -->
-  <div class="tabla-historico">
-    <div class="table-header">
-      <h2>📋 Lotes Cerrados ({{ getLotesFiltrados().length }})</h2>
-    </div>
+  <!-- Pestañas de Vista -->
+  <div class="vista-tabs">
+    <button 
+      (click)="cambiarVista('registros')"
+      [class]="'tab-button ' + (vistaActual === 'registros' ? 'active' : '')">
+      <i class="fas fa-list"></i>
+      Registros Individuales
+    </button>
+    <button 
+      (click)="cambiarVista('estadisticas')"
+      [class]="'tab-button ' + (vistaActual === 'estadisticas' ? 'active' : '')">
+      <i class="fas fa-chart-bar"></i>
+      Estadísticas por Lote
+    </button>
+  </div>
+
+  <!-- Vista de Registros Individuales -->
+  <div *ngIf="vistaActual === 'registros'" class="vista-registros">
     
-    <div class="table-responsive">
-      <table class="historico-table">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Período</th>
-            <th>Duración</th>
-            <th>Animales</th>
-            <th>Ventas</th>
-            <th>Mortalidad</th>
-            <th>Consumo</th>
-            <th>Rentabilidad</th>
-            <th>Supervivencia</th>
-            <th>Motivo Cierre</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let lote of getLotesPaginados(); trackBy: trackByLote" class="table-row">
-            <td class="codigo-cell">
-              <strong>{{ lote.codigo }}</strong>
-            </td>
-            
-            <td class="periodo-cell">
-              <div class="fecha-info">
-                <div class="fecha-inicio">{{ formatearFecha(lote.fechaInicio) }}</div>
-                <div class="fecha-cierre">{{ formatearFecha(lote.fechaCierre) }}</div>
-              </div>
-            </td>
-            
-            <td class="duracion-cell">
-              <span class="duracion-badge">
-                {{ calcularDuracion(lote.fechaInicio, lote.fechaCierre) }} días
-              </span>
-            </td>
-            
-            <td class="animales-cell">
-              <div class="animales-info">
-                <div class="animales-iniciales">
-                  <i class="fas fa-egg text-blue-500"></i>
-                  {{ lote.animalesIniciales }}
+    <!-- Filtros para Registros -->
+    <div class="filtros-container">
+      <div class="filtros-grid">
+        <div class="filtro-group">
+          <label class="filtro-label">🔍 Buscar</label>
+          <input 
+            type="text" 
+            [(ngModel)]="busqueda"
+            placeholder="Código de lote, observaciones..."
+            class="filtro-input">
+        </div>
+        
+        <div class="filtro-group">
+          <label class="filtro-label">🏷️ Lote</label>
+          <select [(ngModel)]="filtroLote" class="filtro-select">
+            <option value="">Todos los lotes</option>
+            <option *ngFor="let lote of getLotesUnicos()" [value]="lote.loteId">
+              {{ lote.loteDescripcion }} ({{ lote.codigoLote }})
+            </option>
+          </select>
+        </div>
+        
+        <div class="filtro-group">
+          <label class="filtro-label">📊 Estado</label>
+          <select [(ngModel)]="filtroStatus" class="filtro-select">
+            <option value="">Todos los estados</option>
+            <option *ngFor="let status of getStatusUnicos()" [value]="status">
+              {{ status }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="filtro-group">
+          <label class="filtro-label">&nbsp;</label>
+          <button (click)="limpiarFiltros()" class="btn btn-secondary">
+            <i class="fas fa-eraser"></i>
+            Limpiar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de Registros -->
+    <div class="tabla-registros">
+      <div class="table-header">
+        <h2>📋 Registros de Alimentación ({{ getRegistrosFiltrados().length }})</h2>
+      </div>
+      
+      <div class="table-responsive" *ngIf="!cargandoRegistros">
+        <table class="registros-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Lote</th>
+              <th>Cantidad</th>
+              <th>Animales Vivos</th>
+              <th>Animales Muertos</th>
+              <th>Estado</th>
+              <th>Día #</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let registro of getRegistrosPaginados(); trackBy: trackByRegistro" class="table-row">
+              <td class="id-cell">
+                <span class="id-badge">#{{ registro.id }}</span>
+              </td>
+              
+              <td class="fecha-cell">
+                <div class="fecha-info">
+                  <div class="fecha-principal">{{ formatearFecha(registro.fecha) }}</div>
+                  <div class="fecha-creacion">{{ formatearFechaHora(registro.fechaCreacion) }}</div>
                 </div>
-              </div>
-            </td>
-            
-            <td class="ventas-cell">
-              <div class="ventas-info">
-                <div class="cantidad-vendida">
-                  <i class="fas fa-shopping-cart text-green-500"></i>
-                  {{ lote.animalesVendidos }}
+              </td>
+              
+              <td class="lote-cell">
+                <div class="lote-info">
+                  <span class="lote-nombre">{{ registro.loteDescripcion }}</span>
+                  <span class="lote-codigo">{{ registro.codigoLote }}</span>
                 </div>
-                <div class="valor-venta">
-                  ${{ lote.valorTotalVentas.toFixed(2) }}
+              </td>
+              
+              <td class="cantidad-cell">
+                <div class="cantidad-info">
+                  <span class="cantidad-valor">{{ registro.cantidadAplicada.toFixed(2) }} kg</span>
                 </div>
-              </div>
-            </td>
-            
-            <td class="mortalidad-cell">
-              <div class="mortalidad-info">
-                <div class="cantidad-muerta">
+              </td>
+              
+              <td class="animales-vivos-cell">
+                <div class="animales-info" *ngIf="registro.animalesVivos !== undefined">
+                  <i class="fas fa-egg text-green-500"></i>
+                  <span>{{ registro.animalesVivos }}</span>
+                </div>
+                <span *ngIf="registro.animalesVivos === undefined" class="no-data">N/A</span>
+              </td>
+              
+              <td class="animales-muertos-cell">
+                <div class="animales-info" *ngIf="registro.animalesMuertos !== undefined">
                   <i class="fas fa-skull text-red-500"></i>
-                  {{ lote.animalesMuertos }}
+                  <span>{{ registro.animalesMuertos }}</span>
                 </div>
-                <div class="porcentaje-mortalidad">
-                  {{ (lote.animalesMuertos / lote.animalesIniciales * 100).toFixed(1) }}%
+                <span *ngIf="registro.animalesMuertos === undefined" class="no-data">N/A</span>
+              </td>
+              
+              <td class="status-cell">
+                <div class="status-badge" [class]="getColorStatus(registro.status)">
+                  <i [class]="getIconoStatus(registro.status)"></i>
+                  <span>{{ registro.status }}</span>
                 </div>
-              </div>
-            </td>
-            
-            <td class="consumo-cell">
-              <div class="consumo-info">
-                <div class="consumo-total">
-                  {{ lote.consumoTotalAlimento.toFixed(2) }} kg
-                </div>
-                <div class="consumo-promedio">
-                  {{ (lote.consumoTotalAlimento / lote.animalesIniciales).toFixed(2) }} kg/animal
-                </div>
-              </div>
-            </td>
-            
-            <td class="rentabilidad-cell">
-              <div class="rentabilidad-info" [class]="getColorRentabilidad(lote.rentabilidad)">
-                <i [class]="getIconoRentabilidad(lote.rentabilidad)"></i>
-                <div class="rentabilidad-valor">
-                  ${{ lote.rentabilidad.toFixed(2) }}
-                </div>
-              </div>
-            </td>
-            
-            <td class="supervivencia-cell">
-              <div class="supervivencia-info">
-                <div class="progress-bar">
-                  <div class="progress-fill" 
-                       [style.width.%]="calcularTasaSupervivencia(lote.animalesIniciales, lote.animalesMuertos)">
-                  </div>
-                </div>
-                <div class="supervivencia-porcentaje">
-                  {{ calcularTasaSupervivencia(lote.animalesIniciales, lote.animalesMuertos).toFixed(1) }}%
-                </div>
-              </div>
-            </td>
-            
-            <td class="motivo-cell">
-              <span class="motivo-badge">
-                {{ lote.motivoCierre }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    
-    <!-- Paginación -->
-    <div class="paginacion-container" *ngIf="getTotalPaginas() > 1">
-      <div class="paginacion-info">
-        Mostrando {{ (paginaActual - 1) * itemsPorPagina + 1 }} - 
-        {{ Math.min(paginaActual * itemsPorPagina, getLotesFiltrados().length) }} 
-        de {{ getLotesFiltrados().length }} lotes
-      </div>
-      
-      <div class="paginacion-controles">
-        <button 
-          (click)="cambiarPagina(paginaActual - 1)"
-          [disabled]="paginaActual === 1"
-          class="btn btn-page">
-          <i class="fas fa-chevron-left"></i>
-        </button>
+              </td>
+              
+              <td class="day-cell">
+                <span class="day-badge">Día {{ registro.dayNumber }}</span>
+              </td>
+              
+              <td class="observaciones-cell">
+                <span class="observaciones-text" [title]="registro.observaciones">
+                  {{ registro.observaciones || 'Sin observaciones' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
         
-        <span class="pagina-actual">
-          {{ paginaActual }} de {{ getTotalPaginas() }}
-        </span>
-        
-        <button 
-          (click)="cambiarPagina(paginaActual + 1)"
-          [disabled]="paginaActual === getTotalPaginas()"
-          class="btn btn-page">
-          <i class="fas fa-chevron-right"></i>
-        </button>
+        <!-- Mensaje si no hay datos -->
+        <div *ngIf="getRegistrosFiltrados().length === 0" class="no-data-message">
+          <i class="fas fa-inbox"></i>
+          <h3>No hay registros</h3>
+          <p>No se encontraron registros para los filtros seleccionados.</p>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Mensaje si no hay datos -->
-  <div class="no-data" *ngIf="getLotesFiltrados().length === 0">
-    <div class="no-data-icon">
-      <i class="fas fa-archive"></i>
+  <!-- Vista de Estadísticas por Lote -->
+  <div *ngIf="vistaActual === 'estadisticas'" class="vista-estadisticas">
+    
+    <div class="estadisticas-header">
+      <h2>📊 Estadísticas Agrupadas por Lote</h2>
+      <p>Métricas consolidadas para cada lote</p>
     </div>
-    <h3>Sin lotes cerrados</h3>
-    <p>No se encontraron lotes cerrados con los filtros aplicados.</p>
+
+    <div class="estadisticas-grid" *ngIf="!cargandoEstadisticas">
+      <div *ngFor="let lote of estadisticasPorLote" class="lote-card">
+        <div class="lote-header">
+          <h3>{{ lote.codigo }}</h3>
+          <span class="lote-id">ID: {{ lote.loteId }}</span>
+        </div>
+        
+        <div class="lote-periodo">
+          <i class="fas fa-calendar"></i>
+          <span>{{ formatearFecha(lote.fechaInicio) }} - {{ formatearFecha(lote.fechaUltimo) }}</span>
+          <span class="dias-badge">{{ lote.diasActivos }} días</span>
+        </div>
+        
+        <div class="lote-metricas">
+          <div class="metrica">
+            <i class="fas fa-list text-blue-500"></i>
+            <span class="metrica-label">Registros</span>
+            <span class="metrica-valor">{{ lote.totalRegistros }}</span>
+          </div>
+          
+          <div class="metrica">
+            <i class="fas fa-weight-hanging text-green-500"></i>
+            <span class="metrica-label">Total</span>
+            <span class="metrica-valor">{{ lote.cantidadTotal.toFixed(2) }} kg</span>
+          </div>
+          
+          <div class="metrica">
+            <i class="fas fa-chart-line text-yellow-500"></i>
+            <span class="metrica-label">Promedio/día</span>
+            <span class="metrica-valor">{{ lote.promedioDiario.toFixed(2) }} kg</span>
+          </div>
+          
+          <div class="metrica">
+            <i class="fas fa-heartbeat text-red-500"></i>
+            <span class="metrica-label">Supervivencia</span>
+            <span class="metrica-valor">{{ lote.tasaSupervivencia.toFixed(1) }}%</span>
+          </div>
+        </div>
+        
+        <div class="lote-animales">
+          <div class="animal-stat">
+            <i class="fas fa-egg text-green-600"></i>
+            <span>{{ lote.animalesVivos }} vivos</span>
+          </div>
+          <div class="animal-stat">
+            <i class="fas fa-skull text-red-600"></i>
+            <span>{{ lote.animalesMuertos }} muertos</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Mensaje si no hay estadísticas -->
+      <div *ngIf="estadisticasPorLote.length === 0" class="no-stats-message">
+        <i class="fas fa-chart-bar"></i>
+        <h3>No hay estadísticas disponibles</h3>
+        <p>No se pudieron generar estadísticas con los datos actuales.</p>
+      </div>
+    </div>
   </div>
+
+  <!-- Paginación -->
+  <div class="paginacion-container" *ngIf="vistaActual === 'registros' && getTotalPaginas() > 1">
+    <div class="paginacion">
+      <button 
+        (click)="cambiarPagina(paginaActual - 1)"
+        [disabled]="paginaActual <= 1"
+        class="btn btn-pagination">
+        <i class="fas fa-chevron-left"></i>
+        Anterior
+      </button>
+      
+      <div class="pagina-info">
+        <span>Página {{ paginaActual }} de {{ getTotalPaginas() }}</span>
+        <span class="registros-info">({{ getRegistrosFiltrados().length }} registros)</span>
+      </div>
+      
+      <button 
+        (click)="cambiarPagina(paginaActual + 1)"
+        [disabled]="paginaActual >= getTotalPaginas()"
+        class="btn btn-pagination">
+        Siguiente
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
 </div> 

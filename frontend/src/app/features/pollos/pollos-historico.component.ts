@@ -1,20 +1,37 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
+import { AlimentacionService, PlanEjecucionHistorial, EstadisticasLoteHistorial, ResumenHistorialGeneral } from './services/alimentacion.service';
 
-// Interface para lotes cerrados/históricos
-interface LoteHistorico {
-  loteId: number;
+// Interface mejorada para registros de alimentación históricos  
+interface RegistroHistorico {
+  id: number;
+  fecha: string;
+  loteId: string;
+  codigoLote: string;
+  loteDescripcion: string;
+  cantidadAplicada: number;
+  animalesVivos?: number;
+  animalesMuertos?: number;
+  observaciones: string;
+  status: string;
+  dayNumber: number;
+  fechaCreacion: string;
+}
+
+// Interface para estadísticas agrupadas por lote
+interface EstadisticasLote {
+  loteId: string;
   codigo: string;
   fechaInicio: string;
-  fechaCierre: string;
-  motivoCierre: string;
-  animalesIniciales: number;
-  animalesVendidos: number;
+  fechaUltimo: string;
+  totalRegistros: number;
+  cantidadTotal: number;
+  promedioDiario: number;
+  animalesVivos: number;
   animalesMuertos: number;
-  consumoTotalAlimento: number;
-  valorTotalVentas: number;
-  rentabilidad: number;
+  tasaSupervivencia: number;
+  diasActivos: number;
 }
 
 @Component({
@@ -25,134 +42,333 @@ interface LoteHistorico {
 export class PollosHistoricoComponent implements OnInit {
   user: User | null = null;
   
-  // Histórico de lotes cerrados (simulación)
-  lotesHistoricos: LoteHistorico[] = [
-    {
-      loteId: 100,
-      codigo: 'POL-2024-001',
-      fechaInicio: '2024-01-01',
-      fechaCierre: '2024-01-15',
-      motivoCierre: 'Lote agotado por ventas/mortalidad',
-      animalesIniciales: 50,
-      animalesVendidos: 45,
-      animalesMuertos: 5,
-      consumoTotalAlimento: 125.5,
-      valorTotalVentas: 1350.75,
-      rentabilidad: 1037.25
-    },
-    {
-      loteId: 101,
-      codigo: 'POL-2024-002',
-      fechaInicio: '2024-01-10',
-      fechaCierre: '2024-01-25',
-      motivoCierre: 'Lote agotado por ventas/mortalidad',
-      animalesIniciales: 30,
-      animalesVendidos: 28,
-      animalesMuertos: 2,
-      consumoTotalAlimento: 78.2,
-      valorTotalVentas: 840.60,
-      rentabilidad: 645.10
-    },
-    {
-      loteId: 102,
-      codigo: 'POL-2024-003',
-      fechaInicio: '2024-01-20',
-      fechaCierre: '2024-02-05',
-      motivoCierre: 'Lote agotado por ventas/mortalidad',
-      animalesIniciales: 75,
-      animalesVendidos: 70,
-      animalesMuertos: 5,
-      consumoTotalAlimento: 189.3,
-      valorTotalVentas: 2100.50,
-      rentabilidad: 1627.25
-    }
-  ];
+  // 🔥 DATOS REALES DEL BACKEND
+  registrosHistoricos: RegistroHistorico[] = [];
+  estadisticasPorLote: EstadisticasLote[] = [];
+  resumenGeneral: ResumenHistorialGeneral | null = null;
+  
+  // Estados de carga
+  cargandoRegistros = true;
+  cargandoEstadisticas = true;
+  errorCarga = '';
 
   // Filtros y búsqueda
   busqueda = '';
   filtroFecha = '';
-  filtroRentabilidad = '';
+  filtroStatus = '';
+  filtroLote = '';
+  
+  // Rango de fechas personalizado
+  fechaInicio = '';
+  fechaFin = '';
   
   // Paginación
   paginaActual = 1;
-  itemsPorPagina = 10;
+  itemsPorPagina = 20;
 
-  constructor(private authService: AuthDirectService) {
+  // Vista actual (registros individuales o estadísticas por lote)
+  vistaActual: 'registros' | 'estadisticas' = 'registros';
+
+  constructor(
+    private authService: AuthDirectService,
+    private alimentacionService: AlimentacionService
+  ) {
     this.user = this.authService.currentUserValue;
   }
 
   ngOnInit(): void {
-    this.cargarHistoricoLotes();
+    this.inicializarFechas();
+    this.cargarDatosHistoricos();
   }
 
   /**
-   * Método trackBy para optimizar el renderizado de la tabla
+   * Inicializar fechas por defecto (últimos 3 meses)
    */
-  trackByLote(index: number, lote: LoteHistorico): number {
-    return lote.loteId || index;
-  }
-
-  /**
-   * Cargar histórico de lotes
-   */
-  cargarHistoricoLotes(): void {
-    // Aquí se haría la llamada al servicio
-    // this.loteService.getHistoricoLotes().subscribe(...)
+  inicializarFechas(): void {
+    const hoy = new Date();
+    const hace3Meses = new Date();
+    hace3Meses.setMonth(hace3Meses.getMonth() - 3);
     
-    console.log('📚 Cargando histórico de lotes:', this.lotesHistoricos.length);
+    this.fechaFin = hoy.toISOString().split('T')[0];
+    this.fechaInicio = hace3Meses.toISOString().split('T')[0];
   }
 
   /**
-   * Obtener lotes filtrados
+   * Cargar todos los datos históricos
    */
-  getLotesFiltrados(): LoteHistorico[] {
-    let lotesFiltrados = [...this.lotesHistoricos];
+  cargarDatosHistoricos(): void {
+    this.cargandoRegistros = true;
+    this.cargandoEstadisticas = true;
+    this.errorCarga = '';
+
+    console.log('📚 Cargando historial de alimentación con rango:', {
+      fechaInicio: this.fechaInicio,
+      fechaFin: this.fechaFin
+    });
+
+    // Cargar registros históricos del backend
+    this.alimentacionService.getHistorialConRango(this.fechaInicio, this.fechaFin)
+      .subscribe({
+        next: (registros) => {
+          console.log('✅ Registros históricos obtenidos:', registros);
+          this.procesarRegistrosDelBackend(registros);
+          this.cargandoRegistros = false;
+        },
+        error: (error) => {
+          console.error('❌ Error al cargar registros históricos:', error);
+          this.errorCarga = 'Error al cargar los registros del historial';
+          this.cargandoRegistros = false;
+          
+          // Fallback a datos de ejemplo si el backend no responde
+          this.cargarDatosDeEjemplo();
+        }
+      });
+
+    // Cargar estadísticas por lote
+    this.alimentacionService.getEstadisticasPorLote()
+      .subscribe({
+        next: (estadisticas) => {
+          console.log('✅ Estadísticas por lote obtenidas:', estadisticas);
+          this.procesarEstadisticasDelBackend(estadisticas);
+          this.cargandoEstadisticas = false;
+        },
+        error: (error) => {
+          console.error('❌ Error al cargar estadísticas:', error);
+          this.cargandoEstadisticas = false;
+        }
+      });
+
+    // Cargar resumen general
+    this.alimentacionService.getResumenHistorialGeneral()
+      .subscribe({
+        next: (resumen) => {
+          console.log('✅ Resumen general obtenido:', resumen);
+          this.resumenGeneral = resumen;
+        },
+        error: (error) => {
+          console.error('❌ Error al cargar resumen general:', error);
+        }
+      });
+  }
+
+  /**
+   * Procesar registros del backend y convertirlos al formato del componente
+   */
+  procesarRegistrosDelBackend(registros: PlanEjecucionHistorial[]): void {
+    this.registrosHistoricos = registros.map(registro => ({
+      id: registro.id,
+      fecha: registro.executionDate,
+      loteId: registro.loteId || 'N/A',
+      codigoLote: registro.loteCodigo || registro.loteId || 'N/A',
+      loteDescripcion: registro.loteDescripcion || 'Lote sin descripción',
+      cantidadAplicada: registro.quantityApplied,
+      animalesVivos: registro.animalesVivos,
+      animalesMuertos: registro.animalesMuertos,
+      observaciones: registro.observations || '',
+      status: registro.status,
+      dayNumber: registro.dayNumber,
+      fechaCreacion: registro.createDate
+    }));
+
+    // Generar estadísticas por lote basadas en los registros reales
+    this.generarEstadisticasPorLote();
+  }
+
+  /**
+   * Procesar estadísticas del backend
+   */
+  procesarEstadisticasDelBackend(estadisticas: EstadisticasLoteHistorial[]): void {
+    this.estadisticasPorLote = estadisticas.map(stat => ({
+      loteId: stat.loteId,
+      codigo: stat.codigo,
+      fechaInicio: stat.fechaInicio,
+      fechaUltimo: stat.fechaFin,
+      totalRegistros: stat.totalRegistros,
+      cantidadTotal: stat.cantidadTotalAplicada,
+      promedioDiario: stat.promedioDiario,
+      animalesVivos: stat.animalesVivos,
+      animalesMuertos: stat.animalesMuertos,
+      tasaSupervivencia: stat.tasaSupervivencia,
+      diasActivos: stat.diasActivos
+    }));
+  }
+
+  /**
+   * Generar estadísticas por lote basadas en registros reales
+   */
+  generarEstadisticasPorLote(): void {
+    const loteStats = new Map<string, any>();
+    
+    this.registrosHistoricos.forEach(registro => {
+      if (!loteStats.has(registro.loteId)) {
+        loteStats.set(registro.loteId, {
+          loteId: registro.loteId,
+          codigo: registro.codigoLote,
+          registros: [],
+          fechaInicio: registro.fecha,
+          fechaUltimo: registro.fecha,
+          cantidadTotal: 0,
+          animalesVivos: 0,
+          animalesMuertos: 0
+        });
+      }
+      
+      const stat = loteStats.get(registro.loteId)!;
+      stat.registros.push(registro);
+      stat.cantidadTotal += registro.cantidadAplicada;
+      
+      // Actualizar fechas
+      if (new Date(registro.fecha) < new Date(stat.fechaInicio)) {
+        stat.fechaInicio = registro.fecha;
+      }
+      if (new Date(registro.fecha) > new Date(stat.fechaUltimo)) {
+        stat.fechaUltimo = registro.fecha;
+      }
+      
+      // Actualizar animales (tomar el último registro)
+      if (registro.animalesVivos !== undefined) {
+        stat.animalesVivos = registro.animalesVivos;
+      }
+      if (registro.animalesMuertos !== undefined) {
+        stat.animalesMuertos = registro.animalesMuertos;
+      }
+    });
+
+    // Convertir a array y calcular métricas
+    this.estadisticasPorLote = Array.from(loteStats.values()).map(stat => {
+      const diasActivos = this.calcularDiasEntreFechas(stat.fechaInicio, stat.fechaUltimo) + 1;
+      const totalAnimales = stat.animalesVivos + stat.animalesMuertos;
+      
+      return {
+        loteId: stat.loteId,
+        codigo: stat.codigo,
+        fechaInicio: stat.fechaInicio,
+        fechaUltimo: stat.fechaUltimo,
+        totalRegistros: stat.registros.length,
+        cantidadTotal: stat.cantidadTotal,
+        promedioDiario: stat.cantidadTotal / diasActivos,
+        animalesVivos: stat.animalesVivos,
+        animalesMuertos: stat.animalesMuertos,
+        tasaSupervivencia: totalAnimales > 0 ? (stat.animalesVivos / totalAnimales * 100) : 100,
+        diasActivos: diasActivos
+      };
+    });
+  }
+
+  /**
+   * Calcular días entre dos fechas
+   */
+  calcularDiasEntreFechas(fecha1: string, fecha2: string): number {
+    const date1 = new Date(fecha1);
+    const date2 = new Date(fecha2);
+    const diffTime = Math.abs(date2.getTime() - date1.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  /**
+   * Datos de ejemplo para fallback
+   */
+  cargarDatosDeEjemplo(): void {
+    console.log('📝 Cargando datos de ejemplo como fallback');
+    
+    // Simular algunos registros de ejemplo
+    this.registrosHistoricos = [
+      {
+        id: 1,
+        fecha: '2024-12-01',
+        loteId: '1',
+        codigoLote: 'LOT-001',
+        loteDescripcion: 'Lote de Pollos Broiler - Ejemplo',
+        cantidadAplicada: 4.2,
+        animalesVivos: 18,
+        animalesMuertos: 2,
+        observaciones: 'Registro normal',
+        status: 'EJECUTADO',
+        dayNumber: 5,
+        fechaCreacion: '2024-12-01T08:00:00'
+      },
+      {
+        id: 2,
+        fecha: '2024-12-02',
+        loteId: '1',
+        codigoLote: 'LOT-001',
+        loteDescripcion: 'Lote de Pollos Broiler - Ejemplo',
+        cantidadAplicada: 4.1,
+        animalesVivos: 18,
+        animalesMuertos: 2,
+        observaciones: 'Todo normal',
+        status: 'EJECUTADO',
+        dayNumber: 6,
+        fechaCreacion: '2024-12-02T08:00:00'
+      }
+    ];
+    
+    this.generarEstadisticasPorLote();
+  }
+
+  /**
+   * Método trackBy para optimizar el renderizado
+   */
+  trackByRegistro(index: number, registro: RegistroHistorico): number {
+    return registro.id || index;
+  }
+
+  /**
+   * Obtener registros filtrados
+   */
+  getRegistrosFiltrados(): RegistroHistorico[] {
+    let registrosFiltrados = [...this.registrosHistoricos];
 
     // Filtrar por búsqueda
     if (this.busqueda.trim()) {
-      lotesFiltrados = lotesFiltrados.filter(lote => 
-        lote.codigo.toLowerCase().includes(this.busqueda.toLowerCase()) ||
-        lote.motivoCierre.toLowerCase().includes(this.busqueda.toLowerCase())
+      registrosFiltrados = registrosFiltrados.filter(registro => 
+        registro.codigoLote.toLowerCase().includes(this.busqueda.toLowerCase()) ||
+        registro.observaciones.toLowerCase().includes(this.busqueda.toLowerCase()) ||
+        registro.loteId.includes(this.busqueda)
       );
     }
 
     // Filtrar por fecha
     if (this.filtroFecha) {
-      lotesFiltrados = lotesFiltrados.filter(lote => 
-        lote.fechaCierre >= this.filtroFecha
+      registrosFiltrados = registrosFiltrados.filter(registro => 
+        registro.fecha >= this.filtroFecha
       );
     }
 
-    // Filtrar por rentabilidad
-    if (this.filtroRentabilidad) {
-      lotesFiltrados = lotesFiltrados.filter(lote => {
-        switch(this.filtroRentabilidad) {
-          case 'alta': return lote.rentabilidad >= 1000;
-          case 'media': return lote.rentabilidad >= 500 && lote.rentabilidad < 1000;
-          case 'baja': return lote.rentabilidad < 500;
-          default: return true;
-        }
-      });
+    // Filtrar por status
+    if (this.filtroStatus) {
+      registrosFiltrados = registrosFiltrados.filter(registro => 
+        registro.status === this.filtroStatus
+      );
     }
 
-    return lotesFiltrados;
+    // Filtrar por lote
+    if (this.filtroLote) {
+      registrosFiltrados = registrosFiltrados.filter(registro => 
+        registro.loteId === this.filtroLote
+      );
+    }
+
+    return registrosFiltrados.sort((a, b) => 
+      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+    );
   }
 
   /**
-   * Obtener lotes paginados
+   * Obtener registros paginados
    */
-  getLotesPaginados(): LoteHistorico[] {
-    const lotesFiltrados = this.getLotesFiltrados();
+  getRegistrosPaginados(): RegistroHistorico[] {
+    const registrosFiltrados = this.getRegistrosFiltrados();
     const inicio = (this.paginaActual - 1) * this.itemsPorPagina;
     const fin = inicio + this.itemsPorPagina;
-    return lotesFiltrados.slice(inicio, fin);
+    return registrosFiltrados.slice(inicio, fin);
   }
 
   /**
    * Obtener número total de páginas
    */
   getTotalPaginas(): number {
-    return Math.ceil(this.getLotesFiltrados().length / this.itemsPorPagina);
+    return Math.ceil(this.getRegistrosFiltrados().length / this.itemsPorPagina);
   }
 
   /**
@@ -165,24 +381,37 @@ export class PollosHistoricoComponent implements OnInit {
   }
 
   /**
-   * Obtener estadísticas generales
+   * Cambiar vista entre registros y estadísticas
+   */
+  cambiarVista(vista: 'registros' | 'estadisticas'): void {
+    this.vistaActual = vista;
+    this.paginaActual = 1; // Resetear paginación
+  }
+
+  /**
+   * Actualizar rango de fechas y recargar datos
+   */
+  actualizarRangoFechas(): void {
+    if (this.fechaInicio && this.fechaFin) {
+      this.cargarDatosHistoricos();
+      this.paginaActual = 1;
+    }
+  }
+
+  /**
+   * Obtener estadísticas generales calculadas
    */
   getEstadisticasGenerales() {
-    const lotes = this.getLotesFiltrados();
+    const registros = this.getRegistrosFiltrados();
     
     return {
-      totalLotes: lotes.length,
-      totalAnimalesIniciales: lotes.reduce((total, lote) => total + lote.animalesIniciales, 0),
-      totalAnimalesVendidos: lotes.reduce((total, lote) => total + lote.animalesVendidos, 0),
-      totalAnimalesMuertos: lotes.reduce((total, lote) => total + lote.animalesMuertos, 0),
-      totalConsumoAlimento: lotes.reduce((total, lote) => total + lote.consumoTotalAlimento, 0),
-      totalVentas: lotes.reduce((total, lote) => total + lote.valorTotalVentas, 0),
-      rentabilidadTotal: lotes.reduce((total, lote) => total + lote.rentabilidad, 0),
-      rentabilidadPromedio: lotes.length > 0 ? 
-        lotes.reduce((total, lote) => total + lote.rentabilidad, 0) / lotes.length : 0,
-      tasaMortalidad: lotes.reduce((total, lote) => total + lote.animalesIniciales, 0) > 0 ?
-        (lotes.reduce((total, lote) => total + lote.animalesMuertos, 0) / 
-         lotes.reduce((total, lote) => total + lote.animalesIniciales, 0)) * 100 : 0
+      totalRegistros: registros.length,
+      totalLotes: new Set(registros.map(r => r.loteId)).size,
+      cantidadTotal: registros.reduce((total, registro) => total + registro.cantidadAplicada, 0),
+      promedioGeneral: registros.length > 0 ? 
+        registros.reduce((total, registro) => total + registro.cantidadAplicada, 0) / registros.length : 0,
+      fechaUltimo: registros.length > 0 ? registros[0].fecha : '',
+      registrosHoy: registros.filter(r => r.fecha === new Date().toISOString().split('T')[0]).length
     };
   }
 
@@ -198,47 +427,51 @@ export class PollosHistoricoComponent implements OnInit {
   }
 
   /**
-   * Calcular duración del lote
+   * Formatear fecha y hora
    */
-  calcularDuracion(fechaInicio: string, fechaCierre: string): number {
-    const inicio = new Date(fechaInicio);
-    const cierre = new Date(fechaCierre);
-    return Math.floor((cierre.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+  formatearFechaHora(fecha: string): string {
+    return new Date(fecha).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   /**
-   * Obtener color de rentabilidad
+   * Obtener color según el status
    */
-  getColorRentabilidad(rentabilidad: number): string {
-    if (rentabilidad >= 1000) return 'text-green-600';
-    if (rentabilidad >= 500) return 'text-yellow-600';
-    return 'text-red-600';
+  getColorStatus(status: string): string {
+    switch(status.toUpperCase()) {
+      case 'EJECUTADO': return 'text-green-600 bg-green-100';
+      case 'PENDIENTE': return 'text-yellow-600 bg-yellow-100';
+      case 'OMITIDO': return 'text-red-600 bg-red-100';
+      case 'CORREGIDO': return 'text-blue-600 bg-blue-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
   }
 
   /**
-   * Obtener icono de rentabilidad
+   * Obtener icono según el status
    */
-  getIconoRentabilidad(rentabilidad: number): string {
-    if (rentabilidad >= 1000) return 'fas fa-arrow-up';
-    if (rentabilidad >= 500) return 'fas fa-minus';
-    return 'fas fa-arrow-down';
-  }
-
-  /**
-   * Calcular tasa de supervivencia
-   */
-  calcularTasaSupervivencia(animalesIniciales: number, animalesMuertos: number): number {
-    if (animalesIniciales === 0) return 0;
-    return ((animalesIniciales - animalesMuertos) / animalesIniciales) * 100;
+  getIconoStatus(status: string): string {
+    switch(status.toUpperCase()) {
+      case 'EJECUTADO': return 'fas fa-check-circle';
+      case 'PENDIENTE': return 'fas fa-clock';
+      case 'OMITIDO': return 'fas fa-times-circle';
+      case 'CORREGIDO': return 'fas fa-edit';
+      default: return 'fas fa-question-circle';
+    }
   }
 
   /**
    * Exportar datos (placeholder)
    */
   exportarDatos(): void {
-    const datos = this.getLotesFiltrados();
-    console.log('📊 Exportando datos del histórico:', datos);
-    alert('🎯 Función de exportación en desarrollo...');
+    console.log('📊 Exportando datos del historial...');
+    // Aquí se implementaría la exportación real
+    alert('Función de exportación en desarrollo');
   }
 
   /**
@@ -247,7 +480,39 @@ export class PollosHistoricoComponent implements OnInit {
   limpiarFiltros(): void {
     this.busqueda = '';
     this.filtroFecha = '';
-    this.filtroRentabilidad = '';
+    this.filtroStatus = '';
+    this.filtroLote = '';
     this.paginaActual = 1;
+  }
+
+  /**
+   * Obtener lista única de lotes para el filtro
+   */
+  getLotesUnicos(): {loteId: string, codigoLote: string, loteDescripcion: string}[] {
+    const lotesMap = new Map<string, {loteId: string, codigoLote: string, loteDescripcion: string}>();
+    
+    this.registrosHistoricos.forEach(registro => {
+      if (registro.loteId && registro.loteId !== 'N/A') {
+        if (!lotesMap.has(registro.loteId)) {
+          lotesMap.set(registro.loteId, {
+            loteId: registro.loteId,
+            codigoLote: registro.codigoLote,
+            loteDescripcion: registro.loteDescripcion
+          });
+        }
+      }
+    });
+    
+    return Array.from(lotesMap.values())
+      .sort((a, b) => a.loteDescripcion.localeCompare(b.loteDescripcion));
+  }
+
+  /**
+   * Obtener lista única de status para el filtro
+   */
+  getStatusUnicos(): string[] {
+    return Array.from(new Set(this.registrosHistoricos.map(r => r.status)))
+      .filter(status => status)
+      .sort();
   }
 } 

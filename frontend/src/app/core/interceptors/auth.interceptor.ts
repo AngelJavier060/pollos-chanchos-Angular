@@ -41,7 +41,9 @@ export class AuthInterceptor implements HttpInterceptor {
       '/api/auth/',
       '/api/public/',
       '/health',
-      '/uploads/'
+      '/uploads/',
+      '/api/plan-ejecucion/', // 🔥 AGREGAR: Todas las rutas de plan-ejecucion son públicas
+      '/debug/' // 🔥 AGREGAR: Todas las rutas de debug son públicas
     ];
     
     // ✅ CORREGIDO: TODAS las rutas de plan-alimentacion son públicas (GET, POST, PUT, DELETE)
@@ -82,6 +84,25 @@ export class AuthInterceptor implements HttpInterceptor {
         catchError(error => {
           console.error('[AuthInterceptor] ❌ Error en ruta pública:', request.url);
           console.error('[AuthInterceptor] Status:', error.status);
+          
+          // 🔥 AGREGAR: Logging detallado del error
+          if (error.status === 400) {
+            console.error('[AuthInterceptor] 🔥 ERROR 400 DETALLADO:');
+            console.error('  - URL:', request.url);
+            console.error('  - Método:', request.method);
+            console.error('  - Headers:', request.headers);
+            console.error('  - Body:', request.body);
+            console.error('  - Error completo:', error);
+            console.error('  - Error.error:', error.error);
+            console.error('  - Error.message:', error.message);
+            
+            if (error.error && typeof error.error === 'string') {
+              console.error('  - Mensaje del backend:', error.error);
+            } else if (error.error && error.error.message) {
+              console.error('  - Mensaje del backend:', error.error.message);
+            }
+          }
+          
           return throwError(() => error);
         })
       );
@@ -109,6 +130,24 @@ export class AuthInterceptor implements HttpInterceptor {
           console.error('[AuthInterceptor] ❌ Error en petición:', request.url);
           console.error('[AuthInterceptor] Status:', error.status);
           
+          // 🔥 AGREGAR: Logging detallado del error
+          if (error.status === 400) {
+            console.error('[AuthInterceptor] 🔥 ERROR 400 DETALLADO (RUTA PROTEGIDA):');
+            console.error('  - URL:', request.url);
+            console.error('  - Método:', request.method);
+            console.error('  - Headers:', request.headers);
+            console.error('  - Body:', request.body);
+            console.error('  - Error completo:', error);
+            console.error('  - Error.error:', error.error);
+            console.error('  - Error.message:', error.message);
+            
+            if (error.error && typeof error.error === 'string') {
+              console.error('  - Mensaje del backend:', error.error);
+            } else if (error.error && error.error.message) {
+              console.error('  - Mensaje del backend:', error.error.message);
+            }
+          }
+          
           if (error.status === 401) {
             console.error('[AuthInterceptor] 🔐 ERROR 401: Token rechazado por el backend');
             
@@ -134,6 +173,25 @@ export class AuthInterceptor implements HttpInterceptor {
         catchError(error => {
           console.error('[AuthInterceptor] ❌ Error en petición (sin token):', request.url);
           console.error('[AuthInterceptor] Status:', error.status);
+          
+          // 🔥 AGREGAR: Logging detallado del error
+          if (error.status === 400) {
+            console.error('[AuthInterceptor] 🔥 ERROR 400 DETALLADO (SIN TOKEN):');
+            console.error('  - URL:', request.url);
+            console.error('  - Método:', request.method);
+            console.error('  - Headers:', request.headers);
+            console.error('  - Body:', request.body);
+            console.error('  - Error completo:', error);
+            console.error('  - Error.error:', error.error);
+            console.error('  - Error.message:', error.message);
+            
+            if (error.error && typeof error.error === 'string') {
+              console.error('  - Mensaje del backend:', error.error);
+            } else if (error.error && error.error.message) {
+              console.error('  - Mensaje del backend:', error.error.message);
+            }
+          }
+          
           return throwError(() => error);
         })
       );

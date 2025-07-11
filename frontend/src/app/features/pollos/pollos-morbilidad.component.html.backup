@@ -1,0 +1,701 @@
+<div class="morbilidad-container max-w-7xl mx-auto p-6">
+  <!-- Header Principal -->
+  <div class="header-section mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-blue-900 mb-2">
+          <i class="fas fa-stethoscope mr-3 text-blue-600"></i>
+          Gestión de Morbilidad
+        </h1>
+        <p class="text-gray-600">Control y seguimiento de animales enfermos y tratamientos médicos</p>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <button 
+          (click)="exportarDatos()" 
+          class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-download mr-2"></i>
+          Exportar Datos
+        </button>
+        <button 
+          (click)="cargarDatos()" 
+          class="refresh-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadísticas Principales -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-blue-600 text-sm font-medium mb-1">Total Enfermos</p>
+          <p class="text-3xl font-bold text-blue-900">{{ estadisticas.totalEnfermos }}</p>
+        </div>
+        <div class="p-3 bg-blue-200 rounded-lg">
+          <i class="fas fa-user-injured text-blue-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-yellow-600 text-sm font-medium mb-1">En Tratamiento</p>
+          <p class="text-3xl font-bold text-yellow-900">{{ estadisticas.enTratamiento }}</p>
+        </div>
+        <div class="p-3 bg-yellow-200 rounded-lg">
+          <i class="fas fa-pills text-yellow-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-green-600 text-sm font-medium mb-1">Recuperados</p>
+          <p class="text-3xl font-bold text-green-900">{{ estadisticas.recuperados }}</p>
+        </div>
+        <div class="p-3 bg-green-200 rounded-lg">
+          <i class="fas fa-heart text-green-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-red-600 text-sm font-medium mb-1">Costo Tratamientos</p>
+          <p class="text-3xl font-bold text-red-900">${{ estadisticas.costoTotalTratamientos.toFixed(0) }}</p>
+        </div>
+        <div class="p-3 bg-red-200 rounded-lg">
+          <i class="fas fa-dollar-sign text-red-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alertas Importantes -->
+  <div *ngIf="estadisticas.alertas.length > 0" class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🚨 Alertas Médicas</h3>
+    <div class="space-y-3">
+      <div *ngFor="let alerta of estadisticas.alertas" 
+           class="p-4 rounded-lg border {{ getColorAlerta(alerta.urgencia) }}">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+              <p class="font-medium">{{ alerta.tipo.replace('_', ' ').toUpperCase() }}</p>
+              <p class="text-sm">{{ alerta.mensaje }}</p>
+            </div>
+          </div>
+          <span class="px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-50">
+            {{ alerta.urgencia.toUpperCase() }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lotes Activos y Registro Rápido -->
+  <div class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🐔 Lotes Activos - Registro de Morbilidad</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div *ngFor="let lote of lotesPollos" 
+           class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 bg-blue-100 rounded-lg">
+                <i class="fas fa-egg text-blue-600"></i>
+              </div>
+              <div>
+                <h4 class="font-semibold text-gray-800">{{ lote.codigo }}</h4>
+                <p class="text-sm text-gray-500">{{ lote.animal?.name }} - {{ lote.race?.name }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 mb-4">
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Pollos vivos:</span>
+              <span class="font-medium text-green-600">{{ lote.quantity }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Edad:</span>
+              <span class="font-medium">{{ calcularEdadLote(lote) }} días</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Estado:</span>
+              <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                {{ lote.status }}
+              </span>
+            </div>
+          </div>
+
+          <button 
+            (click)="abrirModalMorbilidad(lote)"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+            <i class="fas fa-plus mr-2"></i>
+            Registrar Enfermedad
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros y Búsqueda -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros y Búsqueda</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Estado de tratamiento:</label>
+        <select 
+          [(ngModel)]="filtroEstado"
+          (change)="calcularEstadisticas()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Todos los estados</option>
+          <option value="en_observacion">En Observación</option>
+          <option value="en_tratamiento">En Tratamiento</option>
+          <option value="recuperado">Recuperado</option>
+          <option value="movido_a_mortalidad">Movido a Mortalidad</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Gravedad:</label>
+        <select 
+          [(ngModel)]="filtroGravedad"
+          (change)="calcularEstadisticas()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Todas las gravedades</option>
+          <option value="leve">Leve</option>
+          <option value="moderada">Moderada</option>
+          <option value="severa">Severa</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Enfermedad:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="filtroEnfermedad"
+          placeholder="Buscar enfermedad..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Buscar lote:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="busquedaLote"
+          placeholder="Código del lote..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+  </div>
+
+  <!-- Principales Enfermedades y Eficacia de Tratamientos -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Principales Enfermedades</h3>
+      <div class="space-y-4">
+        <div *ngFor="let enfermedad of estadisticas.principalesEnfermedades" class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex justify-between mb-1">
+              <span class="text-sm font-medium text-gray-700">{{ enfermedad.enfermedad }}</span>
+              <span class="text-sm text-gray-500">{{ enfermedad.casos }} casos</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" 
+                   [style.width.%]="enfermedad.porcentaje"></div>
+            </div>
+          </div>
+          <span class="ml-4 text-sm font-semibold text-blue-600">{{ enfermedad.porcentaje.toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">💊 Eficacia de Tratamientos</h3>
+      <div class="space-y-4">
+        <div *ngFor="let tratamiento of estadisticas.eficaciaTratamientos" class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex justify-between mb-1">
+              <span class="text-sm font-medium text-gray-700">{{ tratamiento.medicamento }}</span>
+              <span class="text-sm text-gray-500">{{ tratamiento.casos }} casos</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-green-500 h-2 rounded-full transition-all duration-500" 
+                   [style.width.%]="tratamiento.eficacia"></div>
+            </div>
+          </div>
+          <span class="ml-4 text-sm font-semibold text-green-600">{{ tratamiento.eficacia.toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial de Registros de Morbilidad -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Historial de Morbilidad</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enfermedad</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enfermos</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gravedad</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Revisión</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let registro of getRegistrosFiltrados()" class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <div>
+                <div class="font-medium">{{ registro.fecha | date:'dd/MM/yyyy' }}</div>
+                <div class="text-gray-500">{{ registro.hora }}</div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              {{ getLoteNombre(registro.loteId) }}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">
+              <div class="max-w-xs">
+                <div class="font-medium">{{ registro.enfermedad }}</div>
+                <div class="text-gray-500 text-xs">
+                  <span *ngIf="registro.contagioso" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mr-1">
+                    Contagioso
+                  </span>
+                  <span *ngIf="registro.requiereAislamiento" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                    Aislamiento
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                {{ registro.cantidadEnfermos }}
+              </span>
+              <div class="text-xs text-gray-500">{{ registro.porcentajeAfectado.toFixed(1) }}%</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 py-1 rounded-full text-xs font-medium {{ getColorGravedad(registro.gravedad) }}">
+                {{ registro.gravedad }}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 py-1 rounded-full text-xs font-medium {{ getColorEstado(registro.estadoTratamiento) }}">
+                {{ registro.estadoTratamiento.replace('_', ' ') }}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <div [class.text-red-600]="registro.proximaRevision <= new Date().toISOString().split('T')[0]">
+                {{ registro.proximaRevision | date:'dd/MM/yyyy' }}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+              <button 
+                *ngIf="registro.estadoTratamiento === 'en_tratamiento'"
+                (click)="abrirModalTratamiento(registro)"
+                class="text-blue-600 hover:text-blue-900"
+                title="Agregar tratamiento">
+                <i class="fas fa-pills"></i>
+              </button>
+              <button 
+                *ngIf="registro.estadoTratamiento === 'en_tratamiento'"
+                (click)="marcarComoRecuperado(registro)"
+                class="text-green-600 hover:text-green-900"
+                title="Marcar como recuperado">
+                <i class="fas fa-heart"></i>
+              </button>
+              <button 
+                *ngIf="registro.estadoTratamiento === 'en_tratamiento'"
+                (click)="moverAMortalidad(registro)"
+                class="text-red-600 hover:text-red-900"
+                title="Mover a mortalidad">
+                <i class="fas fa-skull"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div *ngIf="getRegistrosFiltrados().length === 0" 
+           class="text-center py-8 text-gray-500">
+        <i class="fas fa-stethoscope text-4xl mb-4"></i>
+        <p>No se encontraron registros de morbilidad</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Registro de Morbilidad -->
+<div *ngIf="modalMorbilidadAbierto" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+    
+    <!-- Header del Modal -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-white bg-opacity-20 rounded-lg">
+            <i class="fas fa-stethoscope text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold">Registro de Morbilidad</h2>
+            <p class="text-blue-100">{{ loteSeleccionado?.codigo }} - {{ loteSeleccionado?.animal?.name }}</p>
+          </div>
+        </div>
+        <button (click)="cerrarModalMorbilidad()" 
+                class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenido del Modal -->
+    <div class="p-6">
+      
+      <!-- Información del Lote -->
+      <div class="bg-gray-50 rounded-lg p-4 mb-6">
+        <h4 class="font-semibold text-gray-800 mb-3">📊 Información del Lote</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Animales totales</label>
+            <div class="text-xl font-bold text-blue-600">{{ loteSeleccionado?.quantity }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Edad promedio</label>
+            <div class="text-xl font-bold text-green-600">{{ nuevoRegistro.edadPromedio }} días</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Animales enfermos</label>
+            <div class="text-xl font-bold text-orange-600">{{ nuevoRegistro.cantidadEnfermos }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">% Afectado</label>
+            <div class="text-xl font-bold text-red-600">{{ nuevoRegistro.porcentajeAfectado.toFixed(2) }}%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formulario de Registro -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Información Básica -->
+        <div class="space-y-4">
+          <h4 class="font-semibold text-gray-800 border-b pb-2">📝 Información Básica</h4>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Fecha *</label>
+              <input 
+                type="date" 
+                [(ngModel)]="nuevoRegistro.fecha"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Hora *</label>
+              <input 
+                type="time" 
+                [(ngModel)]="nuevoRegistro.hora"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad de enfermos *</label>
+            <input 
+              type="number" 
+              [(ngModel)]="nuevoRegistro.cantidadEnfermos"
+              (ngModelChange)="calcularPorcentajeAfectado()"
+              min="1"
+              max="{{ loteSeleccionado?.quantity }}"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Enfermedad/Diagnóstico *</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.enfermedad"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">Seleccionar enfermedad...</option>
+              <option *ngFor="let enfermedad of enfermedadesComunes" [value]="enfermedad">{{ enfermedad }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Gravedad *</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.gravedad"
+              (ngModelChange)="calcularProximaRevision()"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="leve">Leve</option>
+              <option value="moderada">Moderada</option>
+              <option value="severa">Severa</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Estado inicial</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.estadoTratamiento"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="en_observacion">En Observación</option>
+              <option value="en_tratamiento">En Tratamiento</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                [(ngModel)]="nuevoRegistro.requiereAislamiento"
+                id="requiereAislamiento"
+                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+              <label for="requiereAislamiento" class="text-sm font-medium text-gray-700">
+                Requiere aislamiento
+              </label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                [(ngModel)]="nuevoRegistro.contagioso"
+                id="contagioso"
+                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+              <label for="contagioso" class="text-sm font-medium text-gray-700">
+                Enfermedad contagiosa
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Síntomas y Tratamiento -->
+        <div class="space-y-4">
+          <h4 class="font-semibold text-gray-800 border-b pb-2">🩺 Síntomas y Tratamiento</h4>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Síntomas observados *</label>
+            <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-3">
+              <div *ngFor="let sintoma of sintomasDisponibles" class="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  [checked]="isSintomaSelected(sintoma)"
+                  (change)="toggleSintoma(sintoma, $event)"
+                  [id]="'sintoma-' + sintoma"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                <label [for]="'sintoma-' + sintoma" class="text-sm text-gray-700">
+                  {{ sintoma }}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Medicamento inicial</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.medicamentoAplicado"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">Seleccionar medicamento...</option>
+              <option *ngFor="let medicamento of medicamentosDisponibles" [value]="medicamento">{{ medicamento }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Dosis aplicada</label>
+            <input 
+              type="text" 
+              [(ngModel)]="nuevoRegistro.dosisAplicada"
+              placeholder="Ej: 10mg/kg peso corporal"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Inicio de tratamiento</label>
+              <input 
+                type="date" 
+                [(ngModel)]="nuevoRegistro.fechaInicioTratamiento"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Próxima revisión</label>
+              <input 
+                type="date" 
+                [(ngModel)]="nuevoRegistro.proximaRevision"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Costo estimado ($)</label>
+            <input 
+              type="number" 
+              [(ngModel)]="nuevoRegistro.costo"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones veterinario</label>
+            <textarea 
+              [(ngModel)]="nuevoRegistro.observacionesVeterinario"
+              rows="3"
+              placeholder="Observaciones técnicas del veterinario..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200 mt-6">
+        <button 
+          (click)="cerrarModalMorbilidad()" 
+          class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancelar
+        </button>
+        <button 
+          (click)="registrarMorbilidad()" 
+          class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+          <i class="fas fa-save mr-2"></i>
+          Registrar Morbilidad
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Tratamiento Médico -->
+<div *ngIf="modalTratamientoAbierto" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+    
+    <!-- Header del Modal -->
+    <div class="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-white bg-opacity-20 rounded-lg">
+            <i class="fas fa-pills text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold">Agregar Tratamiento</h2>
+            <p class="text-green-100">{{ registroSeleccionado?.enfermedad }}</p>
+          </div>
+        </div>
+        <button (click)="cerrarModalTratamiento()" 
+                class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenido del Modal -->
+    <div class="p-6 space-y-4">
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Fecha de aplicación *</label>
+          <input 
+            type="date" 
+            [(ngModel)]="nuevoTratamiento.fecha"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Responsable *</label>
+          <input 
+            type="text" 
+            [(ngModel)]="nuevoTratamiento.responsableAplicacion"
+            placeholder="Nombre del responsable"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Medicamento *</label>
+        <select 
+          [(ngModel)]="nuevoTratamiento.medicamento"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+          <option value="">Seleccionar medicamento...</option>
+          <option *ngFor="let medicamento of medicamentosDisponibles" [value]="medicamento">{{ medicamento }}</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Dosis *</label>
+          <input 
+            type="text" 
+            [(ngModel)]="nuevoTratamiento.dosis"
+            placeholder="Ej: 10mg/kg"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Vía de administración *</label>
+          <select 
+            [(ngModel)]="nuevoTratamiento.viaAdministracion"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="">Seleccionar vía...</option>
+            <option value="Oral en agua">Oral en agua</option>
+            <option value="Oral en alimento">Oral en alimento</option>
+            <option value="Inyección intramuscular">Inyección intramuscular</option>
+            <option value="Inyección subcutánea">Inyección subcutánea</option>
+            <option value="Tópica">Tópica</option>
+            <option value="Inhalación">Inhalación</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Efectividad observada</label>
+        <select 
+          [(ngModel)]="nuevoTratamiento.efectividad"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+          <option value="excelente">Excelente</option>
+          <option value="buena">Buena</option>
+          <option value="regular">Regular</option>
+          <option value="mala">Mala</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
+        <textarea 
+          [(ngModel)]="nuevoTratamiento.observaciones"
+          rows="3"
+          placeholder="Observaciones sobre la aplicación del tratamiento..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Efectos secundarios</label>
+        <textarea 
+          [(ngModel)]="nuevoTratamiento.efectosSecundarios"
+          rows="2"
+          placeholder="Efectos secundarios observados (si los hay)..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+        <button 
+          (click)="cerrarModalTratamiento()" 
+          class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancelar
+        </button>
+        <button 
+          (click)="registrarTratamiento()" 
+          class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+          <i class="fas fa-save mr-2"></i>
+          Agregar Tratamiento
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

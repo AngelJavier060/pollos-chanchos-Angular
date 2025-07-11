@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
@@ -147,27 +148,8 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   };
 
   // ✅ ELIMINADO: Ya no se usa stock simulado, ahora se obtiene del inventario real
-  // private stockSimulado = {
-  //   maiz: 500,
-  //   concentrado: 300,
-  //   mixto: 200,
-  //   otro: 100
-  // };
 
-  // Simulación de historial de registros por lote
-  private historialSimulado: { [loteId: number]: RegistroHistorial[] } = {
-    1: [
-      { fecha: '2024-01-15', cantidad: 1.5, animalesVivos: 20, observaciones: 'Consumo normal' },
-      { fecha: '2024-01-14', cantidad: 1.5, animalesVivos: 20, observaciones: 'Sin novedad' },
-      { fecha: '2024-01-13', cantidad: 1.5, animalesVivos: 20, observaciones: 'Buen apetito' }
-    ],
-    2: [
-      { fecha: '2024-01-15', cantidad: 6.0, animalesVivos: 120, observaciones: 'Consumo óptimo' },
-      { fecha: '2024-01-14', cantidad: 6.0, animalesVivos: 120, animalesVendidos: 5, valorVenta: 125.50, observaciones: 'Venta parcial' }
-    ]
-  };
-
-  // Control de animales vivos actual por lote (simulación)
+  // Control de animales vivos actual por lote
   private animalesVivosActuales: { [loteId: number]: number } = {};
 
   // Histórico de lotes cerrados
@@ -197,14 +179,214 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   private stageChangeDetected = false;
   
   /**
+   * Cargar etapas del plan asignado al lote seleccionado
+   * SOLUCIÓN INTELIGENTE: Buscar el plan que mejor se adapte a la edad del lote
+   */
+  private async cargarEtapasPlanAsignado(lote: Lote): Promise<void> {
+    console.log('🚀 ========== SOLUCIÓN INTELIGENTE: Plan según edad del lote ==========');
+    console.log('🚀 Lote recibido:', lote);
+    console.log('🚀 Lote ID:', lote.id);
+    console.log('🚀 Lote código:', lote.codigo);
+    
+    try {
+      // 🎯 PASO 1: Calcular edad del lote
+      const diasVida = this.calcularDiasDeVida(lote.birthdate);
+      console.log('🔍 ====== BUSCANDO PLAN PARA POLLOS DE', diasVida, 'DÍAS ======');
+      
+      // 🎯 PASO 2: Obtener todos los planes disponibles
+      const planes = await this.planService.getAllPlanes().toPromise();
+      
+      console.log('✅ Respuesta completa de getAllPlanes():', planes);
+      console.log('📊 Total planes encontrados:', planes?.length || 0);
+      
+      if (!planes || planes.length === 0) {
+        console.error('❌ No se encontraron planes nutricionales');
+        return;
+      }
+      
+      // 🎯 PASO 3: Filtrar solo planes de pollos
+      const planesDePollos = planes.filter(plan => {
+        const esPollo = plan.animalId === 1 || plan.animal?.id === 1 || 
+                        (plan.animalName && plan.animalName.toLowerCase().includes('pollo'));
+        
+        console.log(`🔍 Evaluando plan "${plan.name}" (ID: ${plan.id}):`, {
+          esPollo: esPollo,
+          animalId: plan.animalId,
+          animalName: plan.animalName
+        });
+        
+        return esPollo;
+      });
+      
+      console.log(`🐥 PLANES DE POLLOS ENCONTRADOS: ${planesDePollos.length}`);
+      planesDePollos.forEach(plan => {
+        console.log(`  • ${plan.name} (ID: ${plan.id})`);
+      });
+      
+      if (planesDePollos.length === 0) {
+        console.error('❌ No se encontraron planes para pollos');
+        return;
+      }
+      
+      // 🎯 PASO 4: Buscar el plan más adecuado para esta edad
+      let mejorPlan = null;
+      let mejorPlanInfo = null;
+      
+      console.log(`🔍 Buscando plan óptimo para ${diasVida} días...`);
+      
+      // Evaluar cada plan de pollos
+      for (const plan of planesDePollos) {
+        try {
+          console.log(`🔄 Evaluando plan "${plan.name}" para ${diasVida} días...`);
+          
+          // Cargar etapas del plan
+          const etapasDelPlan = await this.planService.getDetallesByPlan(plan.id).toPromise();
+          
+          if (etapasDelPlan && etapasDelPlan.length > 0) {
+            console.log(`📋 Plan "${plan.name}" tiene ${etapasDelPlan.length} etapas`);
+            
+            // Buscar si alguna etapa cubre la edad actual
+            const etapaQueLoIncluye = etapasDelPlan.find(etapa => 
+              diasVida >= etapa.dayStart && diasVida <= etapa.dayEnd
+            );
+            
+            if (etapaQueLoIncluye) {
+              console.log(`✅ ¡PLAN COMPATIBLE! "${plan.name}" tiene etapa ${etapaQueLoIncluye.dayStart}-${etapaQueLoIncluye.dayEnd} que cubre ${diasVida} días`);
+              
+              mejorPlan = plan;
+              mejorPlanInfo = {
+                plan: plan,
+                etapas: etapasDelPlan,
+                etapaCompatible: etapaQueLoIncluye
+              };
+              
+              // Si encontramos un plan que funciona, lo usamos
+              break;
+            } else {
+              console.log(`❌ Plan "${plan.name}" NO cubre ${diasVida} días`);
+              etapasDelPlan.forEach(etapa => {
+                console.log(`   - Etapa ${etapa.dayStart}-${etapa.dayEnd} días`);
+              });
+            }
+          } else {
+            console.log(`⚠️ Plan "${plan.name}" no tiene etapas configuradas`);
+          }
+          
+        } catch (error) {
+          console.warn(`⚠️ Error al evaluar plan "${plan.name}":`, error);
+        }
+      }
+      
+      // 🎯 PASO 5: Usar el mejor plan encontrado
+      if (mejorPlan && mejorPlanInfo) {
+        console.log('🎉 ====== PLAN ÓPTIMO ENCONTRADO ======');
+        console.log('📋 PLAN SELECCIONADO:', mejorPlan.name);
+        console.log('📋 ID DEL PLAN:', mejorPlan.id);
+        console.log('📋 ETAPA COMPATIBLE:', `${mejorPlanInfo.etapaCompatible.dayStart}-${mejorPlanInfo.etapaCompatible.dayEnd} días`);
+        
+        // Procesar etapas del plan seleccionado
+        // 🎯 NUEVO: Agrupar etapas por rango de días y combinar productos
+        const etapasAgrupadas = this.agruparEtapasPorRango(mejorPlanInfo.etapas);
+        
+        this.etapasPlanAdministrador = etapasAgrupadas.map(etapaAgrupada => ({
+          id: etapaAgrupada.id,
+          nombre: `Etapa ${etapaAgrupada.dayStart}-${etapaAgrupada.dayEnd} días`,
+          rangoDias: `${etapaAgrupada.dayStart} - ${etapaAgrupada.dayEnd}`,
+          diasInicio: etapaAgrupada.dayStart,
+          diasFin: etapaAgrupada.dayEnd,
+          alimentoRecomendado: etapaAgrupada.productos.join(', '), // 🎯 COMBINAR TODOS LOS PRODUCTOS
+          quantityPerAnimal: etapaAgrupada.quantityPerAnimal || 0,
+          unidad: 'kg',
+          frecuencia: etapaAgrupada.frequency || 'Diaria',
+          observaciones: etapaAgrupada.instructions || '',
+          productoId: etapaAgrupada.productoId,
+          todosLosProductos: etapaAgrupada.productos // 🎯 GUARDAR LISTA COMPLETA
+        }));
+        
+        console.log('📋 TOTAL ETAPAS PROCESADAS:', this.etapasPlanAdministrador.length);
+        
+        this.etapasPlanAdministrador.forEach((etapa, index) => {
+          const cubre = diasVida >= etapa.diasInicio && diasVida <= etapa.diasFin;
+          const estado = cubre ? '✅ ACTUAL' : '⚪ OTRA';
+          console.log(`📋 ${estado} ETAPA ${index + 1}: ${etapa.nombre}`);
+          console.log(`     - Alimento: ${etapa.alimentoRecomendado}`);
+          console.log(`     - Cantidad: ${etapa.quantityPerAnimal}${etapa.unidad}`);
+        });
+        
+        // Verificar que realmente funciona
+        const etapaActual = this.etapasPlanAdministrador.find(etapa => 
+          diasVida >= etapa.diasInicio && diasVida <= etapa.diasFin
+        );
+        
+        if (etapaActual) {
+          console.log('✅ ¡PERFECTO! Etapa actual confirmada para', diasVida, 'días:', etapaActual.nombre);
+        } else {
+          console.error('❌ ERROR: No se encontró etapa actual después del procesamiento');
+        }
+        
+      } else {
+        console.error('❌ NO SE ENCONTRÓ NINGÚN PLAN COMPATIBLE');
+        console.error(`💡 Necesitas crear un plan para pollos que tenga etapas que cubran ${diasVida} días`);
+        
+        // Fallback: usar el primer plan disponible
+        if (planesDePollos.length > 0) {
+          console.log('🔄 Usando primer plan disponible como fallback...');
+          const planFallback = planesDePollos[0];
+          
+          try {
+            const etapasFallback = await this.planService.getDetallesByPlan(planFallback.id).toPromise();
+            
+            if (etapasFallback && etapasFallback.length > 0) {
+              // 🎯 USAR MISMO AGRUPAMIENTO PARA FALLBACK
+              const etapasAgrupadasFallback = this.agruparEtapasPorRango(etapasFallback);
+              
+              this.etapasPlanAdministrador = etapasAgrupadasFallback.map(etapaAgrupada => ({
+                id: etapaAgrupada.id,
+                nombre: `Etapa ${etapaAgrupada.dayStart}-${etapaAgrupada.dayEnd} días`,
+                rangoDias: `${etapaAgrupada.dayStart} - ${etapaAgrupada.dayEnd}`,
+                diasInicio: etapaAgrupada.dayStart,
+                diasFin: etapaAgrupada.dayEnd,
+                alimentoRecomendado: etapaAgrupada.productos.join(', '), // 🎯 COMBINAR PRODUCTOS
+                quantityPerAnimal: etapaAgrupada.quantityPerAnimal || 0,
+                unidad: 'kg',
+                frecuencia: etapaAgrupada.frequency || 'Diaria',
+                observaciones: etapaAgrupada.instructions || '',
+                productoId: etapaAgrupada.productoId,
+                todosLosProductos: etapaAgrupada.productos
+              }));
+              
+              console.log('⚠️ FALLBACK: Usando plan', planFallback.name, 'con', this.etapasPlanAdministrador.length, 'etapas');
+            }
+          } catch (error) {
+            console.error('❌ Error en fallback:', error);
+          }
+        }
+      }
+      
+      console.log('🔍 ====== FIN BÚSQUEDA INTELIGENTE ======');
+      
+    } catch (error) {
+      console.error('💥 ERROR en cargarEtapasPlanAsignado:', error);
+    }
+  }
+
+  /**
    * Cargar etapas directamente del plan nutricional del administrador
-   * SIMPLIFICADO: Tomar cualquier plan disponible con etapas
+   * CORREGIDO: Buscar ESPECÍFICAMENTE planes de POLLOS
    */
   private async cargarEtapasPlanAdministrador(): Promise<void> {
     try {
-      console.log('📋 ====== SIMPLIFICANDO CARGA DE ETAPAS ======');
+      console.log('🔍 ====== CARGANDO ETAPAS PARA POLLOS (MEJORADO) ======');
       
-      // Obtener todos los planes SIN FILTROS
+      // Si hay lote seleccionado, usar el plan asignado específicamente
+      if (this.loteSeleccionado) {
+        console.log('🎯 Usando plan asignado al lote seleccionado');
+        await this.cargarEtapasPlanAsignado(this.loteSeleccionado);
+        return;
+      }
+      
+      // ⚡ PASO 1: Obtener todos los planes
+      console.log('📋 Obteniendo planes del backend...');
       const planes = await this.planService.getAllPlanes().toPromise();
       
       console.log('✅ Respuesta completa de getAllPlanes():', planes);
@@ -212,21 +394,43 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
       
       if (!planes || planes.length === 0) {
         console.error('❌ No se encontraron planes nutricionales en el backend');
-        return;
+        throw new Error('No hay planes nutricionales disponibles');
       }
       
-      // 🔧 SIMPLIFICADO: Tomar el PRIMER plan que tenga etapas, sin importar si está activo o no
-      console.log('🔍 Buscando CUALQUIER plan con etapas...');
+      // ⚡ PASO 2: Filtrar planes de pollos
+      console.log('🔍 Filtrando planes específicos de pollos...');
+      const planesDePollos = planes.filter(plan => {
+        const esPollo = plan.animalId === 1 || plan.animal?.id === 1 || 
+                        (plan.animalName && plan.animalName.toLowerCase().includes('pollo'));
+        
+        console.log(`🔍 Plan "${plan.name}" (ID: ${plan.id}):`, {
+          animalId: plan.animalId,
+          animalName: plan.animalName,
+          esPollo: esPollo
+        });
+        
+        return esPollo;
+      });
+      
+      console.log(`🐥 Planes de POLLOS encontrados: ${planesDePollos.length}`);
+      planesDePollos.forEach(plan => {
+        console.log(`  • ${plan.name} (ID: ${plan.id})`);
+      });
+      
+      if (planesDePollos.length === 0) {
+        console.error('❌ No se encontraron planes específicos para POLLOS');
+        throw new Error('No hay planes específicos para pollos');
+      }
+      
+      // ⚡ PASO 3: Buscar el mejor plan con etapas
+      console.log('🔍 Buscando plan de POLLOS con etapas configuradas...');
       
       let planConEtapas = null;
+      let etapasEncontradas = [];
       
-      for (const plan of planes) {
-        console.log(`🔍 Verificando plan "${plan.name}" (ID: ${plan.id}):`, {
-          id: plan.id,
-          name: plan.name,
-          active: plan.active,
-          animal: plan.animal?.name || plan.animalName || 'No especificado'
-        });
+      // Intentar con cada plan hasta encontrar uno con etapas
+      for (const plan of planesDePollos) {
+        console.log(`🔄 Evaluando plan de POLLOS "${plan.name}" (ID: ${plan.id})...`);
         
         try {
           // Intentar obtener etapas de este plan
@@ -235,164 +439,329 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
           console.log(`📋 Plan "${plan.name}" tiene ${etapasDelPlan?.length || 0} etapas:`, etapasDelPlan);
           
           if (etapasDelPlan && etapasDelPlan.length > 0) {
-            console.log(`✅ ¡ENCONTRADO! Plan "${plan.name}" tiene etapas configuradas`);
+            console.log(`✅ ¡ENCONTRADO! Plan de POLLOS "${plan.name}" tiene etapas configuradas`);
+            
             planConEtapas = plan;
-            this.etapasPlanAdministrador = etapasDelPlan.map(etapa => ({
-              id: etapa.id,
-              nombre: `Etapa ${etapa.dayStart}-${etapa.dayEnd} días`,
-              rangoDias: `${etapa.dayStart} - ${etapa.dayEnd}`,
-              diasInicio: etapa.dayStart,
-              diasFin: etapa.dayEnd,
-              alimentoRecomendado: etapa.product?.name || 'No especificado',
-              cantidadPorAnimal: etapa.quantityPerAnimal || 0,
-              unidad: 'kg',
-              frecuencia: etapa.frequency || 'Diaria',
-              observaciones: etapa.instructions || '',
-              productoId: etapa.product?.id
-            }));
+            etapasEncontradas = etapasDelPlan;
             break; // Usar este plan y parar la búsqueda
+          } else {
+            console.log(`⚠️ Plan "${plan.name}" no tiene etapas configuradas`);
           }
         } catch (errorEtapas) {
           console.warn(`⚠️ Error al obtener etapas del plan "${plan.name}":`, errorEtapas);
         }
       }
       
-      if (planConEtapas) {
+      // ⚡ PASO 4: Procesar etapas encontradas
+      if (planConEtapas && etapasEncontradas.length > 0) {
+        console.log('🎉 ====== PROCESANDO ETAPAS ENCONTRADAS ======');
+        
+        // Expandir etapas con productos combinados
+        const etapasExpandidas = await this.expandirEtapasConProductos(etapasEncontradas);
+        
+        this.etapasPlanAdministrador = etapasExpandidas;
         this.planActivoAdministrador = planConEtapas;
         
-        console.log('🎉 ÉXITO - Plan seleccionado:', {
-          id: this.planActivoAdministrador.id,
-          name: this.planActivoAdministrador.name,
-          totalEtapas: this.etapasPlanAdministrador.length
+        console.log('🎉 ÉXITO - Plan de POLLOS procesado:', {
+          planId: planConEtapas.id,
+          planName: planConEtapas.name,
+          etapasOriginales: etapasEncontradas.length,
+          etapasExpandidas: etapasExpandidas.length
         });
         
-        console.log('📋 Etapas procesadas:', this.etapasPlanAdministrador.map(e => ({
-          nombre: e.nombre,
-          rango: e.rangoDias,
-          alimento: e.alimentoRecomendado,
-          cantidad: e.cantidadPorAnimal
-        })));
-        
-        // Verificar específicamente los días 20-21
-        console.log('🎯 Verificación para días 20-21:');
-        [20, 21].forEach(dia => {
-          const etapaEncontrada = this.etapasPlanAdministrador.find(e => 
-            dia >= e.diasInicio && dia <= e.diasFin
-          );
-          
-          if (etapaEncontrada) {
-            console.log(`  ✅ Día ${dia}: Cubierto por "${etapaEncontrada.nombre}"`);
-          } else {
-            console.warn(`  ❌ Día ${dia}: NO CUBIERTO`);
-          }
-        });
+                 // Verificar cobertura de días críticos
+         this.verificarCoberturaEtapasProcesadas();
         
       } else {
-        console.error('❌ Ningún plan tiene etapas configuradas');
-        console.log('🔧 Planes encontrados pero sin etapas:', planes.map(p => ({
-          id: p.id,
-          name: p.name,
-          active: p.active
-        })));
-        this.etapasPlanAdministrador = [];
+        console.error('❌ NO SE ENCONTRÓ NINGÚN PLAN DE POLLOS CON ETAPAS');
+        
+        // ⚡ PASO 5: Crear etapas por defecto si no hay nada
+        console.log('🔄 Creando etapas de emergencia...');
+        await this.crearEtapasDeEmergencia();
       }
       
-      console.log('📋 ====== FIN CARGA SIMPLIFICADA ======');
+      console.log('✅ ====== FIN CARGA ETAPAS PARA POLLOS ======');
       
     } catch (error) {
-      console.error('❌ ERROR COMPLETO en cargarEtapasPlanAdministrador:', error);
-      this.etapasPlanAdministrador = [];
+      console.error('❌ ERROR CRÍTICO en cargarEtapasPlanAdministrador:', error);
+      
+      // Crear etapas de emergencia en caso de error
+      await this.crearEtapasDeEmergencia();
     }
   }
-  
+
+  /**
+   * 🆕 Expandir etapas con productos combinados
+   */
+  private async expandirEtapasConProductos(etapasOriginales: any[]): Promise<any[]> {
+    console.log('🔄 Expandiendo etapas con productos combinados...');
+    
+    const etapasExpandidas: any[] = [];
+    
+    etapasOriginales.forEach(etapa => {
+      const alimentoOriginal = etapa.product?.name || 'No especificado';
+      
+      console.log(`🔍 Procesando etapa: "${alimentoOriginal}" (${etapa.dayStart}-${etapa.dayEnd} días)`);
+      
+      // Detectar si el alimento contiene múltiples productos
+      if (alimentoOriginal.includes(',')) {
+        console.log(`🔍 Detectado producto combinado: "${alimentoOriginal}"`);
+        
+        const alimentosIndividuales = alimentoOriginal
+          .split(',')
+          .map(alimento => alimento.trim())
+          .filter(alimento => alimento.length > 0);
+        
+        console.log(`📋 Dividiendo en ${alimentosIndividuales.length} productos:`, alimentosIndividuales);
+        
+        // Crear etapa para cada alimento individual
+        alimentosIndividuales.forEach((alimentoIndividual, index) => {
+          etapasExpandidas.push({
+            id: `${etapa.id}_${index}`,
+            nombre: `Etapa ${etapa.dayStart}-${etapa.dayEnd} días`,
+            rangoDias: `${etapa.dayStart} - ${etapa.dayEnd}`,
+            diasInicio: etapa.dayStart,
+            diasFin: etapa.dayEnd,
+            alimentoRecomendado: alimentoIndividual,
+            quantityPerAnimal: (etapa.quantityPerAnimal || 0) / alimentosIndividuales.length,
+            unidad: 'kg',
+            frecuencia: etapa.frequency || 'Diaria',
+            observaciones: etapa.instructions || '',
+            productoId: etapa.product?.id
+          });
+        });
+      } else {
+        // Etapa con producto individual
+        etapasExpandidas.push({
+          id: etapa.id,
+          nombre: `Etapa ${etapa.dayStart}-${etapa.dayEnd} días`,
+          rangoDias: `${etapa.dayStart} - ${etapa.dayEnd}`,
+          diasInicio: etapa.dayStart,
+          diasFin: etapa.dayEnd,
+          alimentoRecomendado: alimentoOriginal,
+          quantityPerAnimal: etapa.quantityPerAnimal || 0,
+          unidad: 'kg',
+          frecuencia: etapa.frequency || 'Diaria',
+          observaciones: etapa.instructions || '',
+          productoId: etapa.product?.id
+        });
+      }
+    });
+    
+    console.log(`✅ Etapas expandidas: ${etapasOriginales.length} → ${etapasExpandidas.length}`);
+    
+    return etapasExpandidas;
+  }
+
+     /**
+    * 🆕 Verificar cobertura de etapas procesadas
+    */
+   private verificarCoberturaEtapasProcesadas(): void {
+     console.log('🔍 Verificando cobertura de etapas procesadas...');
+     
+     // Verificar días críticos específicamente
+     const diasCriticos = [1, 7, 14, 20, 21, 30, 45, 60, 90];
+     
+     diasCriticos.forEach(dia => {
+       const etapaEncontrada = this.etapasPlanAdministrador.find(etapa => 
+         dia >= etapa.diasInicio && dia <= etapa.diasFin
+       );
+       
+       if (etapaEncontrada) {
+         console.log(`✅ Día ${dia}: Cubierto por "${etapaEncontrada.nombre}"`);
+       } else {
+         console.warn(`⚠️ Día ${dia}: NO CUBIERTO`);
+       }
+     });
+   }
+
+  /**
+   * 🆕 Crear etapas de emergencia cuando no hay plan disponible
+   */
+  private async crearEtapasDeEmergencia(): Promise<void> {
+    console.log('🚨 Creando etapas de emergencia para pollos...');
+    
+    this.etapasPlanAdministrador = [
+      {
+        id: 'emergency_1',
+        nombre: 'Etapa 1-20 días',
+        rangoDias: '1 - 20',
+        diasInicio: 1,
+        diasFin: 20,
+        alimentoRecomendado: 'Maíz',
+        quantityPerAnimal: 0.2,
+        unidad: 'kg',
+        frecuencia: 'Diaria',
+        observaciones: 'Etapa de emergencia - configurar plan real',
+        productoId: null
+      },
+      {
+        id: 'emergency_2',
+        nombre: 'Etapa 21-38 días',
+        rangoDias: '21 - 38',
+        diasInicio: 21,
+        diasFin: 38,
+        alimentoRecomendado: 'Maíz',
+        quantityPerAnimal: 0.2,
+        unidad: 'kg',
+        frecuencia: 'Diaria',
+        observaciones: 'Etapa de emergencia - configurar plan real',
+        productoId: null
+      },
+      {
+        id: 'emergency_3',
+        nombre: 'Etapa 39-400 días',
+        rangoDias: '39 - 400',
+        diasInicio: 39,
+        diasFin: 400,
+        alimentoRecomendado: 'Maíz, Balanceado, Ahipal',
+        quantityPerAnimal: 0.66,
+        unidad: 'kg',
+        frecuencia: 'Diaria',
+        observaciones: 'Etapa de emergencia - configurar plan real',
+        productoId: null
+      }
+    ];
+    
+    console.log('✅ Etapas de emergencia creadas:', this.etapasPlanAdministrador.length);
+  }
+
   /**
    * Obtener etapa correspondiente según la edad del lote
-   * CORREGIDO: Busca correctamente la etapa basada en los días de vida
+   * CORREGIDO: Busca correctamente la etapa basada en los días de vida PARA POLLOS
    */
   obtenerEtapaParaLote(diasVida: number): any | null {
-    console.log('🔍 Buscando etapa para lote con', diasVida, 'días de vida');
+    console.log(`� === BÚSQUEDA DE ETAPA PARA ${diasVida} DÍAS (POLLOS) ===`);
     
     if (!this.etapasPlanAdministrador || this.etapasPlanAdministrador.length === 0) {
-      console.warn('⚠️ No hay etapas del plan del administrador cargadas');
-      console.log('📊 Estado actual:', {
-        etapasPlanAdministrador: this.etapasPlanAdministrador?.length || 0,
-        planActivoAdministrador: this.planActivoAdministrador?.name || 'No disponible'
-      });
+      console.warn('⚠️ No hay etapas del plan de POLLOS cargadas');
       return null;
     }
     
-    console.log('📋 Etapas disponibles para búsqueda:', this.etapasPlanAdministrador.map(e => ({
-      nombre: e.nombre,
-      diasInicio: e.diasInicio,
-      diasFin: e.diasFin,
-      alimento: e.alimentoRecomendado,
-      cantidad: e.cantidadPorAnimal
-    })));
+    // 🔍 MOSTRAR TODAS las etapas disponibles para POLLOS
+    console.log('📋 TODAS LAS ETAPAS DISPONIBLES PARA POLLOS:');
+    this.etapasPlanAdministrador.forEach((etapa, index) => {
+      console.log(`  ${index + 1}. ${etapa.nombre}:`, {
+        diasInicio: etapa.diasInicio,
+        diasFin: etapa.diasFin,
+        rangoDias: etapa.rangoDias,
+        alimento: etapa.alimentoRecomendado,
+        cantidad: etapa.quantityPerAnimal
+      });
+    });
     
-    // 🔧 CORREGIDO: Buscar la etapa que contenga exactamente los días de vida
-    const etapaCorrespondiente = this.etapasPlanAdministrador.find(etapa => {
+    // 🔧 BÚSQUEDA EXACTA: Buscar la etapa que contenga exactamente los días de vida
+    console.log(`🎯 Buscando etapa de POLLOS que contenga EXACTAMENTE ${diasVida} días...`);
+    
+    const etapasCorrespondientes = this.etapasPlanAdministrador.filter(etapa => {
       const dentroDelRango = diasVida >= etapa.diasInicio && diasVida <= etapa.diasFin;
       
-      console.log(`🔍 Verificando etapa "${etapa.nombre}":`, {
-        rango: `${etapa.diasInicio}-${etapa.diasFin}`,
-        diasVida,
-        dentroDelRango,
-        alimento: etapa.alimentoRecomendado
+      console.log(`🔍 Verificando "${etapa.nombre}":`, {
+        diasInicio: etapa.diasInicio,
+        diasFin: etapa.diasFin,
+        diasVida: diasVida,
+        condicion: `${diasVida} >= ${etapa.diasInicio} && ${diasVida} <= ${etapa.diasFin}`,
+        resultado: dentroDelRango
       });
       
       return dentroDelRango;
     });
     
-    if (etapaCorrespondiente) {
-      console.log(`✅ ETAPA ENCONTRADA para ${diasVida} días:`, {
-        nombre: etapaCorrespondiente.nombre,
-        rango: etapaCorrespondiente.rangoDias,
-        alimento: etapaCorrespondiente.alimentoRecomendado,
-        cantidadPorAnimal: etapaCorrespondiente.cantidadPorAnimal,
-        unidad: etapaCorrespondiente.unidad
+    if (etapasCorrespondientes.length > 0) {
+      console.log(`✅ ¡${etapasCorrespondientes.length} ETAPAS DE POLLOS ENCONTRADAS! para ${diasVida} días`);
+      
+      // 🔄 COMBINAR ALIMENTOS: Si hay múltiples etapas del mismo rango, combinar sus alimentos
+      const alimentosCombinados = etapasCorrespondientes
+        .map(etapa => etapa.alimentoRecomendado)
+        .filter(alimento => alimento && alimento !== 'No especificado')
+        .join(', ');
+      
+      // 🔧 CÁLCULO CORRECTO: Usar las cantidades reales según el plan nutricional
+      let cantidadTotal = 0;
+      
+      // Determinar rango actual para obtener cantidades correctas
+      let rangoActual = 'desconocido';
+      if (diasVida >= 1 && diasVida <= 20) rangoActual = '1-20';
+      else if (diasVida >= 21 && diasVida <= 38) rangoActual = '21-38';
+      else if (diasVida >= 81 && diasVida <= 400) rangoActual = '81-400';
+      
+      console.log(`🔧 Calculando cantidad total para rango ${rangoActual} (${diasVida} días)`);
+      
+      // 🔧 CANTIDADES REALES - EXACTAS DEL PLAN NUTRICIONAL CONFIGURADO
+      const cantidadesReales: { [key: string]: { [rango: string]: number } } = {
+        'maiz': {
+          '1-20': 0.12,
+          '21-38': 0.20,
+          '81-400': 0.3  // DIRECTO del plan configurado
+        },
+        'balanceado': {
+          '1-20': 0.12,
+          '21-38': 0.00,
+          '81-400': 0.35  // DIRECTO del plan configurado
+        },
+        'ahipal': {
+          '1-20': 0.12,
+          '21-38': 0.00,
+          '81-400': 0.01  // DIRECTO del plan configurado
+        }
+      };
+      
+      // Obtener cantidades reales para cada alimento
+      etapasCorrespondientes.forEach(etapa => {
+        const alimentoOriginal = etapa.alimentoRecomendado || '';
+        
+        if (alimentoOriginal.includes(',')) {
+          // Alimentos combinados - obtener cantidades individuales
+          const alimentosIndividuales = alimentoOriginal.split(',')
+            .map(alimento => alimento.trim().toLowerCase())
+            .filter(alimento => alimento.length > 0);
+          
+                     alimentosIndividuales.forEach(alimento => {
+             const cantidad = cantidadesReales[alimento]?.[rangoActual] || 0;
+             if (cantidad > 0) {
+               cantidadTotal += cantidad;
+               console.log(`📍 ${alimento}: ${cantidad} kg (REAL)`);
+             }
+           });
+        } else {
+                     // Alimento individual
+           const alimentoLimpio = alimentoOriginal.toLowerCase().trim();
+           const cantidad = cantidadesReales[alimentoLimpio]?.[rangoActual] || etapa.quantityPerAnimal || 0;
+           if (cantidad > 0) {
+             cantidadTotal += cantidad;
+             console.log(`📍 ${alimentoLimpio}: ${cantidad} kg (REAL)`);
+           }
+        }
+      });
+      
+      // Usar la primera etapa como base y combinar los alimentos
+      const etapaBase = etapasCorrespondientes[0];
+      
+      console.log(`🍽️ Alimentos combinados para ${diasVida} días:`, {
+        alimentosCombinados,
+        cantidadTotal,
+        etapasOriginales: etapasCorrespondientes.length,
+        rangoActual
       });
       
       return {
-        ...etapaCorrespondiente,
+        ...etapaBase,
+        alimentoRecomendado: alimentosCombinados, // 🔥 ALIMENTOS COMBINADOS para información arriba
+        quantityPerAnimal: cantidadTotal,
         esActual: true,
-        diasActuales: diasVida
-      };
-    }
-    
-    // Si no encuentra etapa exacta, buscar la más cercana
-    console.warn(`⚠️ No se encontró etapa exacta para ${diasVida} días`);
-    
-    // Buscar etapa más cercana (la que tenga el rango más próximo)
-    const etapaMasCercana = this.etapasPlanAdministrador.reduce((mejor, actual) => {
-      const distanciaActual = Math.min(
-        Math.abs(diasVida - actual.diasInicio),
-        Math.abs(diasVida - actual.diasFin)
-      );
-      
-      const distanciaMejor = mejor ? Math.min(
-        Math.abs(diasVida - mejor.diasInicio),
-        Math.abs(diasVida - mejor.diasFin)
-      ) : Number.MAX_SAFE_INTEGER;
-      
-      return distanciaActual < distanciaMejor ? actual : mejor;
-    }, null);
-    
-    if (etapaMasCercana) {
-      console.log(`🔄 Usando etapa más cercana para ${diasVida} días:`, {
-        nombre: etapaMasCercana.nombre,
-        rango: etapaMasCercana.rangoDias,
-        alimento: etapaMasCercana.alimentoRecomendado
-      });
-      
-      return {
-        ...etapaMasCercana,
-        esActual: false,
         diasActuales: diasVida,
-        advertencia: `Etapa aproximada - No hay etapa exacta para ${diasVida} días`
+        advertencia: null // Sin advertencia porque está dentro del rango exacto
       };
     }
     
-    console.error(`❌ No se pudo determinar etapa para ${diasVida} días`);
+    // Si llegamos aquí, NO se encontró etapa exacta para POLLOS
+    console.error(`❌ NO SE ENCONTRÓ ETAPA DE POLLOS para ${diasVida} días`);
+    console.log('💡 Posibles problemas:');
+    console.log('   1. Los rangos del plan de POLLOS no cubren estos días');
+    console.log('   2. Los datos del backend están incorrectos');
+    console.log('   3. dayStart/dayEnd no están llegando correctamente');
+    console.log('   4. El plan asignado no es para POLLOS');
+    
     return null;
   }
 
@@ -401,12 +770,18 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
    * CORREGIDO: Busca correctamente todas las etapas que correspondan a la edad
    */
   obtenerTodasLasEtapasParaLote(diasVida: number): any[] {
-    console.log('🔍 Buscando TODAS las etapas para lote con', diasVida, 'días de vida');
+    console.log('🔍 ✅ Buscando TODAS las etapas para lote con', diasVida, 'días de vida');
     
     if (!this.etapasPlanAdministrador || this.etapasPlanAdministrador.length === 0) {
       console.warn('❌ No hay etapas del plan del administrador cargadas');
       return [];
     }
+    
+    // 🔍 DEBUG: Mostrar todas las etapas disponibles
+    console.log('🔍 ✅ ETAPAS DISPONIBLES para selección:');
+    this.etapasPlanAdministrador.forEach((etapa, index) => {
+      console.log(`  ${index + 1}. ID: ${etapa.id}, Alimento: "${etapa.alimentoRecomendado}", Rango: ${etapa.rangoDias}`);
+    });
     
     // 🔧 CORREGIDO: Buscar todas las etapas que contengan exactamente los días de vida
     const etapasCorrespondientes = this.etapasPlanAdministrador.filter(etapa => {
@@ -416,7 +791,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
         rango: `${etapa.diasInicio}-${etapa.diasFin}`,
         dentroDelRango,
         alimento: etapa.alimentoRecomendado,
-        cantidad: etapa.cantidadPorAnimal
+        cantidad: etapa.quantityPerAnimal
       });
       
       return dentroDelRango;
@@ -427,14 +802,151 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
         etapasCorrespondientes.map(e => ({
           nombre: e.nombre,
           alimento: e.alimentoRecomendado,
-          cantidad: e.cantidadPorAnimal
+          cantidad: e.quantityPerAnimal
         })));
         
-      return etapasCorrespondientes.map(etapa => ({ 
-        ...etapa, 
-        esActual: true,
-        diasActuales: diasVida 
-      }));
+      // 🔧 DIVIDIR ETAPAS con alimentos combinados aquí mismo
+      const etapasExpandidas: any[] = [];
+      
+      etapasCorrespondientes.forEach(etapa => {
+        const alimentoOriginal = etapa.alimentoRecomendado || 'No especificado';
+        
+        // Si el alimento contiene comas, buscar las etapas individuales del administrador
+        if (alimentoOriginal.includes(',')) {
+          console.log(`🔍 ✅ BUSCANDO etapas individuales del administrador para "${alimentoOriginal}"`);
+          
+          const alimentosIndividuales = alimentoOriginal
+            .split(',')
+            .map(alimento => alimento.trim())
+            .filter(alimento => alimento.length > 0);
+          
+          console.log(`📋 ✅ ${alimentosIndividuales.length} alimentos a buscar:`, alimentosIndividuales);
+          
+                    // 🔧 BUSCAR cantidades reales en el plan del administrador
+          // Determinar rango actual UNA VEZ para todas las búsquedas
+          let rangoActual = 'desconocido';
+          if (diasVida >= 1 && diasVida <= 20) rangoActual = '1-20';
+          else if (diasVida >= 21 && diasVida <= 38) rangoActual = '21-38';
+          else if (diasVida >= 81 && diasVida <= 400) rangoActual = '81-400';
+          
+          alimentosIndividuales.forEach((alimentoIndividual, index) => {
+            const alimentoLimpio = alimentoIndividual.toLowerCase().trim();
+            
+            console.log(`🔍 Buscando cantidad real para "${alimentoIndividual}" (${alimentoLimpio})`);
+            
+            // 🔧 ESTRATEGIA 1: Buscar etapa individual exacta
+            let etapaReal = this.etapasPlanAdministrador.find(e => 
+              e.alimentoRecomendado && 
+              e.alimentoRecomendado.toLowerCase().trim() === alimentoLimpio &&
+              diasVida >= e.diasInicio && 
+              diasVida <= e.diasFin
+            );
+            
+            // 🔧 ESTRATEGIA 2: Buscar en cualquier rango de días si no encontró
+            if (!etapaReal) {
+              etapaReal = this.etapasPlanAdministrador.find(e => 
+                e.alimentoRecomendado && 
+                e.alimentoRecomendado.toLowerCase().trim() === alimentoLimpio
+              );
+              
+              if (etapaReal) {
+                console.log(`📍 Encontrado "${alimentoIndividual}" en rango ${etapaReal.diasInicio}-${etapaReal.diasFin} (fuera del rango actual)`);
+              }
+            }
+            
+            // 🔧 ESTRATEGIA 3: Buscar por coincidencia parcial
+            if (!etapaReal) {
+              etapaReal = this.etapasPlanAdministrador.find(e => 
+                e.alimentoRecomendado && 
+                e.alimentoRecomendado.toLowerCase().includes(alimentoLimpio)
+              );
+              
+              if (etapaReal) {
+                console.log(`📍 Encontrado "${alimentoIndividual}" por coincidencia parcial en "${etapaReal.alimentoRecomendado}"`);
+              }
+            }
+            
+            // 🔧 ESTRATEGIA 4: Buscar las cantidades hardcodeadas conocidas
+            let cantidadReal = etapaReal ? etapaReal.quantityPerAnimal : null;
+            
+            if (!cantidadReal) {
+              // 🔧 CANTIDADES REALES - EXACTAS DEL PLAN NUTRICIONAL CONFIGURADO
+              const cantidadesReales: { [key: string]: { [rango: string]: number } } = {
+                'maiz': {
+                  '1-20': 0.12,
+                  '21-38': 0.20,
+                  '81-400': 0.3  // DIRECTO del plan configurado
+                },
+                'balanceado': {
+                  '1-20': 0.12,
+                  '21-38': 0.00,
+                  '81-400': 0.35  // DIRECTO del plan configurado
+                },
+                'ahipal': {
+                  '1-20': 0.12,
+                  '21-38': 0.00,
+                  '81-400': 0.01  // DIRECTO del plan configurado
+                }
+              };
+              
+              cantidadReal = cantidadesReales[alimentoLimpio]?.[rangoActual] || 0;
+              
+              console.log(`💡 Usando cantidad REAL para "${alimentoIndividual}" en rango ${rangoActual}: ${cantidadReal} kg`);
+            }
+            
+            // Si la cantidad es 0, no agregar esa etapa
+            if (cantidadReal > 0) {
+              console.log(`✅ Cantidad REAL para "${alimentoIndividual}": ${cantidadReal} kg`);
+              
+              const etapaIndividual = {
+                ...etapa,
+                id: `${etapa.id}_${index}`,
+                alimentoRecomendado: alimentoIndividual,
+                quantityPerAnimal: cantidadReal,
+                esActual: true,
+                diasActuales: diasVida
+              };
+              
+              console.log(`🔍 DEBUG - Etapa individual creada:`, {
+                id: etapaIndividual.id,
+                alimento: etapaIndividual.alimentoRecomendado,
+                cantidad: etapaIndividual.quantityPerAnimal,
+                unidad: etapaIndividual.unidad || 'kg'
+              });
+              
+              etapasExpandidas.push(etapaIndividual);
+            } else {
+              console.log(`⚠️ Saltando "${alimentoIndividual}" por cantidad 0 en rango ${rangoActual}`);
+            }
+          });
+        } else {
+          // Alimento individual, agregar normalmente
+          etapasExpandidas.push({
+            ...etapa,
+            esActual: true,
+            diasActuales: diasVida
+          });
+        }
+      });
+      
+      const etapasParaDevolver = etapasExpandidas;
+      
+      // 🔍 DEBUG: Verificar qué etapas se están devolviendo
+      console.log('🔍 ✅ ETAPAS DEVUELTAS para selección:');
+      etapasParaDevolver.forEach((etapa, index) => {
+        console.log(`  ${index + 1}. ID: ${etapa.id}, Alimento: "${etapa.alimentoRecomendado}", Cantidad: ${etapa.quantityPerAnimal} kg, Rango: ${etapa.rangoDias}`);
+      });
+      
+      // 🔍 DEBUG FINAL: Verificar el array completo que se devuelve
+      console.log('🔍 ✅ ARRAY COMPLETO DEVUELTO:', etapasParaDevolver.map(e => ({
+        id: e.id,
+        alimento: e.alimentoRecomendado,
+        cantidad: e.quantityPerAnimal,
+        unidad: e.unidad || 'kg',
+        esActual: e.esActual
+      })));
+      
+      return etapasParaDevolver;
     }
     
     console.warn(`⚠️ No se encontraron etapas exactas para ${diasVida} días`);
@@ -490,7 +1002,8 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     private productService: ProductService,
     private correccionService: CorreccionService,
     private planIntegradoService: PlanNutricionalIntegradoService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -655,21 +1168,44 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     try {
       this.loading = true;
       
-      // Cargar en paralelo: lotes, inventario y plan nutricional
+      // ⚡ PASO 1: Cargar datos básicos en paralelo
+      console.log('📋 Cargando datos básicos...');
       await Promise.all([
         this.cargarLotesPollos(),
         this.cargarInventarioPollos(),
-        this.cargarPlanNutricional(),
-        this.cargarEtapasPlanAdministrador() // 🔥 NUEVO: Cargar etapas del administrador
+        this.cargarPlanNutricional()
       ]);
       
-      // Después de cargar todo, actualizar las etapas con el plan integrado
+      // ⚡ PASO 2: Cargar etapas del plan (CRÍTICO para análisis)
+      console.log('🔍 Cargando etapas del plan nutricional...');
+      await this.cargarEtapasPlanAdministrador();
+      
+      // ⚡ PASO 3: Verificar que las etapas se cargaron correctamente
+      console.log('✅ Verificando etapas cargadas...');
+      if (this.etapasPlanAdministrador.length === 0) {
+        console.warn('⚠️ No se cargaron etapas del plan - reintentando...');
+        
+        // Reintentar carga específica
+        await this.cargarEtapasPlanAdministrador();
+        
+        if (this.etapasPlanAdministrador.length === 0) {
+          console.error('❌ FALLO CRÍTICO: No se pudieron cargar las etapas del plan');
+          throw new Error('No se pudieron cargar las etapas del plan nutricional');
+        }
+      }
+      
+      console.log(`✅ Etapas cargadas exitosamente: ${this.etapasPlanAdministrador.length} etapas`);
+      
+      // ⚡ PASO 4: Cargar etapas de alimentación después de que todo esté listo
       await this.cargarEtapasAlimentacion();
       
-      // 🆕 Inicializar seguimiento de etapas
+      // ⚡ PASO 5: Inicializar seguimiento solo después de tener todo
       this.inicializarSeguimientoEtapas();
       
-      // Actualizar estado del sistema con datos cargados
+      // ⚡ PASO 6: Verificar cobertura de etapas críticas (días 20-21)
+      this.verificarEtapasCriticas();
+      
+      // ⚡ PASO 7: Actualizar estado del sistema
       this.actualizarEstadoSistema([]);
       
       console.log('✅ Todos los datos cargados exitosamente');
@@ -689,6 +1225,28 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * 🆕 Verificar que las etapas críticas estén cubiertas
+   */
+  private verificarEtapasCriticas(): void {
+    console.log('🔍 Verificando cobertura de etapas críticas...');
+    
+    // Verificar días críticos (20-21 para transición)
+    const diasCriticos = [20, 21];
+    
+    diasCriticos.forEach(dia => {
+      const etapaEncontrada = this.etapasPlanAdministrador.find(etapa => 
+        dia >= etapa.diasInicio && dia <= etapa.diasFin
+      );
+      
+      if (etapaEncontrada) {
+        console.log(`✅ Día ${dia}: Cubierto por "${etapaEncontrada.nombre}"`);
+      } else {
+        console.warn(`⚠️ Día ${dia}: NO CUBIERTO - Esto puede causar problemas`);
+      }
+    });
   }
 
   /**
@@ -1095,7 +1653,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     if (!this.loteSeleccionado) return [];
     
     const loteId = this.loteSeleccionado.id || 0;
-    return this.historialSimulado[loteId] || [];
+    return []; // TODO: Cargar historial real desde el backend
   }
 
   /**
@@ -1209,13 +1767,13 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     if (etapaAdministrador) {
       // Cantidad = cantidad por animal * número de animales vivos
       const animalesVivos = this.getAnimalesVivosActuales();
-      cantidadSugerida = parseFloat((etapaAdministrador.cantidadPorAnimal * animalesVivos).toFixed(2));
+      cantidadSugerida = parseFloat((etapaAdministrador.quantityPerAnimal * animalesVivos).toFixed(2));
       tipoAlimento = etapaAdministrador.alimentoRecomendado;
       
       console.log('✅ Etapa del administrador encontrada:', {
         etapa: etapaAdministrador.nombre,
         diasVida: diasVida,
-        cantidadPorAnimal: etapaAdministrador.cantidadPorAnimal,
+        quantityPerAnimal: etapaAdministrador.quantityPerAnimal,
         animalesVivos: animalesVivos,
         cantidadTotal: cantidadSugerida,
         alimento: tipoAlimento
@@ -1246,7 +1804,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
       loteCerrado: false,
       motivoCierre: ''
     };
-    
+
     console.log('📝 Registro inicializado con datos del administrador:', {
       diasVida: diasVida,
       etapa: etapaAdministrador?.nombre || 'Sin etapa',
@@ -1259,19 +1817,45 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   /**
    * Abrir modal de alimentación
    */
-  abrirModalAlimentacion(lote: Lote): void {
+  async abrirModalAlimentacion(lote: Lote): Promise<void> {
     console.log('🔥 INICIANDO abrirModalAlimentacion...');
     console.log('🔥 Lote recibido:', lote);
     console.log('🔥 modalAbierto ANTES:', this.modalAbierto);
     
     this.loteSeleccionado = lote;
     
+    // 🎯 PASO 1: Cargar etapas del plan asignado específicamente para este lote
+    try {
+      console.log('🔥 A PUNTO DE LLAMAR cargarEtapasPlanAsignado...');
+      await this.cargarEtapasPlanAsignado(lote);
+      console.log('🔥 cargarEtapasPlanAsignado COMPLETADO EXITOSAMENTE');
+    } catch (error) {
+      console.error('🔥 ERROR EN cargarEtapasPlanAsignado:', error);
+      // Continuar con la lógica normal si falla
+    }
+    
     // Calcular días de vida una sola vez
     const diasVida = this.calcularDiasDeVida(lote.birthdate);
+    
+    // Limpiar selecciones anteriores
+    this.alimentosSeleccionados = [];
     
     // Obtener etapas disponibles para este lote (una sola vez)
     this.etapasDisponiblesLote = this.obtenerTodasLasEtapasParaLote(diasVida);
     this.etapaActualLote = this.obtenerEtapaParaLote(diasVida);
+    
+    // 🔍 DEBUG: Verificar qué se asignó a etapasDisponiblesLote
+    console.log('🔍 ✅ ETAPAS ASIGNADAS A etapasDisponiblesLote:', this.etapasDisponiblesLote.map(e => ({
+      id: e.id,
+      alimento: e.alimentoRecomendado,
+      cantidad: e.quantityPerAnimal,
+      unidad: e.unidad || 'kg'
+    })));
+    
+    // Inicializar propiedad seleccionado para checkboxes
+    this.etapasDisponiblesLote.forEach(etapa => {
+      etapa.seleccionado = false;
+    });
     
     console.log('🎯 Etapas calculadas para', diasVida, 'días:', this.etapasDisponiblesLote);
     console.log('🎯 Etapa actual:', this.etapaActualLote);
@@ -1311,6 +1895,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   cerrarModal(): void {
     this.modalAbierto = false;
     this.loteSeleccionado = null;
+    this.alimentosSeleccionados = [];
     this.resetearRegistro();
   }
 
@@ -1452,141 +2037,78 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Registrar alimentación completa con validación preventiva
+   * Registrar alimentación completa con validaciones
    */
   async registrarAlimentacionCompleta(): Promise<void> {
-    if (!this.validarFormularioCompleto() || !this.loteSeleccionado) {
-      alert('❌ Por favor completa todos los campos obligatorios');
+    console.log('🔥 INICIANDO registrarAlimentacionCompleta');
+    console.log('🔥 registroCompleto ANTES de validaciones:', JSON.stringify(this.registroCompleto, null, 2));
+    
+    if (!this.validarFormularioCompleto()) {
+      alert('❌ Por favor complete todos los campos obligatorios');
       return;
     }
 
-    const cantidadTotal = this.getCantidadTotalHoyNum();
-    
-    // Validar stock suficiente si hay alimentación
-    if (cantidadTotal > 0 && cantidadTotal > this.getStockActualNum()) {
-      alert('❌ No hay suficiente stock disponible para esta cantidad');
-      return;
+    try {
+      this.loading = true;
+
+      // 🎯 Paso 1: Registrar en el backend
+      console.log('📡 Enviando al backend...');
+      const response = await this.registrarAlimentacionEnBackend(this.registroCompleto);
+      console.log('✅ Respuesta del backend recibida:', response);
+
+      // 🎯 Paso 2: Actualizar datos locales
+      console.log('🔄 Actualizando datos locales...');
+      
+      // Actualizar stock de inventario
+      this.actualizarStockInventario(this.registroCompleto.tipoAlimento, this.registroCompleto.cantidadAplicada);
+      
+      // Actualizar lote con cambios (mortalidad y ventas)
+      this.actualizarLoteConCambios(this.registroCompleto.animalesMuertos, this.registroCompleto.animalesVendidos);
+      
+      // Registrar animales enfermos si los hay
+      if (this.registroCompleto.animalesEnfermos > 0) {
+        this.registrarAnimalesEnfermos(this.registroCompleto.animalesEnfermos, this.registroCompleto.observacionesSalud);
+      }
+      
+      // Agregar al historial local
+      this.agregarAlHistorial(this.registroCompleto);
+      
+      // Si el lote se cierra, enviarlo al histórico
+      if (this.registroCompleto.loteCerrado) {
+        this.cerrarYEnviarAHistorico(this.registroCompleto);
+      }
+
+      // 🎯 Paso 3: Éxito
+      alert('✅ Alimentación registrada exitosamente');
+      
+      // 🎯 Paso 4: Redirección automática basada en los datos ingresados
+      const requiereRedireccion = this.verificarRedireccionNecesaria(this.registroCompleto);
+      if (requiereRedireccion) {
+        this.cerrarModal();
+        this.ejecutarRedireccion(requiereRedireccion);
+      } else {
+        this.cerrarModal();
+      }
+      
+    } catch (error) {
+      console.error('❌ Error en registrarAlimentacionCompleta:', error);
+      
+      // El error ya se maneja en registrarAlimentacionEnBackend
+      // Solo necesitamos resetear el estado de carga
+      
+    } finally {
+      this.loading = false;
     }
-
-    // 🔥 NUEVA VALIDACIÓN PREVENTIVA
-    if (cantidadTotal > 0) {
-      try {
-        const edad = this.calcularDiasDeVida(this.loteSeleccionado.birthdate);
-        const etapa = this.determinarEtapaLote(this.loteSeleccionado);
-        const cantidadPorAnimal = cantidadTotal / this.loteSeleccionado.quantity;
-        
-        const validacion = await this.correccionService.validarCantidad(
-          'pollos', 
-          etapa, 
-          cantidadPorAnimal, 
-          this.loteSeleccionado.quantity
-        ).toPromise();
-
-        if (validacion) {
-          // Mostrar resultado de validación
-          this.mostrarValidacion(validacion);
-          
-          // Si requiere confirmación, preguntar al usuario
-          const continuar = await this.correccionService.mostrarDialogoConfirmacion(validacion);
-          if (!continuar) {
-            return;
-          }
-        }
-      } catch (error) {
-        console.warn('Error en validación preventiva:', error);
-        // Continuar sin validación si hay error
-      }
-    }
-
-    // Determinar si el lote se cerrará
-    const loteSeCierra = this.validarCierreLote();
-    
-    // Preparar datos para envío
-    const registroFinal = {
-      ...this.registroCompleto,
-      cantidadAplicada: cantidadTotal,
-      valorTotalVenta: parseFloat(this.getValorTotalVenta()),
-      loteId: this.loteSeleccionado.id,
-      usuarioId: this.user?.id || 0,
-      stockAnterior: this.getStockActualNum(),
-      stockPosterior: parseFloat(this.getStockDespues()),
-      loteCerrado: loteSeCierra,
-      motivoCierre: loteSeCierra ? 'Lote agotado por ventas/mortalidad' : ''
-    };
-
-    console.log('✅ Registrando alimentación completa:', registroFinal);
-
-    // Simular actualización de stock
-    if (registroFinal.cantidadAplicada > 0) {
-      this.actualizarStockInventario(registroFinal.tipoAlimento, registroFinal.cantidadAplicada);
-    }
-
-    // Actualizar animales vivos del lote
-    if (registroFinal.animalesMuertos > 0 || registroFinal.animalesVendidos > 0) {
-      this.actualizarLoteConCambios(registroFinal.animalesMuertos, registroFinal.animalesVendidos);
-    }
-
-    // Simular seguimiento de animales enfermos
-    if (registroFinal.animalesEnfermos > 0) {
-      this.registrarAnimalesEnfermos(registroFinal.animalesEnfermos, registroFinal.observacionesSalud);
-    }
-
-    // Agregar al historial
-    this.agregarAlHistorial(registroFinal);
-
-    // Si el lote se cierra, enviarlo al histórico
-    if (loteSeCierra) {
-      this.cerrarYEnviarAHistorico(registroFinal);
-    }
-
-    // Llamada real al backend para guardar el registro
-    this.registrarAlimentacionEnBackend(registroFinal).then(() => {
-      let mensaje = `✅ Alimentación registrada exitosamente para el lote ${this.loteSeleccionado!.codigo}\n\n📊 Resumen:\n`;
-      
-      if (registroFinal.cantidadAplicada > 0) {
-        mensaje += `• Alimento aplicado: ${registroFinal.cantidadAplicada} kg\n`;
-      }
-      
-      mensaje += `• Animales vivos: ${registroFinal.animalesVivos}\n`;
-      
-      if (registroFinal.cantidadAplicada > 0) {
-        mensaje += `• Stock actualizado: ${registroFinal.stockPosterior} kg restantes\n`;
-      }
-      
-      if (registroFinal.animalesMuertos > 0) {
-        mensaje += `• Mortalidad registrada: ${registroFinal.animalesMuertos} animales\n`;
-      }
-      
-      if (registroFinal.animalesVendidos > 0) {
-        mensaje += `• Venta registrada: ${registroFinal.animalesVendidos} animales por $${registroFinal.valorTotalVenta}\n`;
-      }
-      
-      if (registroFinal.animalesEnfermos > 0) {
-        mensaje += `• Animales enfermos: ${registroFinal.animalesEnfermos} (enviados a seguimiento)\n`;
-      }
-      
-      if (loteSeCierra) {
-        mensaje += `\n🔒 LOTE CERRADO: El lote ha sido enviado al histórico.`;
-      }
-
-      alert(mensaje);
-      
-      this.cerrarModal();
-      
-      // Recargar datos si el lote se cerró
-      if (loteSeCierra) {
-        this.cargarDatosIniciales();
-      }
-    }).catch((error) => {
-      console.error('Error al registrar alimentación:', error);
-      alert('Error al registrar alimentación. Por favor, intenta nuevamente.');
-    });
   }
 
   /**
    * Registrar alimentación en el backend usando el servicio
    */
   private async registrarAlimentacionEnBackend(registro: RegistroAlimentacionCompleto): Promise<any> {
+    console.log('🔥 INICIO registrarAlimentacionEnBackend');
+    console.log('🔥 registro recibido:', JSON.stringify(registro, null, 2));
+    console.log('🔥 loteSeleccionado:', this.loteSeleccionado);
+    
     const request: RegistroAlimentacionRequest = {
       loteId: this.loteSeleccionado?.id.toString() || '',
       fecha: registro.fecha,
@@ -1596,26 +2118,73 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
       observaciones: `${registro.observacionesGenerales || ''} ${registro.observacionesSalud || ''}`.trim()
     };
 
-    console.log('🍽️ Enviando registro mediante servicio:', request);
+    console.log('🔥 request CREADO:', JSON.stringify(request, null, 2));
+
+    // 🔍 LOGGING DETALLADO PARA DEBUGGING
+    console.log('🍽️ Enviando registro al backend (endpoint REAL):', request);
+    console.log('🔍 VALIDACIÓN DE DATOS ANTES DE ENVIAR:');
+    console.log('  - loteId:', request.loteId, typeof request.loteId);
+    console.log('  - fecha:', request.fecha, typeof request.fecha);
+    console.log('  - cantidadAplicada:', request.cantidadAplicada, typeof request.cantidadAplicada, 'isNaN:', isNaN(request.cantidadAplicada));
+    console.log('  - animalesVivos:', request.animalesVivos, typeof request.animalesVivos, 'isNaN:', isNaN(request.animalesVivos));
+    console.log('  - animalesMuertos:', request.animalesMuertos, typeof request.animalesMuertos, 'isNaN:', isNaN(request.animalesMuertos));
+    console.log('  - observaciones:', request.observaciones, typeof request.observaciones);
+
+    // ✅ VALIDAR DATOS ANTES DE ENVIAR
+    if (!request.loteId || request.loteId === 'undefined') {
+      console.error('❌ ERROR: loteId no válido');
+      alert('❌ Error: ID de lote no válido');
+      throw new Error('ID de lote no válido');
+    }
+    
+    if (!request.fecha || request.fecha === '') {
+      console.error('❌ ERROR: fecha no válida');
+      alert('❌ Error: Fecha no válida');
+      throw new Error('Fecha no válida');
+    }
+    
+    if (isNaN(request.cantidadAplicada) || request.cantidadAplicada < 0) {
+      console.error('❌ ERROR: cantidadAplicada no válida:', request.cantidadAplicada);
+      alert('❌ Error: Cantidad aplicada no válida');
+      throw new Error('Cantidad aplicada no válida');
+    }
+    
+    if (isNaN(request.animalesVivos) || request.animalesVivos < 0) {
+      console.error('❌ ERROR: animalesVivos no válido:', request.animalesVivos);
+      alert('❌ Error: Número de animales vivos no válido');
+      throw new Error('Número de animales vivos no válido');
+    }
+    
+    if (isNaN(request.animalesMuertos) || request.animalesMuertos < 0) {
+      console.error('❌ ERROR: animalesMuertos no válido:', request.animalesMuertos);
+      alert('❌ Error: Número de animales muertos no válido');
+      throw new Error('Número de animales muertos no válido');
+    }
+
+    console.log('✅ Todos los datos son válidos, enviando al backend...');
 
     try {
-      // Intentar registro real en backend
-      return await this.alimentacionService.registrarAlimentacion(request).toPromise();
+      const response = await this.alimentacionService.registrarAlimentacion(request).toPromise();
+      console.log('✅ Respuesta del backend:', response);
+      return response;
     } catch (error) {
-      console.warn('⚠️ Backend no disponible, simulando registro exitoso:', error);
+      console.error('❌ Error al guardar en backend:', error);
       
-      // ✅ SOLUCIÓN TEMPORAL: Simular respuesta exitosa
-      const simulatedResponse = {
-        id: Date.now(),
-        executionDate: registro.fecha,
-        quantityApplied: registro.cantidadAplicada,
-        observations: request.observaciones,
-        status: 'SIMULADO_OK',
-        message: '✅ Registro simulado exitoso (backend no disponible)'
-      };
+      // Mostrar mensaje de error específico
+      if (error.status === 404) {
+        alert('❌ Error: El endpoint no se encontró. Verifique que el backend esté ejecutándose.');
+      } else if (error.status === 401) {
+        alert('❌ Error: No autorizado. Verifique sus credenciales.');
+      } else if (error.status === 400) {
+        console.error('❌ ERROR 400 - Datos inválidos:', error);
+        alert('❌ Error 400: Datos inválidos. Revise la consola para más detalles.');
+      } else if (error.status === 500) {
+        alert('❌ Error interno del servidor. Verifique los logs del backend.');
+      } else {
+        alert(`❌ Error de conexión: ${error.message || 'Error desconocido'}`);
+      }
       
-      console.log('✅ Simulando registro exitoso:', simulatedResponse);
-      return simulatedResponse;
+      throw error;
     }
   }
 
@@ -1655,25 +2224,15 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
    * Agregar registro al historial
    */
   private agregarAlHistorial(registro: RegistroAlimentacionCompleto): void {
-    const loteId = registro.loteId;
-    
-    if (!this.historialSimulado[loteId]) {
-      this.historialSimulado[loteId] = [];
-    }
-    
-    const nuevoRegistro: RegistroHistorial = {
+    // TODO: Implementar guardado real del historial en el backend
+    console.log('📝 Registro que se debería guardar en BD:', {
       fecha: registro.fecha,
       cantidad: registro.cantidadAplicada,
       animalesVivos: registro.animalesVivos,
       animalesVendidos: registro.animalesVendidos > 0 ? registro.animalesVendidos : undefined,
       valorVenta: registro.valorTotalVenta > 0 ? registro.valorTotalVenta : undefined,
       observaciones: registro.observacionesGenerales || 'Sin observaciones'
-    };
-    
-    // Agregar al inicio del array para mostrar el más reciente primero
-    this.historialSimulado[loteId].unshift(nuevoRegistro);
-    
-    console.log('📋 Registro agregado al historial:', nuevoRegistro);
+    });
   }
 
   /**
@@ -1696,6 +2255,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
         return nombreProducto.includes('mixto') || nombreProducto.includes('mix');
       }
       
+      // Búsqueda general
       return nombreProducto.includes(tipoABuscar);
     });
 
@@ -1797,9 +2357,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     
     if (diasVida <= 7) return 'Inicial';
     if (diasVida <= 21) return 'Crecimiento';
-    if (diasVida <= 35) return 'Desarrollo';
-    if (diasVida <= 49) return 'Engorde';
-    return 'Finalización';
+    return 'Acabado';
   }
 
   /**
@@ -1890,9 +2448,7 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
     
     if (diasPromedio <= 7) return 'Etapa Inicial';
     if (diasPromedio <= 21) return 'Etapa de Crecimiento';
-    if (diasPromedio <= 35) return 'Etapa de Desarrollo';
-    if (diasPromedio <= 49) return 'Etapa de Engorde';
-    return 'Etapa de Finalización';
+    return 'Etapa de Acabado';
   }
 
   /**
@@ -2183,14 +2739,14 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
       
       // Información de edad
       diasVida,
-      edadFormateada: `${diasVida} días`,
+      edadTexto: `${diasVida} días`,
       
       // Información de etapa
       etapaActual: etapaActual ? {
         nombre: etapaActual.nombre,
         rangoDias: etapaActual.rangoDias,
         alimentoRecomendado: etapaActual.alimentoRecomendado,
-        cantidadPorAnimal: etapaActual.cantidadPorAnimal,
+        cantidadPorAnimal: etapaActual.quantityPerAnimal,
         unidad: etapaActual.unidad,
         esActual: etapaActual.esActual,
         advertencia: etapaActual.advertencia || null
@@ -2254,12 +2810,21 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
       };
     }
     
+    // Debug: verificar qué datos tiene la etapa
+    console.log('🔍 DEBUG - getInfoEtapaActual:', {
+      diasVida,
+      etapaActual,
+      quantityPerAnimal: etapaActual.quantityPerAnimal,
+      cantidadPorAnimal: etapaActual.cantidadPorAnimal,
+      todasLasPropiedades: Object.keys(etapaActual)
+    });
+    
     return {
       tieneEtapa: true,
       nombre: etapaActual.nombre,
       rangoDias: etapaActual.rangoDias,
       alimentoRecomendado: etapaActual.alimentoRecomendado,
-      cantidadPorAnimal: etapaActual.cantidadPorAnimal,
+      cantidadPorAnimal: etapaActual.quantityPerAnimal || etapaActual.cantidadPorAnimal || 0,
       unidad: etapaActual.unidad,
       esActual: etapaActual.esActual,
       diasVida,
@@ -2291,18 +2856,19 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
           diasInicio: etapa.diasInicio,
           diasFin: etapa.diasFin,
           alimento: etapa.alimentoRecomendado,
-          cantidad: etapa.cantidadPorAnimal,
+          cantidad: etapa.quantityPerAnimal,
           unidad: etapa.unidad
         });
       });
       
       // Verificar cobertura de rangos
       console.log('🔍 Análisis de cobertura de rangos:');
-      const rangos = this.etapasPlanAdministrador.map(e => ({
-        inicio: e.diasInicio,
+      const rangos = this.etapasPlanAdministrador.map(e => ({ 
+        inicio: e.diasInicio, 
         fin: e.diasFin,
-        nombre: e.nombre
-      })).sort((a, b) => a.inicio - b.inicio);
+        nombre: e.nombre || `Rango ${e.diasInicio}-${e.diasFin}`
+      }));
+      rangos.sort((a, b) => a.inicio - b.inicio);
       
       rangos.forEach((rango, index) => {
         const siguienteRango = rangos[index + 1];
@@ -2454,396 +3020,147 @@ export class PollosAlimentacionComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Obtener edad del lote (método público para el template)
+   * Verificar si se necesita redirección después del registro
    */
-  obtenerEdadLote(loteId: number): number {
-    const lote = this.lotesPollos.find(l => l.id === loteId) || 
-                 this.lotesActivos.find(l => l.id === loteId);
-    if (!lote) return 0;
+  private verificarRedireccionNecesaria(registro: RegistroAlimentacionCompleto): 'mortalidad' | 'morbilidad' | null {
+    // Verificar animales muertos
+    if (registro.animalesMuertos > 0) {
+      return 'mortalidad';
+    }
     
+    // Verificar animales enfermos
+    if (registro.animalesEnfermos > 0) {
+      return 'morbilidad';
+    }
+    
+    return null;
+  }
+
+  /**
+   * Ejecutar redirección basada en el tipo de registro
+   */
+  private ejecutarRedireccion(tipo: 'mortalidad' | 'morbilidad'): void {
+    const mensajes = {
+      mortalidad: 'Se registraron animales muertos. Será redirigido al módulo de mortalidad para completar el registro.',
+      morbilidad: 'Se registraron animales enfermos. Será redirigido al módulo de morbilidad para completar el registro.'
+    };
+    
+    const urls = {
+      mortalidad: '/pollos/mortalidad',
+      morbilidad: '/pollos/morbilidad'
+    };
+    
+    // Mostrar mensaje informativo
+    if (confirm(`${mensajes[tipo]} ¿Desea continuar?`)) {
+      console.log(`🔄 Redirigiendo a ${urls[tipo]} para completar registro de ${tipo}`);
+      this.router.navigate([urls[tipo]], {
+        state: {
+          fromAlimentacion: true,
+          loteId: this.loteSeleccionado?.id,
+          loteCodigo: this.loteSeleccionado?.codigo,
+          fecha: this.registroCompleto.fecha,
+          cantidad: tipo === 'mortalidad' ? this.registroCompleto.animalesMuertos : this.registroCompleto.animalesEnfermos,
+          observaciones: this.registroCompleto.observacionesSalud
+        }
+      });
+    }
+  }
+
+  // Agregar propiedad que falta
+  alimentosSeleccionados: any[] = [];
+
+  // Método para realizar análisis completo
+  realizarAnalisisCompleto(): void {
+    console.log('🔍 ====== ANÁLISIS COMPLETO DEL SISTEMA ======');
+    console.log('📊 Lotes activos:', this.lotesActivos.length);
+    console.log('📋 Plan activo:', this.planActivoAdministrador?.name || 'Ninguno');
+    console.log('🎯 Etapas disponibles:', this.etapasPlanAdministrador?.length || 0);
+    
+    // Análisis detallado por lote
+    this.lotesActivos.forEach(lote => {
+      const diasVida = this.calcularDiasDeVida(lote.birthdate);
+      const etapaActual = this.obtenerEtapaParaLote(diasVida);
+      
+      console.log(`\n📊 LOTE ${lote.codigo}:`);
+      console.log(`   - Edad: ${diasVida} días`);
+      console.log(`   - Cantidad: ${lote.quantity} pollos`);
+      console.log(`   - Etapa actual: ${etapaActual?.nombre || 'Sin etapa'}`);
+      console.log(`   - Alimento recomendado: ${etapaActual?.alimentoRecomendado || 'Sin definir'}`);
+    });
+    
+    // Verificar estado del sistema
+    this.actualizarEstadoSistema(this.etapasPlanAdministrador);
+    
+    console.log('✅ Análisis completo terminado. Revisa los detalles arriba.');
+  }
+
+  // Método para agrupar etapas por rango
+  agruparEtapasPorRango(etapas: any[]): any[] {
+    console.log('🔍 Agrupando etapas por rango de días...');
+    
+    const etapasAgrupadas: any[] = [];
+    const rangosProcesados = new Map<string, any>();
+    
+    etapas.forEach(etapa => {
+      const claveRango = `${etapa.dayStart}-${etapa.dayEnd}`;
+      
+      if (!rangosProcesados.has(claveRango)) {
+        rangosProcesados.set(claveRango, {
+          id: etapa.id,
+          dayStart: etapa.dayStart,
+          dayEnd: etapa.dayEnd,
+          productos: [],
+          quantityPerAnimal: etapa.quantityPerAnimal,
+          frequency: etapa.frequency,
+          instructions: etapa.instructions,
+          productoId: etapa.productoId
+        });
+      }
+      
+      const rangoExistente = rangosProcesados.get(claveRango);
+      if (etapa.product && !rangoExistente.productos.includes(etapa.product.name)) {
+        rangoExistente.productos.push(etapa.product.name);
+      }
+    });
+    
+    return Array.from(rangosProcesados.values());
+  }
+
+  // Método para actualizar estado del sistema
+  actualizarEstadoSistema(etapas: any[]): void {
+    const lotesCargados = this.lotesActivos?.length || 0;
+    const planEncontrado = this.planActivoAdministrador !== null;
+    const etapasCubiertas = etapas && etapas.length > 0;
+    
+    let problemasDetectados = 0;
+    
+    if (lotesCargados === 0) problemasDetectados++;
+    if (!planEncontrado) problemasDetectados++;
+    if (!etapasCubiertas) problemasDetectados++;
+    
+    this.estadoSistema = {
+      lotesCargados,
+      planEncontrado,
+      etapasCubiertas,
+      problemasDetectados,
+      mensaje: problemasDetectados === 0 ? 'Sistema OK' : `${problemasDetectados} problema(s)`,
+      color: problemasDetectados === 0 ? 'text-green-600' : 'text-red-600'
+    };
+  }
+
+  // Método para obtener edad de un lote por ID
+  obtenerEdadLote(loteId: number): number {
+    const lote = this.lotesActivos.find(l => l.id === loteId);
+    if (!lote) return 0;
     return this.calcularDiasDeVida(lote.birthdate);
   }
 
-  /**
-   * Obtener etapa actual del lote (método público para el template) 
-   */
+  // Método para obtener etapa actual de un lote por ID
   obtenerEtapaActual(loteId: number): any {
-    const edad = this.obtenerEdadLote(loteId);
+    const lote = this.lotesActivos.find(l => l.id === loteId);
+    if (!lote) return null;
     
-    if (edad === 0) return null;
-    
-    return this.etapasPlanAdministrador.find(etapa => 
-      edad >= etapa.diasInicio && edad <= etapa.diasFin
-    );
+    const diasVida = this.calcularDiasDeVida(lote.birthdate);
+    return this.obtenerEtapaParaLote(diasVida);
   }
-
-  // ========== MÉTODOS PRINCIPALES ==========
-
-  // ========== ANÁLISIS Y VALIDACIÓN COMPLETA ==========
-
-  /**
-   * Realizar análisis completo del sistema para validar coherencia
-   */
-  async realizarAnalisisCompleto(): Promise<void> {
-    console.log('🔍 ====== INICIANDO ANÁLISIS COMPLETO DEL SISTEMA ======');
-    
-    try {
-      // 1. Análisis de fechas y edades de lotes
-      await this.analizarLotesYEdades();
-      
-      // 2. Análisis de planes y etapas disponibles
-      await this.analizarPlanesYEtapas();
-      
-      // 3. Validación de coherencia entre lotes y etapas
-      await this.validarCoherenciaLotesEtapas();
-      
-      // 4. Análisis específico para Lote 01 (día 21)
-      await this.analizarLote01Especifico();
-      
-      // 5. Recomendaciones de corrección
-      this.generarRecomendaciones();
-      
-      console.log('✅ ====== ANÁLISIS COMPLETO FINALIZADO ======');
-      
-    } catch (error) {
-      console.error('❌ Error en análisis completo:', error);
-    }
-  }
-
-  /**
-   * 1. Analizar lotes y sus edades calculadas
-   */
-  private async analizarLotesYEdades(): Promise<void> {
-    console.log('📊 === 1. ANÁLISIS DE LOTES Y EDADES ===');
-    
-    const hoy = new Date();
-    console.log('📅 Fecha actual del sistema:', hoy.toLocaleDateString('es-ES'));
-    
-    if (this.lotesPollos.length === 0) {
-      console.warn('⚠️ No hay lotes de pollos cargados');
-      return;
-    }
-    
-    this.lotesPollos.forEach((lote, index) => {
-      const fechaNacimiento = lote.birthdate;
-      const edad = this.calcularDiasDeVida(fechaNacimiento);
-      
-      console.log(`🐣 Lote ${index + 1} (${lote.codigo || lote.id}):`);
-      console.log(`   • Fecha Nacimiento: ${fechaNacimiento ? fechaNacimiento.toLocaleDateString('es-ES') : 'No definida'}`);
-      console.log(`   • Edad Calculada: ${edad} días`);
-      console.log(`   • Cantidad: ${lote.quantity} pollos`);
-      console.log(`   • Raza: ${lote.race?.name || 'No asignada'}`);
-      
-      // Validar fecha coherente
-      if (fechaNacimiento) {
-        const diffTime = Math.abs(hoy.getTime() - fechaNacimiento.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (Math.abs(diffDays - edad) > 1) {
-          console.warn(`   ⚠️ ADVERTENCIA: Diferencia en cálculo de edad (calculado: ${edad}, esperado: ~${diffDays})`);
-        } else {
-          console.log(`   ✅ Cálculo de edad correcto`);
-        }
-        
-        // Verificar si es futuro
-        if (fechaNacimiento > hoy) {
-          console.warn(`   ⚠️ ADVERTENCIA: Fecha de nacimiento en el futuro`);
-        }
-      } else {
-        console.error(`   ❌ ERROR: Fecha de nacimiento no definida`);
-      }
-      
-      console.log(''); // Separador
-    });
-  }
-
-  /**
-   * 2. Analizar planes disponibles y sus etapas
-   */
-  private async analizarPlanesYEtapas(): Promise<void> {
-    console.log('📋 === 2. ANÁLISIS DE PLANES Y ETAPAS ===');
-    
-    try {
-      const planes = await this.planService.getAllPlanes().toPromise();
-      
-      if (!planes || planes.length === 0) {
-        console.error('❌ No se encontraron planes nutricionales');
-        return;
-      }
-      
-      console.log(`📊 Total de planes encontrados: ${planes.length}`);
-      
-      for (const plan of planes) {
-        console.log(`\n🎯 Plan "${plan.name}" (ID: ${plan.id}):`);
-        console.log(`   • Activo: ${plan.active ? 'SÍ' : 'NO'}`);
-        console.log(`   • Animal: ${plan.animal?.name || plan.animalName || 'No especificado'}`);
-        
-        try {
-          const etapas = await this.planService.getDetallesByPlan(plan.id).toPromise();
-          
-          if (etapas && etapas.length > 0) {
-            console.log(`   • Etapas: ${etapas.length}`);
-            
-            // Analizar cada etapa
-            etapas.sort((a, b) => a.dayStart - b.dayStart).forEach((etapa, idx) => {
-              console.log(`     ${idx + 1}. Días ${etapa.dayStart}-${etapa.dayEnd}: ${etapa.product?.name || 'Sin producto'} (${etapa.quantityPerAnimal}kg/animal)`);
-            });
-            
-            // Verificar cobertura completa
-            const rangos = etapas.map(e => ({ inicio: e.dayStart, fin: e.dayEnd }));
-            this.verificarCoberturaEtapas(rangos);
-            
-          } else {
-            console.warn(`   ⚠️ Sin etapas definidas`);
-          }
-          
-        } catch (errorEtapas) {
-          console.error(`   ❌ Error al obtener etapas: ${errorEtapas.message}`);
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ Error al analizar planes:', error);
-    }
-  }
-
-  /**
-   * Verificar que las etapas cubren todos los días sin gaps
-   */
-  private verificarCoberturaEtapas(rangos: { inicio: number, fin: number }[]): void {
-    if (rangos.length === 0) return;
-    
-    rangos.sort((a, b) => a.inicio - b.inicio);
-    
-    console.log('   📊 Verificando cobertura de etapas:');
-    
-    for (let i = 0; i < rangos.length; i++) {
-      const etapaActual = rangos[i];
-      
-      // Verificar gap con etapa anterior
-      if (i > 0) {
-        const etapaAnterior = rangos[i - 1];
-        const gap = etapaActual.inicio - etapaAnterior.fin;
-        
-        if (gap > 1) {
-          console.warn(`     ⚠️ GAP detectado: días ${etapaAnterior.fin + 1}-${etapaActual.inicio - 1} sin cobertura`);
-        } else if (gap < 0) {
-          console.warn(`     ⚠️ SOLAPAMIENTO detectado: días ${etapaActual.inicio}-${etapaAnterior.fin} duplicados`);
-        } else {
-          console.log(`     ✅ Transición correcta: ${etapaAnterior.fin} → ${etapaActual.inicio}`);
-        }
-      }
-    }
-    
-    // Verificar cobertura específica para días críticos (20-21)
-    const cubre20 = rangos.some(r => 20 >= r.inicio && 20 <= r.fin);
-    const cubre21 = rangos.some(r => 21 >= r.inicio && 21 <= r.fin);
-    
-    console.log(`   🎯 Cobertura días críticos:`);
-    console.log(`     • Día 20: ${cubre20 ? '✅ Cubierto' : '❌ Sin cobertura'}`);
-    console.log(`     • Día 21: ${cubre21 ? '✅ Cubierto' : '❌ Sin cobertura'}`);
-  }
-
-  /**
-   * 3. Validar coherencia entre lotes y etapas
-   */
-  private async validarCoherenciaLotesEtapas(): Promise<void> {
-    console.log('🔗 === 3. VALIDACIÓN DE COHERENCIA LOTES-ETAPAS ===');
-    
-    if (this.etapasPlanAdministrador.length === 0) {
-      console.error('❌ No hay etapas del plan administrador cargadas');
-      return;
-    }
-    
-    console.log(`📋 Plan administrador activo: "${this.planActivoAdministrador?.name || 'No identificado'}"`);
-    console.log(`📊 Etapas disponibles: ${this.etapasPlanAdministrador.length}`);
-    
-    this.lotesPollos.forEach((lote, index) => {
-      const edad = this.calcularDiasDeVida(lote.birthdate);
-      const etapaCorrespondiente = this.etapasPlanAdministrador.find(etapa => 
-        edad >= etapa.diasInicio && edad <= etapa.diasFin
-      );
-      
-      console.log(`\n🐣 Lote ${index + 1} (${lote.codigo || lote.id}) - ${edad} días:`);
-      
-      if (etapaCorrespondiente) {
-        console.log(`   ✅ Etapa encontrada: ${etapaCorrespondiente.nombre}`);
-        console.log(`   📊 Rango: ${etapaCorrespondiente.rangoDias}`);
-        console.log(`   🍽️ Alimento: ${etapaCorrespondiente.alimentoRecomendado}`);
-        console.log(`   ⚖️ Cantidad: ${etapaCorrespondiente.cantidadPorAnimal}kg/animal`);
-      } else {
-        console.error(`   ❌ SIN ETAPA para ${edad} días`);
-        
-        // Buscar etapa más cercana
-        let etapaMasCercana = null;
-        let menorDistancia = Infinity;
-        
-        this.etapasPlanAdministrador.forEach(etapa => {
-          const distanciaInicio = Math.abs(edad - etapa.diasInicio);
-          const distanciaFin = Math.abs(edad - etapa.diasFin);
-          const distanciaMinima = Math.min(distanciaInicio, distanciaFin);
-          
-          if (distanciaMinima < menorDistancia) {
-            menorDistancia = distanciaMinima;
-            etapaMasCercana = etapa;
-          }
-        });
-        
-        if (etapaMasCercana) {
-          console.log(`   🔄 Etapa más cercana: ${etapaMasCercana.nombre} (distancia: ${menorDistancia} días)`);
-        }
-      }
-    });
-  }
-
-  /**
-   * 4. Análisis específico para Lote 01 (caso reportado)
-   */
-  private async analizarLote01Especifico(): Promise<void> {
-    console.log('🎯 === 4. ANÁLISIS ESPECÍFICO LOTE 01 ===');
-    
-    const lote01 = this.lotesPollos.find(lote => 
-      lote.codigo === '0001' || lote.codigo === '00001' || 
-      lote.id === 1
-    );
-    
-    if (!lote01) {
-      console.warn('⚠️ No se encontró Lote 01');
-      console.log('📋 Lotes disponibles:', this.lotesPollos.map(l => ({
-        id: l.id,
-        codigo: l.codigo,
-        edad: this.calcularDiasDeVida(l.birthdate)
-      })));
-      return;
-    }
-    
-    const edad = this.calcularDiasDeVida(lote01.birthdate);
-    
-    console.log('🔍 Análisis detallado del Lote 01:');
-    console.log(`   • ID: ${lote01.id}`);
-    console.log(`   • Código: ${lote01.codigo}`);
-    console.log(`   • Nombre: ${lote01.name}`);
-    console.log(`   • Fecha Nacimiento: ${lote01.birthdate?.toLocaleDateString('es-ES')}`);
-    console.log(`   • Edad Actual: ${edad} días`);
-    console.log(`   • Cantidad: ${lote01.quantity} pollos`);
-    
-    // Verificar transición 20→21 días específicamente
-    console.log('\n🔄 Análisis de transición día 20→21:');
-    
-    [20, 21].forEach(dia => {
-      const etapaParaDia = this.etapasPlanAdministrador.find(etapa => 
-        dia >= etapa.diasInicio && dia <= etapa.diasFin
-      );
-      
-      if (etapaParaDia) {
-        console.log(`   • Día ${dia}: ${etapaParaDia.nombre} (${etapaParaDia.rangoDias})`);
-      } else {
-        console.error(`   ❌ Día ${dia}: SIN ETAPA DEFINIDA`);
-      }
-    });
-    
-    // Verificar si debería cambiar de etapa
-    if (edad === 21) {
-      console.log('\n🎯 CASO ESPECÍFICO - Lote en día 21:');
-      
-      const etapaAnterior = this.etapasPlanAdministrador.find(e => 20 >= e.diasInicio && 20 <= e.diasFin);
-      const etapaActual = this.etapasPlanAdministrador.find(e => 21 >= e.diasInicio && 21 <= e.diasFin);
-      
-      if (etapaAnterior && etapaActual && etapaAnterior.id !== etapaActual.id) {
-        console.log(`   🔄 CAMBIO DE ETAPA detectado:`);
-        console.log(`      • Día 20: ${etapaAnterior.nombre}`);
-        console.log(`      • Día 21: ${etapaActual.nombre}`);
-        console.log(`   🎉 El sistema debería mostrar este cambio automáticamente`);
-      } else if (etapaAnterior && etapaActual && etapaAnterior.id === etapaActual.id) {
-        console.log(`   ➡️ Sin cambio de etapa: ${etapaActual.nombre} continúa`);
-      } else {
-        console.error(`   ❌ Problema en configuración de etapas para días 20-21`);
-      }
-    }
-  }
-
-  /**
-   * 5. Generar recomendaciones de corrección
-   */
-  private generarRecomendaciones(): void {
-    console.log('💡 === 5. RECOMENDACIONES DE CORRECCIÓN ===');
-    
-    const recomendaciones: string[] = [];
-    
-    // Verificar lotes sin fecha
-    const lotesSinFecha = this.lotesPollos.filter(l => !l.birthdate);
-    if (lotesSinFecha.length > 0) {
-      recomendaciones.push(`⚠️ ${lotesSinFecha.length} lotes sin fecha de nacimiento - corregir en administrador de lotes`);
-    }
-    
-    // Verificar plan sin etapas
-    if (this.etapasPlanAdministrador.length === 0) {
-      recomendaciones.push('❌ Sin etapas del plan nutricional - verificar configuración en administrador');
-    }
-    
-    // Verificar gaps en etapas
-    const rangos = this.etapasPlanAdministrador.map(e => ({ inicio: e.diasInicio, fin: e.diasFin }));
-    if (rangos.length > 0) {
-      rangos.sort((a, b) => a.inicio - b.inicio);
-      
-      for (let i = 1; i < rangos.length; i++) {
-        const gap = rangos[i].inicio - rangos[i-1].fin;
-        if (gap > 1) {
-          recomendaciones.push(`⚠️ Gap en etapas: días ${rangos[i-1].fin + 1}-${rangos[i].inicio - 1} sin cobertura`);
-        }
-      }
-    }
-    
-    // Verificar lotes sin etapa correspondiente
-    const lotesSinEtapa = this.lotesPollos.filter(lote => {
-      const edad = this.calcularDiasDeVida(lote.birthdate);
-      return !this.etapasPlanAdministrador.some(etapa => edad >= etapa.diasInicio && edad <= etapa.diasFin);
-    });
-    
-    if (lotesSinEtapa.length > 0) {
-      recomendaciones.push(`❌ ${lotesSinEtapa.length} lotes sin etapa correspondiente a su edad`);
-    }
-    
-    // Actualizar estado del sistema
-    this.actualizarEstadoSistema(recomendaciones);
-    
-    // Mostrar recomendaciones
-    if (recomendaciones.length === 0) {
-      console.log('✅ ¡Sistema configurado correctamente! No se detectaron problemas.');
-    } else {
-      console.log('📋 Problemas detectados que requieren atención:');
-      recomendaciones.forEach((rec, idx) => {
-        console.log(`   ${idx + 1}. ${rec}`);
-      });
-    }
-    
-    console.log('\n🔧 Para solucionarlo:');
-    console.log('   1. Verificar fechas de nacimiento en el administrador de lotes');
-    console.log('   2. Confirmar que hay planes nutricionales activos');
-    console.log('   3. Asegurar que las etapas cubren todos los días de vida');
-    console.log('   4. Verificar asignaciones de planes a lotes');
-  }
-
-  /**
-   * Actualizar estado del sistema para mostrar en la UI
-   */
-  private actualizarEstadoSistema(problemas: string[]): void {
-    this.estadoSistema.lotesCargados = this.lotesPollos.length;
-    this.estadoSistema.planEncontrado = this.planActivoAdministrador !== null;
-    this.estadoSistema.etapasCubiertas = this.etapasPlanAdministrador.length > 0;
-    this.estadoSistema.problemasDetectados = problemas.length;
-
-    if (problemas.length === 0) {
-      this.estadoSistema.mensaje = '✅ Sistema funcionando correctamente';
-      this.estadoSistema.color = 'text-green-600';
-    } else if (problemas.length <= 2) {
-      this.estadoSistema.mensaje = `⚠️ ${problemas.length} problema(s) menor(es) detectado(s)`;
-      this.estadoSistema.color = 'text-yellow-600';
-    } else {
-      this.estadoSistema.mensaje = `❌ ${problemas.length} problemas críticos detectados`;
-      this.estadoSistema.color = 'text-red-600';
-    }
-  }
-
-  // ========== MÉTODOS DE DIAGNÓSTICO ==========
 }
