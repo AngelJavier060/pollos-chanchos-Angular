@@ -22,6 +22,11 @@ const routes: Routes = [
       { path: 'dashboard', component: PollosDashboardHomeComponent, canActivate: [AuthGuard] },
       { path: 'alimentacion', component: PollosAlimentacionComponent, canActivate: [AuthGuard] },
       { path: 'lotes', component: PollosLotesComponent, canActivate: [AuthGuard] },
+      { 
+        path: 'inventario', 
+        loadComponent: () => import('../inventario/inventario.component').then(m => m.InventarioComponent),
+        canActivate: [AuthGuard] 
+      },
       { path: 'historico', component: PollosHistoricoComponent, canActivate: [AuthGuard] },
       { path: 'mortalidad', component: PollosMortalidadComponent, canActivate: [AuthGuard] },
       { path: 'morbilidad', component: PollosMorbilidadComponent, canActivate: [AuthGuard] }

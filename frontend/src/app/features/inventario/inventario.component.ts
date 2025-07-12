@@ -5,6 +5,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
 import { ProductService } from '../../shared/services/product.service';
+import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/services/analisis-inventario.service';
 import { 
   Product, Provider, TypeFood, UnitMeasurement, Animal, Stage 
 } from '../../shared/models/product.model';
@@ -24,6 +25,13 @@ export class InventarioComponent implements OnInit {
   animals: Animal[] = [];
   stages: Stage[] = [];
   
+  // Análisis de inventario
+  analisisInventario: InventarioAnalisis | null = null;
+  cargandoAnalisis = false;
+  
+  // Vista actual
+  vistaActual: 'productos' | 'analisis' = 'productos';
+  
   productForm: FormGroup;
   searchForm: FormGroup;
   
@@ -34,6 +42,7 @@ export class InventarioComponent implements OnInit {
   
   constructor(
     private productService: ProductService,
+    private analisisService: AnalisisInventarioService,
     private fb: FormBuilder
   ) {
     this.productForm = this.fb.group({
@@ -64,6 +73,7 @@ export class InventarioComponent implements OnInit {
   ngOnInit(): void {
     this.loadRelatedEntities();
     this.loadProducts();
+    this.cargarAnalisisInventario();
   }
   
   loadProducts(): void {
@@ -133,6 +143,80 @@ export class InventarioComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+  
+  /**
+   * Cargar análisis de inventario
+   */
+  cargarAnalisisInventario(): void {
+    this.cargandoAnalisis = true;
+    this.analisisService.getAnalisisInventario().subscribe({
+      next: (analisis) => {
+        this.analisisInventario = analisis;
+        this.cargandoAnalisis = false;
+        console.log('Análisis de inventario cargado:', analisis);
+      },
+      error: (error) => {
+        console.error('Error al cargar análisis de inventario:', error);
+        this.cargandoAnalisis = false;
+      }
+    });
+  }
+  
+  /**
+   * Cambiar entre vistas
+   */
+  cambiarVista(vista: 'productos' | 'analisis'): void {
+    this.vistaActual = vista;
+    if (vista === 'analisis' && !this.analisisInventario) {
+      this.cargarAnalisisInventario();
+    }
+  }
+  
+  /**
+   * Obtener indicador de tendencia
+   */
+  getTendencia(valores: number[]): 'up' | 'down' | 'stable' {
+    if (valores.length < 2) return 'stable';
+    
+    const ultimo = valores[valores.length - 1];
+    const penultimo = valores[valores.length - 2];
+    
+    if (ultimo > penultimo) return 'up';
+    if (ultimo < penultimo) return 'down';
+    return 'stable';
+  }
+  
+  /**
+   * Formatear número con separadores de miles
+   */
+  formatearNumero(numero: number): string {
+    return numero.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+  }
+  
+  /**
+   * Obtener clase CSS para el estado del lote
+   */
+  getClaseEstado(estado: string): string {
+    return estado === 'activo' ? 'text-green-600' : 'text-red-600';
+  }
+  
+  /**
+   * Obtener color para el rendimiento
+   */
+  getColorRendimiento(rendimiento: number): string {
+    if (rendimiento >= 80) return 'text-green-600';
+    if (rendimiento >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  }
+  
+  /**
+   * Obtener color para la rentabilidad
+   */
+  getColorRentabilidad(rentabilidad: number): string {
+    if (rentabilidad >= 20) return 'text-green-600';
+    if (rentabilidad >= 10) return 'text-yellow-600';
+    return 'text-red-600';
   }
   
   searchProducts(): void {

@@ -11,12 +11,15 @@ interface RegistroHistorico {
   codigoLote: string;
   loteDescripcion: string;
   cantidadAplicada: number;
+  cantidad?: number; // Alias para cantidadAplicada
   animalesVivos?: number;
   animalesMuertos?: number;
   observaciones: string;
   status: string;
   dayNumber: number;
   fechaCreacion: string;
+  fechaUltimaModificacion?: string;
+  usuarioUltimaModificacion?: number;
 }
 
 // Interface para estadísticas agrupadas por lote
@@ -515,4 +518,116 @@ export class PollosHistoricoComponent implements OnInit {
       .filter(status => status)
       .sort();
   }
-} 
+
+  /**
+   * Editar un registro existente
+   */
+  editarRegistro(registro: any): void {
+    const confirmacion = confirm(`¿Deseas editar el registro #${registro.id}?`);
+    if (!confirmacion) return;
+
+    // Crear un modal o formulario de edición
+    const cantidadActual = registro.cantidadAplicada || registro.cantidad || 0;
+    const nuevaCantidad = prompt(`Cantidad actual: ${cantidadActual} kg\nIngresa la nueva cantidad:`, cantidadActual.toString());
+    if (nuevaCantidad === null) return;
+
+    const cantidadNumerica = parseFloat(nuevaCantidad);
+    if (isNaN(cantidadNumerica) || cantidadNumerica <= 0) {
+      alert('❌ La cantidad debe ser un número válido mayor a 0');
+      return;
+    }
+
+    const nuevasObservaciones = prompt(`Observaciones actuales: ${registro.observaciones || 'Sin observaciones'}\nNuevas observaciones:`, registro.observaciones || '');
+    if (nuevasObservaciones === null) return;
+
+    // Datos de la corrección
+    const datosCorreccion = {
+      registroId: registro.id,
+      cantidadAnterior: cantidadActual,
+      cantidadNueva: cantidadNumerica,
+      observacionesAnteriores: registro.observaciones,
+      observacionesNuevas: nuevasObservaciones,
+      motivoCorreccion: prompt('Motivo de la corrección:', 'Corrección de datos') || 'Corrección de datos',
+      usuarioCorreccion: this.user?.id || 0
+    };
+
+    // Llamar al servicio para actualizar
+    this.aplicarCorreccion(datosCorreccion);
+  }
+
+  /**
+   * Eliminar un registro
+   */
+  eliminarRegistro(registro: any): void {
+    const confirmacion = confirm(`⚠️ ¿Estás seguro de eliminar el registro #${registro.id}?\n\nEsta acción NO se puede deshacer.`);
+    if (!confirmacion) return;
+
+    const motivoEliminacion = prompt('Motivo de la eliminación:', 'Registro erróneo');
+    if (!motivoEliminacion) {
+      alert('❌ Debes proporcionar un motivo para la eliminación');
+      return;
+    }
+
+    // Llamar al servicio para eliminar
+    this.eliminarRegistroDelSistema(registro.id, motivoEliminacion);
+  }
+
+  /**
+   * Ver detalles completos de un registro
+   */
+  verDetalles(registro: any): void {
+    const cantidad = registro.cantidadAplicada || registro.cantidad || 0;
+    alert(`📋 DETALLES DEL REGISTRO #${registro.id}
+
+🏷️ Lote: ${registro.loteDescripcion} (${registro.codigoLote})
+📅 Fecha de Registro: ${this.formatearFecha(registro.fecha)}
+⏰ Fecha de Creación: ${this.formatearFechaHora(registro.fechaCreacion)}
+🥬 Cantidad: ${cantidad} kg
+🐔 Animales Vivos: ${registro.animalesVivos || 'N/A'}
+💀 Animales Muertos: ${registro.animalesMuertos || 'N/A'}
+📊 Estado: ${registro.status}
+📝 Observaciones: ${registro.observaciones || 'Sin observaciones'}
+👤 Usuario: ${registro.usuarioId || 'N/A'}`);
+  }
+
+  /**
+   * Aplicar corrección a un registro
+   */
+  private aplicarCorreccion(datosCorreccion: any): void {
+    console.log('🔧 Aplicando corrección:', datosCorreccion);
+    
+    // Aquí implementarías la llamada al backend
+    // Por ahora, simularemos la actualización local
+    const registro = this.registrosHistoricos.find(r => r.id === datosCorreccion.registroId);
+    if (registro) {
+      registro.cantidadAplicada = datosCorreccion.cantidadNueva;
+      registro.cantidad = datosCorreccion.cantidadNueva; // Alias
+      registro.observaciones = datosCorreccion.observacionesNuevas;
+      registro.fechaUltimaModificacion = new Date().toISOString();
+      registro.usuarioUltimaModificacion = datosCorreccion.usuarioCorreccion;
+      
+      alert('✅ Registro actualizado correctamente');
+      
+      // Recargar datos
+      this.cargarDatosHistoricos();
+    }
+  }
+
+  /**
+   * Eliminar registro del sistema
+   */
+  private eliminarRegistroDelSistema(registroId: number, motivo: string): void {
+    console.log('🗑️ Eliminando registro:', { registroId, motivo });
+    
+    // Aquí implementarías la llamada al backend para eliminar
+    // Por ahora, simularemos la eliminación local
+    const index = this.registrosHistoricos.findIndex(r => r.id === registroId);
+    if (index !== -1) {
+      this.registrosHistoricos.splice(index, 1);
+      alert('✅ Registro eliminado correctamente');
+      
+      // Recargar datos
+      this.cargarDatosHistoricos();
+    }
+  }
+}

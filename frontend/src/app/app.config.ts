@@ -1,17 +1,17 @@
 import { ApplicationConfig } from '@angular/core';
 import { provideRouter, withViewTransitions } from '@angular/router';
 import { routes } from './app.routes';
-import { provideClientHydration, withNoHttpTransferCache } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { AuthInterceptor } from './core/interceptors/auth.interceptor';
 
-export const appConfig: ApplicationConfig = {  providers: [
+export const appConfig: ApplicationConfig = {
+  providers: [
     provideRouter(routes, withViewTransitions()),
-    // Se agrega withNoHttpTransferCache para solucionar el error NG0505
-    provideClientHydration(withNoHttpTransferCache()),
+    // Hydratación deshabilitada para evitar errores NG0505
+    // provideClientHydration(),
     provideAnimations(),
-    // Se agrega withFetch para mejorar la compatibilidad del HttpClient
+    // HttpClient configurado con fetch API
     provideHttpClient(withInterceptorsFromDi(), withFetch()),
     {
       provide: HTTP_INTERCEPTORS,

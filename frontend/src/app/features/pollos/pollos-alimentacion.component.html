@@ -170,10 +170,24 @@
                   <span class="text-blue-900 font-semibold">{{ etapaActualLote.alimentoRecomendado }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-blue-600">Cantidad:</span>
+                  <span class="text-blue-600">Cantidad total:</span>
                   <span class="text-green-700 font-bold">
                     {{ formatearCantidad(etapaActualLote.quantityPerAnimal * (loteSeleccionado.quantity || 0)) }} kg total
                   </span>
+                </div>
+                
+                <!-- 🎯 NUEVA: Mostrar detalles individuales en la sección principal -->
+                <div *ngIf="etapaActualLote.productosDetalle && etapaActualLote.productosDetalle.length > 0" 
+                     class="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                  <div class="text-blue-700 font-medium text-xs mb-1">Detalles por producto:</div>
+                  <div *ngFor="let producto of etapaActualLote.productosDetalle" 
+                       class="flex justify-between text-xs">
+                    <span class="text-blue-600">{{ producto.nombre }}:</span>
+                    <span class="text-blue-900 font-medium">
+                      {{ formatearCantidad(producto.cantidad * (loteSeleccionado.quantity || 0)) }} kg total
+                      <span class="text-blue-500">({{ formatearCantidad(producto.cantidad) }} kg/animal)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -406,28 +420,79 @@
                       </span>
                     </div>
                     <div class="space-y-2">
-                      <label *ngFor="let etapa of etapasDisponiblesLote; let i = index"
-                             class="flex items-center p-3 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors"
-                             [class.border-blue-400]="etapa.seleccionado"
-                             [class.bg-blue-100]="etapa.seleccionado">
-                        <input type="checkbox" 
-                               [(ngModel)]="etapa.seleccionado"
-                               (change)="actualizarAlimentosSeleccionados()"
-                               class="mr-3 text-blue-600">
-                        <div class="flex-1">
-                          <div class="flex items-center justify-between">
-                            <span class="font-semibold text-blue-900">{{ etapa.alimentoRecomendado }}</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                      <!-- 🎯 MOSTRAR OPCIONES INDIVIDUALES SI EXISTEN -->
+                      <div *ngIf="etapasDisponiblesLote.length > 0 && etapasDisponiblesLote[0].opcionesIndividuales; else etapasNormales">
+                        <label *ngFor="let opcion of etapasDisponiblesLote[0].opcionesIndividuales; let i = index"
+                               class="flex items-center p-3 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors"
+                               [class.border-blue-400]="opcion.seleccionado"
+                               [class.bg-blue-100]="opcion.seleccionado">
+                          <input type="checkbox" 
+                                 [(ngModel)]="opcion.seleccionado"
+                                 (change)="actualizarAlimentosSeleccionados()"
+                                 class="mr-3 text-blue-600">
+                          <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                              <span class="font-semibold text-blue-900">{{ opcion.alimentoRecomendado }}</span>
+                              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                            </div>
+                            <div class="text-blue-700 text-sm mt-1">
+                              <i class="fas fa-weight mr-1"></i>
+                              {{ formatearCantidad(opcion.quantityPerAnimal) }} {{ opcion.unidad || 'kg' }}/animal/día
+                            </div>
+                            
+                            <!-- Detalles del producto individual -->
+                            <div *ngIf="opcion.productosDetalle && opcion.productosDetalle.length > 0" 
+                                 class="text-blue-600 text-xs mt-2 pl-4 border-l-2 border-blue-200">
+                              <div class="font-medium mb-1">Detalles por producto:</div>
+                              <div *ngFor="let producto of opcion.productosDetalle" class="flex justify-between">
+                                <span>• {{ producto.nombre }}:</span>
+                                <span class="font-medium">{{ formatearCantidad(producto.cantidad) }} {{ producto.unidad }}/día</span>
+                              </div>
+                            </div>
+                            
+                            <div *ngIf="opcion.observaciones" class="text-blue-600 text-xs mt-1 italic">
+                              {{ opcion.observaciones }}
+                            </div>
                           </div>
-                          <div class="text-blue-700 text-sm mt-1">
-                            <i class="fas fa-weight mr-1"></i>
-                            {{ formatearCantidad(etapa.quantityPerAnimal) }} {{ etapa.unidad }}/animal/día
+                        </label>
+                      </div>
+                      
+                      <!-- 🎯 ETAPAS NORMALES (sin opciones individuales) -->
+                      <ng-template #etapasNormales>
+                        <label *ngFor="let etapa of etapasDisponiblesLote; let i = index"
+                               class="flex items-center p-3 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors"
+                               [class.border-blue-400]="etapa.seleccionado"
+                               [class.bg-blue-100]="etapa.seleccionado">
+                          <input type="checkbox" 
+                                 [(ngModel)]="etapa.seleccionado"
+                                 (change)="actualizarAlimentosSeleccionados()"
+                                 class="mr-3 text-blue-600">
+                          <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                              <span class="font-semibold text-blue-900">{{ etapa.alimentoRecomendado }}</span>
+                              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                            </div>
+                            <div class="text-blue-700 text-sm mt-1">
+                              <i class="fas fa-weight mr-1"></i>
+                              {{ formatearCantidad(etapa.quantityPerAnimal) }} {{ etapa.unidad }}/animal/día
+                            </div>
+                            
+                            <!-- Detalles por producto -->
+                            <div *ngIf="etapa.productosDetalle && etapa.productosDetalle.length > 0" 
+                                 class="text-blue-600 text-xs mt-2 pl-4 border-l-2 border-blue-200">
+                              <div class="font-medium mb-1">Detalles por producto:</div>
+                              <div *ngFor="let producto of etapa.productosDetalle" class="flex justify-between">
+                                <span>• {{ producto.nombre }}:</span>
+                                <span class="font-medium">{{ formatearCantidad(producto.cantidad) }} {{ producto.unidad }}/día</span>
+                              </div>
+                            </div>
+                            
+                            <div *ngIf="etapa.observaciones" class="text-blue-600 text-xs mt-1 italic">
+                              {{ etapa.observaciones }}
+                            </div>
                           </div>
-                          <div *ngIf="etapa.observaciones" class="text-blue-600 text-xs mt-1 italic">
-                            {{ etapa.observaciones }}
-                          </div>
-                        </div>
-                      </label>
+                        </label>
+                      </ng-template>
                     </div>
                     
                     <!-- Resumen de seleccionados -->
@@ -438,11 +503,11 @@
                       </div>
                       <div class="space-y-1">
                         <div *ngFor="let alimento of alimentosSeleccionados" class="flex justify-between items-center bg-white px-2 py-1 rounded border border-green-200 group">
-                          <span class="text-xs text-green-800 font-medium">{{ alimento.nombre }}</span>
+                          <span class="text-xs text-green-800 font-medium">{{ alimento.alimentoRecomendado }}</span>
                           <div class="flex items-center space-x-2">
-                            <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">{{ formatearCantidad(alimento.cantidad) }} kg</span>
+                            <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">{{ formatearCantidad(alimento.quantityPerAnimal * (loteSeleccionado?.quantity || 0)) }} kg</span>
                             <button 
-                              (click)="removerAlimento(alimento.nombre)"
+                              (click)="removerAlimento(alimento.alimentoRecomendado)"
                               class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
                               title="Remover alimento">
                               <i class="fas fa-times text-xs"></i>

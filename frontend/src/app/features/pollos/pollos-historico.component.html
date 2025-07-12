@@ -180,7 +180,7 @@
           <thead>
             <tr>
               <th>ID</th>
-              <th>Fecha</th>
+              <th>Fecha de Creación</th>
               <th>Lote</th>
               <th>Cantidad</th>
               <th>Animales Vivos</th>
@@ -188,6 +188,7 @@
               <th>Estado</th>
               <th>Día #</th>
               <th>Observaciones</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -198,8 +199,7 @@
               
               <td class="fecha-cell">
                 <div class="fecha-info">
-                  <div class="fecha-principal">{{ formatearFecha(registro.fecha) }}</div>
-                  <div class="fecha-creacion">{{ formatearFechaHora(registro.fechaCreacion) }}</div>
+                  <div class="fecha-principal">{{ formatearFechaHora(registro.fechaCreacion) }}</div>
                 </div>
               </td>
               
@@ -247,6 +247,29 @@
                 <span class="observaciones-text" [title]="registro.observaciones">
                   {{ registro.observaciones || 'Sin observaciones' }}
                 </span>
+              </td>
+              
+              <td class="acciones-cell">
+                <div class="acciones-container">
+                  <button 
+                    (click)="editarRegistro(registro)" 
+                    class="btn-accion btn-editar"
+                    title="Editar registro">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button 
+                    (click)="eliminarRegistro(registro)" 
+                    class="btn-accion btn-eliminar"
+                    title="Eliminar registro">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <button 
+                    (click)="verDetalles(registro)" 
+                    class="btn-accion btn-detalles"
+                    title="Ver detalles">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
