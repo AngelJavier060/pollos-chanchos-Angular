@@ -1,12 +1,11 @@
 import { Injectable } from '@angular/core';
-import { Observable, BehaviorSubject, of } from 'rxjs';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, BehaviorSubject } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { 
   RegistroMortalidad, 
   EstadisticasMortalidad, 
   AlertaMortalidad,
-  CAUSAS_MORTALIDAD,
   CausaMortalidad 
 } from '../models/mortalidad.model';
 
@@ -16,23 +15,18 @@ import {
 export class MortalidadService {
   private readonly API_URL = `${environment.apiUrl}/mortalidad`;
   
-  // Subjects para data en tiempo real
   private mortalidadSubject = new BehaviorSubject<RegistroMortalidad[]>([]);
-  private alertasSubject = new BehaviorSubject<AlertaMortalidad[]>([]);
-  private estadisticasSubject = new BehaviorSubject<EstadisticasMortalidad | null>(null);
-
-  // Observables públicos
   public mortalidad$ = this.mortalidadSubject.asObservable();
-  public alertas$ = this.alertasSubject.asObservable();
-  public estadisticas$ = this.estadisticasSubject.asObservable();
-
-  // Cache temporal para simulación
-  private registrosCache: RegistroMortalidad[] = [];
+  
+  // Cache para alertas
   private alertasCache: AlertaMortalidad[] = [];
+  private alertasSubject = new BehaviorSubject<AlertaMortalidad[]>([]);
+  public alertas$ = this.alertasSubject.asObservable();
+  
+  // Cache para registros
+  private registrosCache: RegistroMortalidad[] = [];
 
-  constructor(private http: HttpClient) {
-    this.inicializarDatosSimulados();
-  }
+  constructor(private http: HttpClient) {}
 
   /**
    * Obtener todos los registros de mortalidad
@@ -117,101 +111,56 @@ export class MortalidadService {
   }
 
   /**
-   * Inicializar datos simulados para desarrollo
-   */
-  private inicializarDatosSimulados(): void {
-    // Generar registros de los últimos 7 días
-    for (let i = 0; i < 7; i++) {
-      const fecha = new Date();
-      fecha.setDate(fecha.getDate() - i);
-      
-      // 1-3 registros por día
-      const numRegistros = Math.floor(Math.random() * 3) + 1;
-      
-      for (let j = 0; j < numRegistros; j++) {
-        const registro: RegistroMortalidad = {
-          id: this.registrosCache.length + 1,
-          loteId: Math.floor(Math.random() * 5) + 1,
-          loteName: `Lote ${Math.floor(Math.random() * 5) + 1}`,
-          fechaRegistro: fecha,
-          cantidadMuertos: Math.floor(Math.random() * 3) + 1,
-          causa: CAUSAS_MORTALIDAD[Math.floor(Math.random() * CAUSAS_MORTALIDAD.length)],
-          observaciones: this.generarObservacionAleatoria(),
-          usuarioRegistro: 'Sistema',
-          peso: Math.random() * 2 + 1, // 1-3 kg
-          edad: Math.floor(Math.random() * 60) + 7, // 7-67 días
-          ubicacion: `Galpon ${Math.floor(Math.random() * 3) + 1}`,
-          confirmado: Math.random() > 0.3 // 70% confirmados
-        };
-        
-        this.registrosCache.unshift(registro);
-      }
-    }
-
-    this.mortalidadSubject.next([...this.registrosCache]);
-    this.generarAlertasIniciales();
-  }
-
-  /**
-   * Generar observación aleatoria para simulación
-   */
-  private generarObservacionAleatoria(): string {
-    const observaciones = [
-      'Animal encontrado sin signos previos de enfermedad',
-      'Presentaba síntomas respiratorios desde ayer',
-      'Se observó decaimiento general en las últimas horas',
-      'Posible estrés por cambio de temperatura',
-      'Animal separado del grupo, sin apetito',
-      'Síntomas digestivos evidentes',
-      'Muerte súbita durante la noche'
-    ];
-    
-    return observaciones[Math.floor(Math.random() * observaciones.length)];
-  }
-
-  /**
-   * Calcular estadísticas basadas en registros actuales
+   * Calcular estadísticas de mortalidad
    */
   private calcularEstadisticas(): EstadisticasMortalidad {
-    const totalMuertes = this.registrosCache.reduce((total, r) => total + r.cantidadMuertos, 0);
-    
-    // Simular población total (esto debería venir del servicio de lotes)
-    const poblacionTotal = 1000; // Placeholder
-    const porcentajeMortalidad = (totalMuertes / poblacionTotal) * 100;
-    
-    // Agrupar por causa
-    const muertesPorCausa = new Map<string, number>();
-    this.registrosCache.forEach(r => {
-      const actual = muertesPorCausa.get(r.causa.nombre) || 0;
-      muertesPorCausa.set(r.causa.nombre, actual + r.cantidadMuertos);
+    const totalMuertes = this.registrosCache.reduce((sum, r) => sum + r.cantidadMuertos, 0);
+    const porcentajeMortalidad = totalMuertes / (this.registrosCache.length > 0 ? this.registrosCache[0].edad : 1);
+    const muertesPorCausaArray = this.registrosCache.reduce((acc, r) => {
+      const index = acc.findIndex(a => a.causa === r.causa.nombre);
+      if (index >= 0) {
+        acc[index].muertes += r.cantidadMuertos;
+      } else {
+        acc.push({
+          causa: r.causa.nombre,
+          muertes: r.cantidadMuertos,
+          porcentaje: 0
+        });
+      }
+      return acc;
+    }, [] as { causa: string; muertes: number; porcentaje: number }[]);
+
+    // Calcular porcentajes
+    const total = muertesPorCausaArray.reduce((sum, a) => sum + a.muertes, 0);
+    muertesPorCausaArray.forEach(a => {
+      a.porcentaje = (a.muertes / total) * 100;
     });
-    
-    const causaMasFrecuente = Array.from(muertesPorCausa.entries())
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-    
-    // Generar datos para gráficos (últimos 7 días)
-    const muertesPorDia = this.generarMuertesPorDia();
-    const muertesPorCausaArray = Array.from(muertesPorCausa.entries()).map(([causa, cantidad]) => ({
-      causa,
-      cantidad,
-      porcentaje: (cantidad / totalMuertes) * 100
-    }));
+
+    // Encontrar causa más frecuente
+    const causaMasFrecuente = muertesPorCausaArray.reduce((prev, curr) => 
+      prev.muertes > curr.muertes ? prev : curr
+    ).causa;
 
     return {
       totalMuertes,
       porcentajeMortalidad: Math.round(porcentajeMortalidad * 100) / 100,
       causaMasFrecuente,
       tendencia: this.calcularTendencia(),
-      muertesPorDia,
-      muertesPorCausa: muertesPorCausaArray
+      muertesPorDia: this.generarMuertesPorDia(),
+      muertesPorCausa: muertesPorCausaArray,
+      totalLotes: new Set(this.registrosCache.map(r => r.loteId)).size,
+      tasaPromedioMortalidad: Math.round((totalMuertes / (this.registrosCache.length > 0 ? this.registrosCache[0].edad : 1)) * 100) / 100,
+      alertas: this.alertasCache,
+      principalesCausas: muertesPorCausaArray.sort((a, b) => b.muertes - a.muertes).slice(0, 5),
+      tendenciaSemanal: this.generarMuertesPorDia()
     };
   }
 
   /**
    * Generar datos de muertes por día para gráficos
    */
-  private generarMuertesPorDia(): { fecha: string; cantidad: number }[] {
-    const datos: { fecha: string; cantidad: number }[] = [];
+  private generarMuertesPorDia(): { fecha: string; muertes: number }[] {
+    const datos: { fecha: string; muertes: number }[] = [];
     
     for (let i = 6; i >= 0; i--) {
       const fecha = new Date();
@@ -226,7 +175,7 @@ export class MortalidadService {
       
       datos.push({
         fecha: fecha.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-        cantidad: muertesDia
+        muertes: muertesDia
       });
     }
     
@@ -242,8 +191,8 @@ export class MortalidadService {
     if (muertesPorDia.length < 2) return 'estable';
     
     const ultimosDias = muertesPorDia.slice(-3);
-    const promedio = ultimosDias.reduce((sum, d) => sum + d.cantidad, 0) / ultimosDias.length;
-    const ultimo = ultimosDias[ultimosDias.length - 1].cantidad;
+    const promedio = ultimosDias.reduce((sum, d) => sum + d.muertes, 0) / ultimosDias.length;
+    const ultimo = ultimosDias[ultimosDias.length - 1].muertes;
     
     if (ultimo > promedio * 1.2) return 'subiendo';
     if (ultimo < promedio * 0.8) return 'bajando';
@@ -278,13 +227,13 @@ export class MortalidadService {
   /**
    * Crear nueva alerta
    */
-  private crearAlerta(tipo: 'critica' | 'advertencia' | 'informativa', titulo: string, mensaje: string, loteAfectado?: number, accion?: string): void {
+  private crearAlerta(tipo: 'critica' | 'advertencia' | 'informativa', titulo: string, mensaje: string, loteId?: number, accion?: string): void {
     const nuevaAlerta: AlertaMortalidad = {
       id: this.alertasCache.length + 1,
       tipo,
       titulo,
       mensaje,
-      loteAfectado,
+      loteId,
       fechaCreacion: new Date(),
       leida: false,
       accionRequerida: accion

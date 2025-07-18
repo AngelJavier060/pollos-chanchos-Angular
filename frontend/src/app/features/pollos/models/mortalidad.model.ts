@@ -28,8 +28,13 @@ export interface EstadisticasMortalidad {
   porcentajeMortalidad: number;
   causaMasFrecuente: string;
   tendencia: 'subiendo' | 'bajando' | 'estable';
-  muertesPorDia: { fecha: string; cantidad: number }[];
-  muertesPorCausa: { causa: string; cantidad: number; porcentaje: number }[];
+  muertesPorDia: { fecha: string; muertes: number }[];
+  muertesPorCausa: { causa: string; muertes: number; porcentaje: number }[];
+  totalLotes: number;
+  tasaPromedioMortalidad: number;
+  alertas: AlertaMortalidad[];
+  principalesCausas: { causa: string; muertes: number; porcentaje: number }[];
+  tendenciaSemanal: { fecha: string; muertes: number }[];
 }
 
 export interface AlertaMortalidad {
@@ -37,7 +42,7 @@ export interface AlertaMortalidad {
   tipo: 'critica' | 'advertencia' | 'informativa';
   titulo: string;
   mensaje: string;
-  loteAfectado?: number;
+  loteId?: number;
   fechaCreacion: Date;
   leida: boolean;
   accionRequerida?: string;

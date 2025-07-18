@@ -1,49 +1,12 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
-
-// Interface para registros de morbilidad
-export interface RegistroMorbilidad {
-  id?: number;
-  loteId: number;
-  fecha: string;
-  hora: string;
-  cantidadEnfermos: number;
-  enfermedad: string;
-  sintomasObservados: string[];
-  gravedad: 'leve' | 'moderada' | 'severa';
-  estadoTratamiento: 'en_tratamiento' | 'en_observacion' | 'recuperado' | 'movido_a_mortalidad';
-  medicamentoAplicado: string;
-  dosisAplicada: string;
-  fechaInicioTratamiento: string;
-  fechaFinTratamiento?: string;
-  observacionesVeterinario: string;
-  proximaRevision: string;
-  costo?: number;
-  requiereAislamiento: boolean;
-  contagioso: boolean;
-  usuarioRegistro: string;
-  fechaRegistro: string;
-  // Campos calculados
-  diasEnTratamiento: number;
-  porcentajeAfectado: number;
-  animalesTratados: number;
-}
-
-// Interface para estadísticas de morbilidad
-export interface EstadisticasMorbilidad {
-  totalEnfermos: number;
-  enTratamiento: number;
-  recuperados: number;
-  movidosAMortalidad: number;
-  principalesEnfermedades: { enfermedad: string; casos: number; porcentaje: number }[];
-  eficaciaTratamientos: { medicamento: string; eficacia: number; casos: number }[];
-  costoTotalTratamientos: number;
-  alertas: { tipo: string; mensaje: string; urgencia: 'alta' | 'media' | 'baja' }[];
-}
+import { MorbilidadService } from './services/morbilidad.service';
+import { RegistroMorbilidad, EstadisticasMorbilidad, Enfermedad, Tratamiento, EstadoEnfermedad, ESTADOS_ENFERMEDAD } from './models/morbilidad.model';
 
 @Component({
   selector: 'app-pollos-morbilidad',
@@ -57,44 +20,24 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   lotesPollos: Lote[] = [];
   registrosMorbilidad: RegistroMorbilidad[] = [];
   cargando = false;
+  enfermedades: Enfermedad[] = [];
+  estados: EstadoEnfermedad[] = ESTADOS_ENFERMEDAD;
   
   // Modales
   modalMorbilidadAbierto = false;
   loteSeleccionado: Lote | null = null;
   
   // Nuevo registro de morbilidad
-  nuevoRegistro: Partial<RegistroMorbilidad> = {
-    loteId: 0,
-    fecha: new Date().toISOString().split('T')[0],
-    hora: new Date().toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-    cantidadEnfermos: 1,
-    enfermedad: '',
-    sintomasObservados: [],
-    gravedad: 'leve',
-    estadoTratamiento: 'en_observacion',
-    medicamentoAplicado: '',
-    dosisAplicada: '',
-    fechaInicioTratamiento: new Date().toISOString().split('T')[0],
-    observacionesVeterinario: '',
-    proximaRevision: '',
-    costo: 0,
-    requiereAislamiento: false,
-    contagioso: false,
-    usuarioRegistro: '',
-    fechaRegistro: new Date().toISOString(),
-    diasEnTratamiento: 0,
-    porcentajeAfectado: 0,
-    animalesTratados: 0
-  };
+  nuevoRegistro: Partial<RegistroMorbilidad> = {};
   
   // Filtros y búsqueda
-  filtroEstado = '';
+  filtroEstadoId: number | null = null;
   filtroGravedad = '';
   filtroEnfermedad = '';
   busquedaLote = '';
   
   // Estadísticas
-  estadisticas: EstadisticasMorbilidad = {
+  estadisticas: any = { // Temporalmente any para evitar errores de compilación
     totalEnfermos: 0,
     enTratamiento: 0,
     recuperados: 0,
@@ -153,12 +96,18 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
 
   constructor(
     private authService: AuthDirectService,
-    private loteService: LoteService
+    private loteService: LoteService,
+    private morbilidadService: MorbilidadService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.user = this.authService.currentUserValue;
     this.cargarDatos();
+    
+    // ✅ VERIFICAR SI ES AUTOREGISTRO DESDE REGISTRO DIARIO
+    this.verificarAutoregistro();
   }
 
   ngOnDestroy(): void {
@@ -186,10 +135,28 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     
     this.subscriptions.add(lotesSub);
     
-    // TODO: Cargar datos reales de morbilidad desde el backend
-    this.calcularEstadisticas();
+    // Cargar enfermedades para el dropdown
+    const enfermedadesSub = this.morbilidadService.getEnfermedades().subscribe({
+      next: (data) => {
+        this.enfermedades = data;
+      },
+      error: (error) => console.error('Error al cargar enfermedades:', error)
+    });
+    this.subscriptions.add(enfermedadesSub);
     
-    this.cargando = false;
+    const morbilidadSub = this.morbilidadService.getRegistrosMorbilidad().subscribe({
+      next: (data) => {
+        this.registrosMorbilidad = data;
+        this.calcularEstadisticas();
+        this.cargando = false;
+      },
+      error: (error) => {
+        console.error('Error al cargar registros de morbilidad:', error);
+        this.cargando = false;
+      }
+    });
+
+    this.subscriptions.add(morbilidadSub);
   }
 
   /**
@@ -199,17 +166,18 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     const registros = this.getRegistrosFiltrados();
     
     this.estadisticas.totalEnfermos = registros.reduce((sum, r) => sum + r.cantidadEnfermos, 0);
-    this.estadisticas.enTratamiento = registros.filter(r => r.estadoTratamiento === 'en_tratamiento').length;
-    this.estadisticas.recuperados = registros.filter(r => r.estadoTratamiento === 'recuperado').length;
-    this.estadisticas.movidosAMortalidad = registros.filter(r => r.estadoTratamiento === 'movido_a_mortalidad').length;
+    this.estadisticas.enTratamiento = registros.filter(r => r.estado.nombre === 'En Tratamiento').length;
+    this.estadisticas.recuperados = registros.filter(r => r.estado.nombre === 'Recuperado').length;
+    this.estadisticas.movidosAMortalidad = registros.filter(r => r.derivadoAMortalidad).length;
     
     // Calcular principales enfermedades
-    const enfermedades = new Map<string, number>();
+    const enfermedadesMap = new Map<string, number>();
     registros.forEach(r => {
-      enfermedades.set(r.enfermedad, (enfermedades.get(r.enfermedad) || 0) + r.cantidadEnfermos);
+      const nombreEnfermedad = r.enfermedad.nombre;
+      enfermedadesMap.set(nombreEnfermedad, (enfermedadesMap.get(nombreEnfermedad) || 0) + r.cantidadEnfermos);
     });
 
-    this.estadisticas.principalesEnfermedades = Array.from(enfermedades.entries())
+    this.estadisticas.principalesEnfermedades = Array.from(enfermedadesMap.entries())
       .map(([enfermedad, casos]) => ({
         enfermedad,
         casos,
@@ -218,18 +186,23 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
       .sort((a, b) => b.casos - a.casos)
       .slice(0, 5);
 
-    // Calcular eficacia de tratamientos
+    // Calcular eficacia de tratamientos y costo
     const medicamentos = new Map<string, {casos: number, eficacia: number}>();
+    let costoTotal = 0;
     registros.forEach(r => {
-      if (r.medicamentoAplicado) {
-        const existing = medicamentos.get(r.medicamentoAplicado) || {casos: 0, eficacia: 0};
-        const eficacia = r.estadoTratamiento === 'recuperado' ? 100 : 
-                        r.estadoTratamiento === 'en_tratamiento' ? 75 : 
-                        r.estadoTratamiento === 'movido_a_mortalidad' ? 0 : 50;
-        medicamentos.set(r.medicamentoAplicado, {
+      if (r.tratamiento && r.tratamiento.medicamento) {
+        const med = r.tratamiento.medicamento;
+        const existing = medicamentos.get(med) || {casos: 0, eficacia: 0};
+        const eficacia = r.estado.nombre === 'Recuperado' ? 100 : 
+                        r.estado.nombre === 'En Tratamiento' ? 75 : 
+                        r.derivadoAMortalidad ? 0 : 50;
+        medicamentos.set(med, {
           casos: existing.casos + 1,
           eficacia: ((existing.eficacia * existing.casos) + eficacia) / (existing.casos + 1)
         });
+      }
+      if(r.tratamiento && r.tratamiento.costo){
+        costoTotal += r.tratamiento.costo;
       }
     });
 
@@ -242,7 +215,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
       .sort((a, b) => b.eficacia - a.eficacia)
       .slice(0, 5);
 
-    this.estadisticas.costoTotalTratamientos = registros.reduce((sum, r) => sum + (r.costo || 0), 0);
+    this.estadisticas.costoTotalTratamientos = costoTotal;
   }
 
   /**
@@ -250,28 +223,24 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    */
   abrirModalMorbilidad(lote: Lote): void {
     this.loteSeleccionado = lote;
+    const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
+
     this.nuevoRegistro = {
       loteId: lote.id,
-      fecha: new Date().toISOString().split('T')[0],
-      hora: new Date().toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      fechaRegistro: new Date(),
       cantidadEnfermos: 1,
-      enfermedad: '',
-      sintomasObservados: [],
-      gravedad: 'leve',
-      estadoTratamiento: 'en_observacion',
-      medicamentoAplicado: '',
-      dosisAplicada: '',
-      fechaInicioTratamiento: new Date().toISOString().split('T')[0],
-      observacionesVeterinario: '',
-      proximaRevision: '',
-      costo: 0,
-      requiereAislamiento: false,
-      contagioso: false,
+      sintomas: [],
+      severidad: 'leve',
+      estado: estadoPorDefecto,
+      aislado: false,
       usuarioRegistro: this.user?.username || '',
-      fechaRegistro: new Date().toISOString(),
-      diasEnTratamiento: 0,
-      porcentajeAfectado: 0,
-      animalesTratados: 0
+      tratamiento: {
+        id: 0,
+        nombre: 'Inicial',
+        descripcion: '',
+        duracion: 0,
+        efectividad: 0
+      }
     };
     this.modalMorbilidadAbierto = true;
   }
@@ -289,28 +258,23 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    * Abrir modal para nuevo registro
    */
   abrirModalRegistro(): void {
+    const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
     this.nuevoRegistro = {
       loteId: 0,
-      fecha: new Date().toISOString().split('T')[0],
-      hora: new Date().toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      fechaRegistro: new Date(),
       cantidadEnfermos: 1,
-      enfermedad: '',
-      sintomasObservados: [],
-      gravedad: 'leve',
-      estadoTratamiento: 'en_observacion',
-      medicamentoAplicado: '',
-      dosisAplicada: '',
-      fechaInicioTratamiento: new Date().toISOString().split('T')[0],
-      observacionesVeterinario: '',
-      proximaRevision: '',
-      costo: 0,
-      requiereAislamiento: false,
-      contagioso: false,
+      sintomas: [],
+      severidad: 'leve',
+      estado: estadoPorDefecto,
+      aislado: false,
       usuarioRegistro: this.user?.username || '',
-      fechaRegistro: new Date().toISOString(),
-      diasEnTratamiento: 0,
-      porcentajeAfectado: 0,
-      animalesTratados: 0
+      tratamiento: {
+        id: 0,
+        nombre: 'Inicial',
+        descripcion: '',
+        duracion: 0,
+        efectividad: 0
+      }
     };
     this.modalMorbilidadAbierto = true;
   }
@@ -320,41 +284,37 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    */
   registrarMorbilidad(): void {
     if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.enfermedad || !this.nuevoRegistro.cantidadEnfermos) {
-      alert('Por favor complete todos los campos obligatorios');
+      alert('Por favor complete todos los campos obligatorios: Lote, Enfermedad y Cantidad.');
       return;
     }
 
     const registro: RegistroMorbilidad = {
-      id: Date.now(),
       loteId: this.nuevoRegistro.loteId!,
-      fecha: this.nuevoRegistro.fecha!,
-      hora: this.nuevoRegistro.hora!,
+      fechaRegistro: new Date(),
       cantidadEnfermos: this.nuevoRegistro.cantidadEnfermos!,
       enfermedad: this.nuevoRegistro.enfermedad!,
-      sintomasObservados: this.nuevoRegistro.sintomasObservados || [],
-      gravedad: this.nuevoRegistro.gravedad || 'leve',
-      estadoTratamiento: this.nuevoRegistro.estadoTratamiento || 'en_observacion',
-      medicamentoAplicado: this.nuevoRegistro.medicamentoAplicado || '',
-      dosisAplicada: this.nuevoRegistro.dosisAplicada || '',
-      fechaInicioTratamiento: this.nuevoRegistro.fechaInicioTratamiento || new Date().toISOString().split('T')[0],
-      observacionesVeterinario: this.nuevoRegistro.observacionesVeterinario || '',
-      proximaRevision: this.nuevoRegistro.proximaRevision || '',
-      costo: this.nuevoRegistro.costo || 0,
-      requiereAislamiento: this.nuevoRegistro.requiereAislamiento || false,
-      contagioso: this.nuevoRegistro.contagioso || false,
+      sintomas: this.nuevoRegistro.sintomas || [],
+      severidad: this.nuevoRegistro.severidad || 'leve',
+      estado: this.nuevoRegistro.estado!,
+      aislado: this.nuevoRegistro.aislado || false,
+      observaciones: this.nuevoRegistro.observaciones || '',
+      tratamiento: this.nuevoRegistro.tratamiento,
       usuarioRegistro: this.user?.username || 'Usuario',
-      fechaRegistro: new Date().toISOString(),
-      diasEnTratamiento: 0,
-      porcentajeAfectado: 0,
-      animalesTratados: this.nuevoRegistro.cantidadEnfermos || 0
     };
 
-    this.registrosMorbilidad.unshift(registro);
-    this.calcularEstadisticas();
-    this.cerrarModalMorbilidad();
-    
-    console.log('✅ Morbilidad registrada exitosamente:', registro);
-    alert('Morbilidad registrada exitosamente');
+    this.morbilidadService.registrarMorbilidad(registro).subscribe({
+      next: (nuevoRegistro) => {
+        this.registrosMorbilidad.unshift(nuevoRegistro);
+        this.calcularEstadisticas();
+        this.cerrarModalMorbilidad();
+        console.log('✅ Morbilidad registrada exitosamente:', nuevoRegistro);
+        alert('Morbilidad registrada exitosamente');
+      },
+      error: (error) => {
+        console.error('Error al registrar morbilidad:', error);
+        alert('Error al registrar morbilidad. Por favor, intente de nuevo.');
+      }
+    });
   }
 
   /**
@@ -378,9 +338,17 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    */
   eliminarRegistro(id: number): void {
     if (confirm('¿Está seguro de eliminar este registro? Esta acción no se puede deshacer.')) {
-      this.registrosMorbilidad = this.registrosMorbilidad.filter(r => r.id !== id);
-      this.calcularEstadisticas();
-      console.log('✅ Registro eliminado');
+      this.morbilidadService.eliminarRegistro(id).subscribe({
+        next: () => {
+          this.registrosMorbilidad = this.registrosMorbilidad.filter(r => r.id !== id);
+          this.calcularEstadisticas();
+          console.log('✅ Registro eliminado');
+        },
+        error: (error) => {
+          console.error('Error al eliminar registro:', error);
+          alert('Error al eliminar el registro.');
+        }
+      });
     }
   }
 
@@ -395,7 +363,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    * Limpiar filtros
    */
   limpiarFiltros(): void {
-    this.filtroEstado = '';
+    this.filtroEstadoId = null;
     this.filtroGravedad = '';
     this.filtroEnfermedad = '';
     this.busquedaLote = '';
@@ -408,16 +376,16 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   getRegistrosFiltrados(): RegistroMorbilidad[] {
     let registros = [...this.registrosMorbilidad];
     
-    if (this.filtroEstado) {
-      registros = registros.filter(r => r.estadoTratamiento === this.filtroEstado);
+    if (this.filtroEstadoId) {
+      registros = registros.filter(r => r.estado.id === this.filtroEstadoId);
     }
     
     if (this.filtroGravedad) {
-      registros = registros.filter(r => r.gravedad === this.filtroGravedad);
+      registros = registros.filter(r => r.severidad === this.filtroGravedad);
     }
     
     if (this.filtroEnfermedad) {
-      registros = registros.filter(r => r.enfermedad.toLowerCase().includes(this.filtroEnfermedad.toLowerCase()));
+      registros = registros.filter(r => r.enfermedad.nombre.toLowerCase().includes(this.filtroEnfermedad.toLowerCase()));
     }
     
     if (this.busquedaLote) {
@@ -439,6 +407,13 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Comparar objetos de enfermedad para el select
+   */
+  compareEnfermedades(e1: Enfermedad, e2: Enfermedad): boolean {
+    return e1 && e2 ? e1.id === e2.id : e1 === e2;
+  }
+
+  /**
    * Exportar datos
    */
   exportarDatos(): void {
@@ -452,5 +427,131 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   imprimirReporte(): void {
     console.log('🖨️ Generando reporte para impresión...');
     alert('Funcionalidad de impresión en desarrollo');
+  }
+
+  /**
+   * ✅ VERIFICAR SI ES AUTOREGISTRO DESDE FORMULARIO DIARIO
+   */
+  verificarAutoregistro(): void {
+    this.route.queryParams.subscribe(params => {
+      if (params['autoRegistro'] === 'true' && params['datos']) {
+        try {
+          const datosAutoregistro = JSON.parse(params['datos']);
+          console.log('🔄 Autoregistro de morbilidad recibido:', datosAutoregistro);
+          const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
+          
+          // Prellenar el formulario con los datos recibidos
+          this.nuevoRegistro = {
+            loteId: Number(datosAutoregistro.loteId),
+            cantidadEnfermos: Number(datosAutoregistro.cantidad),
+            fechaRegistro: new Date(),
+            sintomas: [],
+            severidad: 'leve',
+            estado: estadoPorDefecto,
+            aislado: false,
+            observaciones: 'Registro automático desde alimentación.',
+            usuarioRegistro: this.user?.username || '',
+          };
+          
+          // Abrir el modal automáticamente
+          this.modalMorbilidadAbierto = true;
+          
+          // Limpiar los query params
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {},
+            replaceUrl: true
+          });
+          
+        } catch (error) {
+          console.error('❌ Error al procesar autoregistro:', error);
+        }
+      }
+    });
+  }
+
+  /**
+   * ✅ FUNCIONALIDAD PARA RECUPERACIÓN DE ANIMALES
+   */
+  marcarComoRecuperado(registro: RegistroMorbilidad): void {
+    if (confirm('¿Confirma que los animales se han recuperado y deben volver al lote?')) {
+      // Cambiar estado a recuperado
+      const estadoRecuperado = this.estados.find(e => e.nombre === 'Recuperado');
+      if (estadoRecuperado) {
+        registro.estado = estadoRecuperado;
+      }
+      registro.fechaRecuperacion = new Date();
+      
+      // Devolver animales al lote
+      this.devolverAnimalesAlLote(registro);
+      
+      console.log('✅ Animales marcados como recuperados y devueltos al lote');
+    }
+  }
+
+  /**
+   * ✅ DEVOLVER ANIMALES RECUPERADOS AL LOTE
+   */
+  private async devolverAnimalesAlLote(registro: RegistroMorbilidad): Promise<void> {
+    try {
+      // Buscar el lote
+      const lote = this.lotesPollos.find(l => l.id === registro.loteId);
+      if (!lote) {
+        console.error('❌ Lote no encontrado');
+        return;
+      }
+      
+      // Incrementar la cantidad de animales
+      const nuevaCantidad = lote.quantity + registro.cantidadEnfermos;
+      
+      console.log(`🔄 Devolviendo ${registro.cantidadEnfermos} animales al lote ${lote.id}:`, {
+        cantidadAnterior: lote.quantity,
+        animalesRecuperados: registro.cantidadEnfermos,
+        nuevaCantidad: nuevaCantidad
+      });
+      
+      // Actualizar en el backend
+      const loteActualizado = { ...lote, quantity: nuevaCantidad };
+      await this.loteService.updateLote(loteActualizado).toPromise();
+      
+      // Actualizar en la vista local
+      lote.quantity = nuevaCantidad;
+      
+      alert(`✅ ${registro.cantidadEnfermos} animales recuperados devueltos al lote ${lote.name}`);
+      
+    } catch (error) {
+      console.error('❌ Error al devolver animales al lote:', error);
+      alert('Error al devolver animales al lote. Intente nuevamente.');
+    }
+  }
+
+  /**
+   * ✅ MOVER ANIMALES A MORTALIDAD
+   */
+  moverAMortalidad(registro: RegistroMorbilidad): void {
+    if (confirm('¿Confirma que los animales han muerto y deben registrarse en mortalidad?')) {
+      // Cambiar estado
+      const estadoMortalidad = this.estados.find(e => e.nombre === 'Muerto'); // Asumiendo que existe este estado
+      if(estadoMortalidad) {
+        registro.estado = estadoMortalidad;
+      }
+      registro.derivadoAMortalidad = true;
+      registro.fechaMuerte = new Date();
+      
+      // Redirigir a mortalidad con datos
+      const datosMortalidad = {
+        loteId: registro.loteId,
+        cantidad: registro.cantidadEnfermos,
+        fecha: new Date().toISOString(),
+        observaciones: `Derivado de morbilidad: ${registro.enfermedad.nombre}. ${registro.observaciones}`
+      };
+      
+      this.router.navigate(['/pollos/mortalidad'], {
+        queryParams: {
+          autoRegistro: 'true',
+          datos: JSON.stringify(datosMortalidad)
+        }
+      });
+    }
   }
 }

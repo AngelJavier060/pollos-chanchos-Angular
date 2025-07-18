@@ -1,63 +1,12 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { LoteService } from '../lotes/services/lote.service';
 import { User } from '../../shared/models/user.model';
 import { Lote } from '../lotes/interfaces/lote.interface';
-
-// Interfaces para mortalidad
-export interface CausaMortalidad {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  color: string;
-}
-
-export interface RegistroMortalidad {
-  id?: number;
-  loteId: number;
-  cantidadMuertos: number;
-  causa: CausaMortalidad;
-  observaciones: string;
-  peso: number;
-  edad: number;
-  ubicacion: string;
-  confirmado: boolean;
-  fechaRegistro: Date;
-  usuarioRegistro: string;
-}
-
-export interface EstadisticasMortalidad {
-  totalMuertes: number;
-  totalLotes: number;
-  tasaPromedioMortalidad: number;
-  principalesCausas: { causa: string; porcentaje: number; cantidad: number }[];
-  tendenciaSemanal: { fecha: string; muertes: number }[];
-  alertas: AlertaMortalidad[];
-}
-
-export interface AlertaMortalidad {
-  id: number;
-  tipo: 'critica' | 'advertencia' | 'informativa';
-  titulo: string;
-  mensaje: string;
-  fechaCreacion: Date;
-  leida: boolean;
-  loteId?: number | null;
-}
-
-// Causas predefinidas
-export const CAUSAS_MORTALIDAD: CausaMortalidad[] = [
-  { id: 1, nombre: 'Enfermedad Respiratoria', descripcion: 'Problemas respiratorios', color: '#ff6b6b' },
-  { id: 2, nombre: 'Enfermedad Digestiva', descripcion: 'Problemas digestivos', color: '#4ecdc4' },
-  { id: 3, nombre: 'Problemas Cardíacos', descripcion: 'Fallos cardíacos', color: '#45b7d1' },
-  { id: 4, nombre: 'Stress Térmico', descripcion: 'Estrés por temperatura', color: '#f9ca24' },
-  { id: 5, nombre: 'Deficiencias Nutricionales', descripcion: 'Problemas nutricionales', color: '#6c5ce7' },
-  { id: 6, nombre: 'Lesiones Físicas', descripcion: 'Heridas o traumatismos', color: '#feca57' },
-  { id: 7, nombre: 'Problemas Genéticos', descripcion: 'Defectos genéticos', color: '#ff9ff3' },
-  { id: 8, nombre: 'Causas Desconocidas', descripcion: 'Origen no determinado', color: '#95a5a6' },
-  { id: 9, nombre: 'Otras Causas', descripcion: 'Otros factores', color: '#74b9ff' }
-];
+import { MortalidadService } from './services/mortalidad.service';
+import { CausaMortalidad, RegistroMortalidad, EstadisticasMortalidad, AlertaMortalidad } from './models/mortalidad.model';
 
 @Component({
   selector: 'app-pollos-mortalidad',
@@ -72,7 +21,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   estadisticas: EstadisticasMortalidad | null = null;
   alertas: AlertaMortalidad[] = [];
   lotes: Lote[] = [];
-  causasMortalidad: CausaMortalidad[] = CAUSAS_MORTALIDAD;
+  causasMortalidad: CausaMortalidad[] = [];
   
   // Variables de control de UI
   mostrarModalRegistro = false;
@@ -101,12 +50,18 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
 
   constructor(
     private authService: AuthDirectService,
-    private loteService: LoteService
+    private loteService: LoteService,
+    private mortalidadService: MortalidadService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.user = this.authService.currentUserValue;
     this.cargarDatosIniciales();
+    
+    // ✅ VERIFICAR SI ES AUTOREGISTRO DESDE REGISTRO DIARIO
+    this.verificarAutoregistro();
   }
 
   ngOnDestroy(): void {
@@ -134,10 +89,29 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     
     this.subscriptions.add(lotesSub);
     
-    // TODO: Cargar datos reales de mortalidad desde el backend
-    this.calcularEstadisticas();
-    
-    this.cargando = false;
+    const mortalidadSub = this.mortalidadService.getRegistrosMortalidad().subscribe({
+      next: (data) => {
+        this.registrosMortalidad = data;
+        this.calcularEstadisticas();
+        this.cargando = false;
+      },
+      error: (error) => {
+        console.error('Error al cargar registros de mortalidad:', error);
+        this.cargando = false;
+      }
+    });
+
+    const causasSub = this.mortalidadService.getCausas().subscribe({
+      next: (data) => {
+        this.causasMortalidad = data;
+      },
+      error: (error) => {
+        console.error('Error al cargar causas de mortalidad:', error);
+      }
+    });
+
+    this.subscriptions.add(mortalidadSub);
+    this.subscriptions.add(causasSub);
   }
 
   /**
@@ -149,8 +123,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       return;
     }
     
-    const registro: RegistroMortalidad = {
-      id: Date.now(),
+    const registro: Partial<RegistroMortalidad> = {
       loteId: this.nuevoRegistro.loteId!,
       cantidadMuertos: this.nuevoRegistro.cantidadMuertos!,
       causa: this.nuevoRegistro.causa!,
@@ -162,13 +135,20 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       fechaRegistro: new Date(),
       usuarioRegistro: this.user?.username || 'Desconocido'
     };
-    
-    this.registrosMortalidad.unshift(registro);
-    this.calcularEstadisticas();
-    this.cerrarModalRegistro();
-    
-    console.log('✅ Mortalidad registrada exitosamente:', registro);
-    alert('Mortalidad registrada exitosamente');
+
+    this.mortalidadService.registrarMortalidad(registro as RegistroMortalidad).subscribe({
+      next: (nuevoRegistro) => {
+        this.registrosMortalidad.unshift(nuevoRegistro);
+        this.calcularEstadisticas();
+        this.cerrarModalRegistro();
+        console.log('✅ Mortalidad registrada exitosamente:', nuevoRegistro);
+        alert('Mortalidad registrada exitosamente');
+      },
+      error: (error) => {
+        console.error('Error al registrar mortalidad:', error);
+        alert('Error al registrar mortalidad. Por favor, intente de nuevo.');
+      }
+    });
   }
 
   /**
@@ -176,11 +156,19 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
    */
   confirmarRegistro(id: number): void {
     if (confirm('¿Está seguro de confirmar este registro de mortalidad?')) {
-      const registro = this.registrosMortalidad.find(r => r.id === id);
-      if (registro) {
-        registro.confirmado = true;
-        console.log('✅ Registro confirmado');
-      }
+      this.mortalidadService.confirmarRegistro(id).subscribe({
+        next: () => {
+          const registro = this.registrosMortalidad.find(r => r.id === id);
+          if (registro) {
+            registro.confirmado = true;
+          }
+          console.log('✅ Registro confirmado');
+        },
+        error: (error) => {
+          console.error('Error al confirmar registro:', error);
+          alert('Error al confirmar el registro.');
+        }
+      });
     }
   }
 
@@ -189,9 +177,17 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
    */
   eliminarRegistro(id: number): void {
     if (confirm('¿Está seguro de eliminar este registro? Esta acción no se puede deshacer.')) {
-      this.registrosMortalidad = this.registrosMortalidad.filter(r => r.id !== id);
-      this.calcularEstadisticas();
-      console.log('✅ Registro eliminado');
+      this.mortalidadService.eliminarRegistro(id).subscribe({
+        next: () => {
+          this.registrosMortalidad = this.registrosMortalidad.filter(r => r.id !== id);
+          this.calcularEstadisticas();
+          console.log('✅ Registro eliminado');
+        },
+        error: (error) => {
+          console.error('Error al eliminar registro:', error);
+          alert('Error al eliminar el registro.');
+        }
+      });
     }
   }
 
@@ -216,19 +212,26 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     const totalLotes = new Set(registros.map(r => r.loteId)).size;
     
     // Calcular principales causas
-    const causas = new Map<string, number>();
-    registros.forEach(r => {
-      const nombreCausa = r.causa.nombre;
-      causas.set(nombreCausa, (causas.get(nombreCausa) || 0) + r.cantidadMuertos);
-    });
+    const muertesPorCausa = this.registrosMortalidad.reduce((acc, registro) => {
+      const index = acc.findIndex(a => a.causa === registro.causa.nombre);
+      if (index >= 0) {
+        acc[index].muertes += registro.cantidadMuertos;
+      } else {
+        acc.push({
+          causa: registro.causa.nombre,
+          muertes: registro.cantidadMuertos,
+          porcentaje: 0
+        });
+      }
+      return acc;
+    }, [] as { causa: string; muertes: number; porcentaje: number }[]);
 
-    const principalesCausas = Array.from(causas.entries())
-      .map(([causa, cantidad]) => ({
-        causa,
-        cantidad,
-        porcentaje: totalMuertes > 0 ? (cantidad / totalMuertes) * 100 : 0
-      }))
-      .sort((a, b) => b.cantidad - a.cantidad)
+    const principalesCausas = muertesPorCausa.map(causa => ({
+      causa: causa.causa,
+      muertes: causa.muertes,
+      porcentaje: totalMuertes > 0 ? (causa.muertes / totalMuertes) * 100 : 0
+    }))
+      .sort((a, b) => b.muertes - a.muertes)
       .slice(0, 5);
 
     // Calcular tendencia semanal
@@ -247,6 +250,14 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       totalMuertes,
       totalLotes,
       tasaPromedioMortalidad: 0, // TODO: Calcular con datos reales
+      porcentajeMortalidad: totalMuertes > 0 ? (totalMuertes / (totalLotes * 1000)) * 100 : 0, // Asumiendo 1000 pollos por lote
+      causaMasFrecuente: principalesCausas[0]?.causa || 'Ninguna',
+      tendencia: this.calcularTendencia(tendenciaSemanal),
+      muertesPorDia: tendenciaSemanal.map(t => ({
+        fecha: t.fecha,
+        muertes: t.muertes
+      })),
+      muertesPorCausa: principalesCausas,
       principalesCausas,
       tendenciaSemanal,
       alertas: this.alertas
@@ -407,5 +418,61 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   imprimirReporte(): void {
     console.log('🖨️ Generando reporte para impresión...');
     alert('Funcionalidad de impresión en desarrollo');
+  }
+
+  /**
+   * Calcular tendencia de mortalidad
+   */
+  private calcularTendencia(tendenciaSemanal: { fecha: string; muertes: number }[]): 'subiendo' | 'bajando' | 'estable' {
+    if (tendenciaSemanal.length < 2) return 'estable';
+    
+    const primerDia = tendenciaSemanal[0].muertes;
+    const ultimoDia = tendenciaSemanal[tendenciaSemanal.length - 1].muertes;
+    
+    const diferencia = ultimoDia - primerDia;
+    const porcentajeCambio = (diferencia / primerDia) * 100;
+    
+    if (porcentajeCambio > 10) return 'subiendo';
+    if (porcentajeCambio < -10) return 'bajando';
+    return 'estable';
+  }
+
+  /**
+   * ✅ VERIFICAR SI ES AUTOREGISTRO DESDE FORMULARIO DIARIO
+   */
+  verificarAutoregistro(): void {
+    this.route.queryParams.subscribe(params => {
+      if (params['autoRegistro'] === 'true' && params['datos']) {
+        try {
+          const datosAutoregistro = JSON.parse(params['datos']);
+          console.log('🔄 Autoregistro de mortalidad recibido:', datosAutoregistro);
+          
+          // Prellenar el formulario con los datos recibidos
+          this.nuevoRegistro = {
+            loteId: Number(datosAutoregistro.loteId),
+            cantidadMuertos: Number(datosAutoregistro.cantidad),
+            observaciones: 'Registro automático desde alimentación.',
+            peso: 0,
+            edad: 0,
+            ubicacion: '',
+            confirmado: false,
+            fechaRegistro: new Date()
+          };
+          
+          // Abrir el modal automáticamente
+          this.mostrarModalRegistro = true;
+          
+          // Limpiar los query params
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {},
+            replaceUrl: true
+          });
+          
+        } catch (error) {
+          console.error('❌ Error al procesar autoregistro:', error);
+        }
+      }
+    });
   }
 }

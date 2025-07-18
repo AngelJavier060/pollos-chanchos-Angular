@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { PlanAlimentacionService, PlanDetalle } from '../plan-nutricional/services/plan-alimentacion.service';
+import { RegistroDiarioService, RegistroDiarioCompleto } from '../../shared/services/registro-diario.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
 
 @Component({
@@ -24,11 +26,29 @@ export class PollosDashboardHomeComponent implements OnInit {
   
   // Variables para registro diario
   registrosDiarios: { [loteId: number]: RegistroDiario } = {};
+  
+  // ✅ NUEVAS VARIABLES PARA FORMULARIO DE REGISTRO DIARIO
+  mostrarFormularioRegistro = false;
+  loteSeleccionadoParaRegistro: Lote | null = null;
+  registroDiarioActual: RegistroDiario = {
+    fecha: new Date(),
+    cantidadAplicada: 0,
+    animalesVivos: 0,
+    animalesMuertos: 0,
+    animalesEnfermos: 0,
+    cantidadAlimento: 0,
+    tipoAlimento: '',
+    porcentajeConsumido: 0,
+    observaciones: '',
+    procesandoRegistro: false
+  };
 
   constructor(
     private authService: AuthDirectService,
     private loteService: LoteService,
-    private planService: PlanAlimentacionService
+    private planService: PlanAlimentacionService,
+    private registroDiarioService: RegistroDiarioService,
+    private router: Router
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -178,12 +198,15 @@ export class PollosDashboardHomeComponent implements OnInit {
     
     const etapa = this.getEtapaActual(lote);
     this.registrosDiarios[loteId] = {
+      fecha: new Date(),
       cantidadAplicada: etapa ? this.calcularCantidadTotal(lote, etapa) : 0,
       animalesVivos: lote.quantity,
       animalesMuertos: 0,
+      animalesEnfermos: 0,
+      cantidadAlimento: etapa ? this.calcularCantidadTotal(lote, etapa) : 0,
+      tipoAlimento: etapa?.product?.name || '',
       porcentajeConsumido: 100,
-      observaciones: '',
-      fecha: new Date()
+      observaciones: ''
     };
   }
 
@@ -286,6 +309,9 @@ export class PollosDashboardHomeComponent implements OnInit {
       cantidadAplicada: 0,
       animalesVivos: 0,
       animalesMuertos: 0,
+      animalesEnfermos: 0,
+      cantidadAlimento: 0,
+      tipoAlimento: '',
       porcentajeConsumido: 100,
       observaciones: ''
     };
@@ -389,14 +415,195 @@ export class PollosDashboardHomeComponent implements OnInit {
       console.error('❌ Error en cargarEtapasAlimentacion:', error);
     }
   }
+
+  // ✅ MÉTODOS PARA FORMULARIO DE REGISTRO DIARIO
+
+  /**
+   * Abrir formulario de registro diario para un lote
+   */
+  abrirFormularioRegistro(lote: Lote): void {
+    this.loteSeleccionadoParaRegistro = lote;
+    this.mostrarFormularioRegistro = true;
+    
+    // Inicializar con valores del lote actual
+    this.registroDiarioActual = {
+      fecha: new Date(),
+      cantidadAplicada: 0,
+      animalesVivos: lote.quantity,
+      animalesMuertos: 0,
+      animalesEnfermos: 0,
+      cantidadAlimento: 0,
+      tipoAlimento: '',
+      porcentajeConsumido: 100,
+      observaciones: '',
+      procesandoRegistro: false
+    };
+  }
+
+  /**
+   * Cerrar formulario de registro diario
+   */
+  cerrarFormularioRegistro(): void {
+    this.mostrarFormularioRegistro = false;
+    this.loteSeleccionadoParaRegistro = null;
+  }
+
+  /**
+   * Procesar registro diario - IMPLEMENTACIÓN REAL CON BACKEND
+   */
+  async procesarRegistroDiario(): Promise<void> {
+    if (!this.loteSeleccionadoParaRegistro) return;
+    
+    console.log('🔄 Procesando registro diario REAL:', this.registroDiarioActual);
+    
+    this.registroDiarioActual.procesandoRegistro = true;
+    
+    try {
+      // Crear objeto de registro completo
+      const registroCompleto: RegistroDiarioCompleto = {
+        loteId: this.loteSeleccionadoParaRegistro.id!,
+        fecha: this.registroDiarioActual.fecha,
+        animalesMuertos: this.registroDiarioActual.animalesMuertos,
+        animalesEnfermos: this.registroDiarioActual.animalesEnfermos,
+        tipoAlimento: this.registroDiarioActual.tipoAlimento,
+        cantidadAlimento: this.registroDiarioActual.cantidadAlimento,
+        observaciones: this.registroDiarioActual.observaciones,
+        usuario: this.user?.username || 'Sistema'
+      };
+
+      // Procesar con el servicio integrado
+      const resultado = await this.registroDiarioService.procesarRegistroDiarioCompleto(registroCompleto).toPromise();
+
+      console.log('✅ Resultado del procesamiento:', resultado);
+
+      if (resultado && resultado.success) {
+        // Mostrar mensaje de éxito
+        const mensajes = [];
+        if (resultado.resultados.loteActualizado) mensajes.push('✅ Cantidad de animales actualizada');
+        if (resultado.resultados.mortalidadRegistrada) mensajes.push('✅ Mortalidad registrada');
+        if (resultado.resultados.morbilidadRegistrada) mensajes.push('✅ Morbilidad registrada');
+        if (resultado.resultados.inventarioDescontado) mensajes.push('✅ Inventario actualizado');
+
+        alert(`Registro diario procesado exitosamente:\n\n${mensajes.join('\n')}`);
+
+        // REDIRECCIÓN AUTOMÁTICA
+        await this.redirigirSegunRegistros();
+
+      } else {
+        // Mostrar errores específicos
+        const errores = resultado?.errores || ['Error desconocido'];
+        alert(`Errores en el procesamiento:\n\n${errores.join('\n')}`);
+      }
+
+      // Cerrar formulario y recargar datos
+      this.cerrarFormularioRegistro();
+      this.cargarDatosIniciales();
+      
+    } catch (error) {
+      console.error('❌ Error crítico al procesar registro diario:', error);
+      alert(`Error crítico: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      this.registroDiarioActual.procesandoRegistro = false;
+    }
+  }
+
+  /**
+   * Redirigir según registros - FUNCIONALIDAD CLAVE
+   */
+  private async redirigirSegunRegistros(): Promise<void> {
+    const { animalesMuertos, animalesEnfermos } = this.registroDiarioActual;
+    
+    if (animalesMuertos > 0 && animalesEnfermos > 0) {
+      // Ambos casos: primero morbilidad, luego mortalidad
+      console.log('🔄 Redirigiendo a morbilidad y luego mortalidad...');
+      
+      // Preparar datos para morbilidad
+      const datosMorbilidad = {
+        loteId: this.loteSeleccionadoParaRegistro?.id,
+        cantidadEnfermos: animalesEnfermos,
+        fecha: this.registroDiarioActual.fecha,
+        observaciones: this.registroDiarioActual.observaciones
+      };
+      
+      // Ir a morbilidad con datos
+      this.router.navigate(['/pollos/morbilidad'], { 
+        queryParams: { 
+          autoRegistro: 'true', 
+          datos: JSON.stringify(datosMorbilidad) 
+        } 
+      });
+      
+    } else if (animalesMuertos > 0) {
+      // Solo mortalidad
+      console.log('🔄 Redirigiendo a mortalidad...');
+      
+      const datosMortalidad = {
+        loteId: this.loteSeleccionadoParaRegistro?.id,
+        cantidadMuertos: animalesMuertos,
+        fecha: this.registroDiarioActual.fecha,
+        observaciones: this.registroDiarioActual.observaciones
+      };
+      
+      this.router.navigate(['/pollos/mortalidad'], { 
+        queryParams: { 
+          autoRegistro: 'true', 
+          datos: JSON.stringify(datosMortalidad) 
+        } 
+      });
+      
+    } else if (animalesEnfermos > 0) {
+      // Solo morbilidad
+      console.log('🔄 Redirigiendo a morbilidad...');
+      
+      const datosMorbilidad = {
+        loteId: this.loteSeleccionadoParaRegistro?.id,
+        cantidadEnfermos: animalesEnfermos,
+        fecha: this.registroDiarioActual.fecha,
+        observaciones: this.registroDiarioActual.observaciones
+      };
+      
+      this.router.navigate(['/pollos/morbilidad'], { 
+        queryParams: { 
+          autoRegistro: 'true', 
+          datos: JSON.stringify(datosMorbilidad) 
+        } 
+      });
+    }
+  }
+
+  /**
+   * Validar formulario de registro diario
+   */
+  validarFormularioRegistro(): boolean {
+    const { animalesVivos, animalesMuertos, animalesEnfermos } = this.registroDiarioActual;
+    
+    // Validar que el total no exceda los animales disponibles
+    const totalRegistrado = animalesMuertos + animalesEnfermos;
+    if (totalRegistrado > animalesVivos) {
+      alert('El total de animales registrados no puede exceder la cantidad disponible en el lote.');
+      return false;
+    }
+    
+    // Al menos debe haber algún registro
+    if (totalRegistrado === 0 && this.registroDiarioActual.cantidadAlimento === 0) {
+      alert('Debe registrar al menos un evento (mortalidad, morbilidad o consumo de alimento).');
+      return false;
+    }
+    
+    return true;
+  }
 }
 
 // Interfaz para el registro diario
 interface RegistroDiario {
+  fecha: Date;
   cantidadAplicada: number;
   animalesVivos: number;
   animalesMuertos: number;
+  animalesEnfermos: number;
+  cantidadAlimento: number;
+  tipoAlimento: string;
   porcentajeConsumido: number;
   observaciones: string;
-  fecha: Date;
+  procesandoRegistro?: boolean;
 }

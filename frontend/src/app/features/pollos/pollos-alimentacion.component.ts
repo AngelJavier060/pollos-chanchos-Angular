@@ -1,4 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Router } from '@angular/router';
 import { LoteService } from '../lotes/services/lote.service';
 import { AlimentacionService } from './services/alimentacion.service';
 import { PlanNutricionalIntegradoService } from '../../shared/services/plan-nutricional-integrado.service';
@@ -92,7 +93,8 @@ export class PollosAlimentacionComponent implements OnInit {
     private loteService: LoteService,
     private alimentacionService: AlimentacionService,
     private planNutricionalService: PlanNutricionalIntegradoService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -467,8 +469,15 @@ export class PollosAlimentacionComponent implements OnInit {
       
       if (response) {
         alert('✅ Alimentación registrada exitosamente');
-        this.cerrarModal();
-        await this.cargarDatosIniciales();
+
+        if (this.registroCompleto.animalesMuertos > 0) {
+          this.router.navigate(['/pollos/mortalidad'], { queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesMuertos } });
+        } else if (this.registroCompleto.animalesEnfermos > 0) {
+          this.router.navigate(['/pollos/morbilidad'], { queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesEnfermos } });
+        } else {
+          this.cerrarModal();
+          await this.cargarDatosIniciales();
+        }
       }
 
     } catch (error) {
