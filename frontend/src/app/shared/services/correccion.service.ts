@@ -1,6 +1,8 @@
+
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { 
   ValidacionResult, 
   CorreccionRequest, 
@@ -14,7 +16,7 @@ import { PlanEjecucion } from '../models/plan-ejecucion.model';
 })
 export class CorreccionService {
   
-  private readonly API_URL = 'http://localhost:8088/api/plan-ejecucion';
+  private readonly API_URL = environment.apiUrl + '/plan-ejecucion';
 
   constructor(private http: HttpClient) {}
 
