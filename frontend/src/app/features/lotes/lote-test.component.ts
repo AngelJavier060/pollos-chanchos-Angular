@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { environment } from 'src/environments/environment';
 
 /**
  * Componente exclusivamente para diagnóstico del problema con la API de lotes
@@ -99,7 +100,7 @@ export class LoteTestComponent {
     this.error = null;
     this.result = null;
     
-    this.http.get('http://localhost:8080/race').subscribe({
+    this.http.get(`${environment.apiUrl}/race`).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -118,7 +119,7 @@ export class LoteTestComponent {
     this.error = null;
     this.result = null;
     
-    this.http.get('http://localhost:8080/lote').subscribe({
+    this.http.get(`${environment.apiUrl}/lote`).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -148,7 +149,7 @@ export class LoteTestComponent {
     console.log('Intentando crear lote con datos mínimos:', minimalLote);
     
     // Usamos ID de raza 1 que debe existir según la captura que compartiste
-    this.http.post('http://localhost:8080/lote/1', minimalLote, this.getHeaders()).subscribe({
+    this.http.post(`${environment.apiUrl}/lote/1`, minimalLote, this.getHeaders()).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -191,7 +192,7 @@ export class LoteTestComponent {
     
     console.log('Alternativa 1 - Intentando crear lote con formato de fecha específico:', lote);
     
-    this.http.post('http://localhost:8080/lote/1', lote, this.getHeaders()).subscribe({
+    this.http.post(`${environment.apiUrl}/lote/1`, lote, this.getHeaders()).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -221,7 +222,7 @@ export class LoteTestComponent {
     
     console.log('Alternativa 2 - Intentando crear lote con timestamp:', lote);
     
-    this.http.post('http://localhost:8080/lote/1', lote, this.getHeaders()).subscribe({
+    this.http.post(`${environment.apiUrl}/lote/1`, lote, this.getHeaders()).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -251,7 +252,7 @@ export class LoteTestComponent {
     
     console.log('Alternativa 3 - Intentando crear lote sin especificar fecha:', lote);
     
-    this.http.post('http://localhost:8080/lote/1', lote, this.getHeaders()).subscribe({
+    this.http.post(`${environment.apiUrl}/lote/1`, lote, this.getHeaders()).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -274,7 +275,7 @@ export class LoteTestComponent {
 
     const id = this.raceId || 1;
     
-    this.http.get(`http://localhost:8080/diagnostic/race/exists/${id}`).subscribe({
+    this.http.get(`${environment.apiUrl}/diagnostic/race/exists/${id}`).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
@@ -305,7 +306,7 @@ export class LoteTestComponent {
     console.log('Diagnóstico - Intentando crear lote:', lote);
     console.log('Con raza ID:', raceId);
     
-    this.http.post(`http://localhost:8080/diagnostic/lote/test/${raceId}`, lote, this.getHeaders()).subscribe({
+    this.http.post(`${environment.apiUrl}/diagnostic/lote/test/${raceId}`, lote, this.getHeaders()).subscribe({
       next: (data) => {
         this.result = data;
         this.loading = false;
