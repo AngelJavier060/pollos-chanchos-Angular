@@ -69,7 +69,7 @@ export class AuthDirectService {
 
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>(`${this.apiUrl}/api/auth/login`, credentials)
+      .post<AuthResponse>(`${this.apiUrl}/auth/login`, credentials)
       .pipe(
         tap((response) => this.setSession(response)),
         catchError((error) => {
@@ -89,7 +89,7 @@ export class AuthDirectService {
     }
     const body: RefreshTokenRequest = { refreshToken };
     return this.http
-      .post<AuthResponse>(`${this.apiUrl}/api/auth/refresh-token`, body)
+      .post<AuthResponse>(`${this.apiUrl}/auth/refresh-token`, body)
       .pipe(
         tap((response: AuthResponse) => {
           this.setSession(response);
