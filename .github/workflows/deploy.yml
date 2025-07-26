@@ -23,9 +23,11 @@ jobs:
         script: |
           cd /var/www/granja.elvita.proyecto
           git pull
+          npm install -g @angular/cli
           cd frontend
           npm install
           ng build --configuration=production
           cd ../backend
+          chmod +x mvnw
           ./mvnw clean package
           # Reinicia servicios si es necesario
