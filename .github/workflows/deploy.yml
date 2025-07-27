@@ -13,30 +13,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 1. Build Frontend
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-    - name: Install Frontend Dependencies and Build
-      working-directory: ./frontend
-      run: |
-        npm install
-        npm install -g @angular/cli
-        ng build --configuration production
-
-    # 2. Build Backend
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-    - name: Build Backend with Maven
-      working-directory: ./backend
-      run: chmod +x mvnw && ./mvnw clean package -DskipTests
-
-    # 3. Deploy All Artifacts
-    - name: Deploy files to server
+    - name: Deploy and Restart Docker Compose
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -44,53 +21,8 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
-          # Stop services
-          sudo systemctl stop granja-backend.service || echo "Backend service not running or does not exist, continuing..."
-
-          # Set ownership for the main project directory
-          sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /var/www/granja.elvita.proyecto
-
-          # Force-clean the old frontend build artifacts
-          sudo rm -rf /var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend/*
-
-          # Ensure target directories exist
-          sudo mkdir -p /var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend
-          sudo mkdir -p /var/www/granja.elvita.proyecto/backend/target
-
-    - name: Copy Frontend Artifacts
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: 22
-        source: "frontend/dist/avicola-frontend/"
-        target: "/var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend"
-        strip_components: 3
-
-    - name: Copy Backend Artifact
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: 22
-        source: "backend/target/*.jar"
-        target: "/var/www/granja.elvita.proyecto/backend/target/"
-
-    - name: Restart Services on Server
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: 22
-        script: |
-          # Optional: Create/update backend service if it doesn't exist
-          # You would need a granja-backend.service file for this
-
-          # Restart backend service
-          sudo systemctl restart granja-backend.service || echo "Could not restart backend service."
-
-          # Reload Nginx to be safe
-          sudo systemctl reload nginx
+          cd /var/www/granja.elvita.proyecto # Cambia esta ruta si tu proyecto está en otra carpeta
+          git pull
+          docker-compose down
+          docker-compose up --build -d
+          docker system prune -f # Opcional: limpia imágenes antiguas
