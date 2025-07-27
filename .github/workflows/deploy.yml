@@ -21,8 +21,11 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
-          cd /var/www/granja.elvita.proyecto # Cambia esta ruta si tu proyecto está en otra carpeta
+          cd /var/www/granja.elvita.proyecto
           git pull
+          cd backend
+          ./mvnw clean package -DskipTests
+          cd ..
           docker-compose down
           docker-compose up --build -d
-          docker system prune -f # Opcional: limpia imágenes antiguas
+          docker system prune -f
