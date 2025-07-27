@@ -52,7 +52,9 @@
                   "maximumError": "30kb"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "baseHref": "/api/",
+              "deployUrl": "/api/"
             },
             "development": {
               "buildOptimizer": false,
