@@ -47,11 +47,14 @@ jobs:
           # Stop services
           sudo systemctl stop granja-backend.service || echo "Backend service not running or does not exist, continuing..."
 
-          # Create/clear frontend directory and set permissions
-          sudo mkdir -p /var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend
+          # Set ownership for the main project directory
           sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /var/www/granja.elvita.proyecto
 
-          # Create/clear backend directory
+          # Force-clean the old frontend build artifacts
+          sudo rm -rf /var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend/*
+
+          # Ensure target directories exist
+          sudo mkdir -p /var/www/granja.elvita.proyecto/frontend/dist/avicola-frontend
           sudo mkdir -p /var/www/granja.elvita.proyecto/backend/target
 
     - name: Copy Frontend Artifacts
