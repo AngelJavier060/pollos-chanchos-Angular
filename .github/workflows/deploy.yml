@@ -21,7 +21,7 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
-          cd /var/www/granja.elvita.proyecto
+                    cd /var/www/granja.elvita.proyecto
           git pull
           npm install -g @angular/cli
           cd frontend
