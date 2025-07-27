@@ -7,7 +7,7 @@ Este proyecto corresponde al backend de la aplicación de gestión avícola, des
 ### Entidades Principales
 
 - **Usuario**: Entidad principal para la gestión de usuarios del sistema.
-  - Tabla en la base de datos: `usuarios` 
+  - Tabla en la base de datos: `usuarios` //para la Base de datos
   - Paquete: `com.wil.avicola_backend.model.Usuario`
   - Repositorio: `UsuarioRepository`
 
