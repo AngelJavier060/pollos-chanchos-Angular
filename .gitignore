@@ -1,0 +1,34 @@
+# Archivos de dependencias
+node_modules/
+*/node_modules/
+
+# Archivos de build
+*/dist/
+*/target/
+*/build/
+
+# Archivos de logs
+*.log
+*/logs/
+backend/backend.log
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de uploads (opcional, dependiendo de tu estrategia)
+backend/uploads/
+
+# Cache de npm
+.npm/

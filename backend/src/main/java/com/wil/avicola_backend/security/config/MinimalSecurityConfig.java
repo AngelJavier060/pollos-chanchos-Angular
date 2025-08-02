@@ -73,6 +73,7 @@ public class MinimalSecurityConfig {
                     // Endpoints públicos - NO requieren autenticación
                     .requestMatchers(
                         "/api/auth/**",
+                        "/auth/**", // Agregar también /auth/** por compatibilidad
                         "/health",
                         "/api/health", 
                         "/api/public/**",

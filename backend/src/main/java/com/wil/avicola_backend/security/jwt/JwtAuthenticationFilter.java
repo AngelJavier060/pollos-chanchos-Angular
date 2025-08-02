@@ -29,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     // Lista consolidada de rutas públicas
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
             "/api/auth/**",
+            "/auth/**",  // Agregar también /auth/** por compatibilidad
             "/health",
             "/api/health",
             "/actuator/**",

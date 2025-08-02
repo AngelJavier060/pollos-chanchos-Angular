@@ -32,7 +32,15 @@ export class AuthDirectService {
 
   public getToken(): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('accessToken');
+      // Intentar con la clave principal
+      let token = localStorage.getItem('accessToken');
+      
+      // Si no existe, intentar con la clave alternativa (para compatibilidad)
+      if (!token) {
+        token = localStorage.getItem('auth_token');
+      }
+      
+      return token;
     }
     return null;
   }
@@ -69,7 +77,7 @@ export class AuthDirectService {
 
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>(`${this.apiUrl}/auth/login`, credentials)
+      .post<AuthResponse>(`${this.apiUrl}/api/auth/login`, credentials)
       .pipe(
         tap((response) => this.setSession(response)),
         catchError((error) => {
@@ -119,6 +127,7 @@ export class AuthDirectService {
 
       localStorage.setItem('currentUser', JSON.stringify(user));
       localStorage.setItem('accessToken', authResponse.token);
+      localStorage.setItem('auth_token', authResponse.token); // Guardar también con clave alternativa para compatibilidad
       if (authResponse.refreshToken) {
         localStorage.setItem('refreshToken', authResponse.refreshToken);
       }
@@ -138,7 +147,12 @@ export class AuthDirectService {
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('accessToken');
+      localStorage.removeItem('auth_token'); // Limpiar también la clave alternativa
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user'); // Limpiar también esta clave por compatibilidad
+      localStorage.removeItem('token'); // Y esta también
+      localStorage.removeItem('refresh_token'); // Y esta también
+      localStorage.removeItem('token_expiry'); // Y esta también
     }
   }
 }

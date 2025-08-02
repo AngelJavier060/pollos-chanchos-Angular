@@ -21,8 +21,8 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
-          cd /var/www/granja.elvita.proyecto
-          git pull
+          cd /opt/pollos-chanchos-Angular
+          git pull origin main
           cd backend
           ./mvnw clean package -DskipTests
           cd ..

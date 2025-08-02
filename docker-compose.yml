@@ -1,11 +1,14 @@
-version: '3'
+version: '3.8'
 services:
   backend:
     build: ./backend
     ports:
-      - "3000:3000"
+      - "8088:8088"  # Puerto correcto del backend Spring Boot
     environment:
-      - NODE_ENV=production
+      - SPRING_PROFILES_ACTIVE=production
+      - SERVER_PORT=8088
+    networks:
+      - app-network
 
   frontend:
     build: ./frontend
@@ -13,3 +16,9 @@ services:
       - "80:80"
     depends_on:
       - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
