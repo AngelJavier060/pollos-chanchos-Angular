@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: '/api' // Usar ruta relativa para producción, Nginx redirige a backend
+  apiUrl: '' // Usar cadena vacía para que las rutas sean relativas sin duplicar /api
 };
