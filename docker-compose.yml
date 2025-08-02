@@ -1,14 +1,37 @@
 version: '3.8'
 services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_avicola
+      MYSQL_USER: avicola_user
+      MYSQL_PASSWORD: avicola_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
-      - "8088:8088"  # Puerto correcto del backend Spring Boot
+      - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=production
       - SERVER_PORT=8088
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=db_avicola
+      - DB_USER=avicola_user
+      - DB_PASSWORD=avicola_password
+    depends_on:
+      - mysql
     networks:
       - app-network
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -18,6 +41,10 @@ services:
       - backend
     networks:
       - app-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
 
 networks:
   app-network:
