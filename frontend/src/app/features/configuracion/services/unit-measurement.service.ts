@@ -9,7 +9,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class UnitMeasurementService {
-  private apiUrl = `${environment.apiUrl}/unitmeasurement`;
+  private apiUrl = `${environment.apiUrl}/api/unitmeasurement`;
   
   private httpOptions = {
     headers: new HttpHeaders({

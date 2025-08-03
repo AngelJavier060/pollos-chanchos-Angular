@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.ProviderService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/provider")
+@RequestMapping("/api/provider")
 public class ProviderController {
 
     @Autowired

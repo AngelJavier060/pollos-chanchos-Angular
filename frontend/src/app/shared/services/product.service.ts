@@ -9,13 +9,13 @@ import { environment } from '../../../environments/environment';
 })
 export class ProductService {
   // Actualizado para usar la ruta correcta del backend
-  private apiUrl = `${environment.apiUrl}/product`;
-  private providerUrl = `${environment.apiUrl}/provider`;
-  private typeFoodUrl = `${environment.apiUrl}/typefood`;
-  private unitMeasurementUrl = `${environment.apiUrl}/unitmeasurement`;
-  private animalUrl = `${environment.apiUrl}/animal`;
-  private stageUrl = `${environment.apiUrl}/stage`;
-  private categoryUrl = `${environment.apiUrl}/category`;
+  private apiUrl = `${environment.apiUrl}/api/product`;
+  private providerUrl = `${environment.apiUrl}/api/provider`;
+  private typeFoodUrl = `${environment.apiUrl}/api/typefood`;
+  private unitMeasurementUrl = `${environment.apiUrl}/api/unitmeasurement`;
+  private animalUrl = `${environment.apiUrl}/api/animal`;
+  private stageUrl = `${environment.apiUrl}/api/stage`;
+  private categoryUrl = `${environment.apiUrl}/api/category`;
   
   constructor(private http: HttpClient) { }
   

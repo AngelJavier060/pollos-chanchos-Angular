@@ -20,7 +20,7 @@ import com.wil.avicola_backend.service.ProductService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/product")
+@RequestMapping("/api/product")
 @CrossOrigin(origins = "http://localhost:4200")
 public class ProductController {
 

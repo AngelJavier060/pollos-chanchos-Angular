@@ -9,7 +9,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class TypeFoodService {
-  private apiUrl = `${environment.apiUrl}/typefood`;
+  private apiUrl = `${environment.apiUrl}/api/typefood`;
   
   private httpOptions = {
     headers: new HttpHeaders({

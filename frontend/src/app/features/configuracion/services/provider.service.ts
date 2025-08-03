@@ -9,7 +9,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class ProviderService {
-  private apiUrl = `${environment.apiUrl}/provider`;
+  private apiUrl = `${environment.apiUrl}/api/provider`;
   
   private httpOptions = {
     headers: new HttpHeaders({

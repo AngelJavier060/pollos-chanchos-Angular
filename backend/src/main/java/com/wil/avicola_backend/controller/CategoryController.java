@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.CategoryService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/category")
+@RequestMapping("/api/category")
 public class CategoryController {
 
     @Autowired

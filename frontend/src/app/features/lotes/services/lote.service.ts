@@ -8,7 +8,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class LoteService {
-  private apiUrl = `${environment.apiUrl}/lote`;
+  private apiUrl = `${environment.apiUrl}/api/lote`;
 
   private httpOptions = {
     headers: new HttpHeaders({

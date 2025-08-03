@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.UnitMeasurementService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/unitmeasurement")
+@RequestMapping("/api/unitmeasurement")
 public class UnitMeasurementController {
 
     @Autowired

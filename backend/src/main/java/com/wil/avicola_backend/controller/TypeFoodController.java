@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.TypeFoodService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/typefood")
+@RequestMapping("/api/typefood")
 public class TypeFoodController {
 
     @Autowired

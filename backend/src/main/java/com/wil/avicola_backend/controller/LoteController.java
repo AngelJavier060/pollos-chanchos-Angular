@@ -18,7 +18,7 @@ import com.wil.avicola_backend.service.LoteService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/lote")
+@RequestMapping("/api/lote")
 public class LoteController {
 
     @Autowired

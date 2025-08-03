@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.RaceService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/race")
+@RequestMapping("/api/race")
 public class RaceController {
 
     @Autowired

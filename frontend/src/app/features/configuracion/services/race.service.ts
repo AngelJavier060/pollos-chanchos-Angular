@@ -8,7 +8,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class RaceService {
-  private apiUrl = `${environment.apiUrl}/race`;
+  private apiUrl = `${environment.apiUrl}/api/race`;
   
   // Definiendo encabezados HTTP comunes para todas las solicitudes
   private httpOptions = {
