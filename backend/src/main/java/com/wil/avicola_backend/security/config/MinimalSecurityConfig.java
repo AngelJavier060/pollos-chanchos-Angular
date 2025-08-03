@@ -134,7 +134,12 @@ public class MinimalSecurityConfig {
         
         CorsConfiguration configuration = new CorsConfiguration();
         // 🔧 CRÍTICO: No usar "*" con allowCredentials=true
-        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:4200", "http://localhost:*"));
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:4200", 
+            "http://localhost:*",
+            "https://granja.improvement-solution.com",
+            "http://granja.improvement-solution.com"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"));
         configuration.setAllowCredentials(false); // 🔧 CRÍTICO: Desactivar credentials para endpoints públicos
