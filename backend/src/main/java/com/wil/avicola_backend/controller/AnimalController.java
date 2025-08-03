@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.AnimalService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/animal")
+@RequestMapping("/api/animal")
 public class AnimalController {
 
     @Autowired
@@ -25,7 +25,7 @@ public class AnimalController {
 
     @GetMapping
     public ResponseEntity<?> findAnimals() {
-        System.out.println("🐾 GET /animal - Obteniendo todos los animales");
+        System.out.println("🐾 GET /api/animal - Obteniendo todos los animales");
         ResponseEntity<?> response = animalService.findAnimals();
         System.out.println("📊 Respuesta del servicio: " + response.getBody());
         return response;
@@ -33,13 +33,13 @@ public class AnimalController {
 
     @GetMapping("/test")
     public ResponseEntity<String> testEndpoint() {
-        System.out.println("🧪 GET /animal/test - Endpoint de prueba");
+        System.out.println("🧪 GET /api/animal/test - Endpoint de prueba");
         return ResponseEntity.ok("Endpoint de animales funcionando correctamente");
     }
 
     @PostMapping("/init-data")
     public ResponseEntity<String> initializeDefaultAnimals() {
-        System.out.println("🔄 POST /animal/init-data - Inicializando animales por defecto");
+        System.out.println("🔄 POST /api/animal/init-data - Inicializando animales por defecto");
         return animalService.initializeDefaultAnimals();
     }
 
