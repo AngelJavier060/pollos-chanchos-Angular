@@ -9,16 +9,16 @@
 
     <form class="mt-8 space-y-6" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <div>
-        <label for="username" class="block text-sm font-medium text-gray-700">Usuario</label>
+        <label for="identifier" class="block text-sm font-medium text-gray-700">Usuario o Email</label>
         <input 
-          id="username" 
-          name="username" 
+          id="identifier" 
+          name="identifier" 
           type="text" 
-          formControlName="username"
+          formControlName="identifier"
           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Ingrese su usuario">
-        <div *ngIf="usernameControl?.touched && usernameControl?.invalid" class="mt-1 text-sm text-red-600">
-          {{ getErrorMessage('username') }}
+          placeholder="Ingrese su usuario o email">
+        <div *ngIf="identifierControl?.touched && identifierControl?.invalid" class="mt-1 text-sm text-red-600">
+          {{ getErrorMessage('identifier') }}
         </div>
       </div>
 

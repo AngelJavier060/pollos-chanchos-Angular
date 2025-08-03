@@ -41,7 +41,7 @@ export class LoginComponent implements OnInit {
 
   private initializeForm(): void {
     this.loginForm = this.formBuilder.group({
-      username: ['', [Validators.required]],
+      identifier: ['', [Validators.required]],
       password: ['', [Validators.required, Validators.minLength(6)]]
     });
   }
@@ -53,8 +53,12 @@ export class LoginComponent implements OnInit {
       : '/admin/dashboard';
   }
 
+  get identifierControl() {
+    return this.loginForm.get('identifier');
+  }
+
   get usernameControl() {
-    return this.loginForm.get('username');
+    return this.loginForm.get('identifier'); // Mantenemos compatibilidad
   }
 
   get passwordControl() {
@@ -66,7 +70,7 @@ export class LoginComponent implements OnInit {
     if (!control) return '';
     
     if (control.hasError('required')) {
-      return 'Este campo es requerido';
+      return controlName === 'identifier' ? 'Usuario o email es requerido' : 'Este campo es requerido';
     }
     if (control.hasError('email')) {
       return 'Debe ser un email válido';
@@ -86,16 +90,21 @@ export class LoginComponent implements OnInit {
     this.error = 'Iniciando sesión...';
     console.log('Iniciando proceso de login...');
 
-    const username = this.loginForm.get('username')?.value;
+    const identifier = this.loginForm.get('identifier')?.value;
     const password = this.loginForm.get('password')?.value;
 
-    if (!username || !password) {
-      this.handleError('Debe proporcionar usuario y contraseña');
+    if (!identifier || !password) {
+      this.handleError('Debe proporcionar usuario/email y contraseña');
       return;
     }
 
-    const loginData = {
-      username,
+    // Determinar si es email o username
+    const isEmail = identifier.includes('@');
+    const loginData = isEmail ? {
+      email: identifier,
+      password
+    } : {
+      username: identifier,
       password
     };
 
