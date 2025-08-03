@@ -37,14 +37,11 @@ services:
     build: ./frontend
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       - backend
     networks:
       - app-network
     restart: unless-stopped
-    volumes:
-      - ./ssl:/etc/nginx/ssl:ro
 
 volumes:
   mysql_data:
