@@ -17,7 +17,7 @@ import com.wil.avicola_backend.service.StageService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/stage")
+@RequestMapping("/api/stage")
 public class StageController {
 
     @Autowired

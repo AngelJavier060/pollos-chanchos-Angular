@@ -9,7 +9,7 @@ import { environment } from '../../../../environments/environment';
   providedIn: 'root'
 })
 export class StageService {
-  private apiUrl = `${environment.apiUrl}/stage`;
+  private apiUrl = `${environment.apiUrl}/api/stage`;
   
   // Definiendo encabezados HTTP comunes para todas las solicitudes
   private httpOptions = {
