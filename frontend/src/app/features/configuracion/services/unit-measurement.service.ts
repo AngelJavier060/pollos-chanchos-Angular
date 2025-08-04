@@ -3,13 +3,13 @@ import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http
 import { Observable, throwError } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 import { UnitMeasurement } from '../interfaces/unit-measurement.interface';
-import { environment } from '../../../../environments/environment';
+import { ApiUrlService } from '../../../core/services/api-url.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class UnitMeasurementService {
-  private apiUrl = `${environment.apiUrl}/api/unitmeasurement`;
+  private apiUrl: string;
   
   private httpOptions = {
     headers: new HttpHeaders({
@@ -18,7 +18,12 @@ export class UnitMeasurementService {
     })
   };
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private apiUrlService: ApiUrlService
+  ) { 
+    this.apiUrl = this.apiUrlService.buildUrl('unitmeasurement');
+  }
 
   getUnitMeasurements(): Observable<UnitMeasurement[]> {
     return this.http.get<UnitMeasurement[]>(this.apiUrl, this.httpOptions).pipe(

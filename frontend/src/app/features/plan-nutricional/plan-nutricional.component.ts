@@ -399,7 +399,7 @@ export class PlanNutricionalComponent implements OnInit {
   
   private loadAnimales(): void {
     console.log('🐾 === CARGANDO ANIMALES DESDE BD ===');
-    console.log('URL endpoint:', `${environment.apiUrl}/animal`);
+    console.log('URL endpoint:', `${environment.apiUrl}/api/animal`);
     
     this.animalService.getAnimals().subscribe({
       next: (animales) => {

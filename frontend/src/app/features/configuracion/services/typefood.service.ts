@@ -3,13 +3,13 @@ import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http
 import { Observable, throwError } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 import { TypeFood } from '../interfaces/typefood.interface';
-import { environment } from '../../../../environments/environment';
+import { ApiUrlService } from '../../../core/services/api-url.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TypeFoodService {
-  private apiUrl = `${environment.apiUrl}/api/typefood`;
+  private apiUrl: string;
   
   private httpOptions = {
     headers: new HttpHeaders({
@@ -18,7 +18,12 @@ export class TypeFoodService {
     })
   };
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private apiUrlService: ApiUrlService
+  ) { 
+    this.apiUrl = this.apiUrlService.buildUrl('typefood');
+  }
 
   getTypeFoods(): Observable<TypeFood[]> {
     return this.http.get<TypeFood[]>(this.apiUrl, this.httpOptions).pipe(

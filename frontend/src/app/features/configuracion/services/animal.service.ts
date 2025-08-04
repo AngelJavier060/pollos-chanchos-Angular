@@ -2,13 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, catchError, retry } from 'rxjs';
 import { Animal } from '../interfaces/animal.interface';
-import { environment } from '../../../../environments/environment';
+import { ApiUrlService } from '../../../core/services/api-url.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AnimalService {
-  private apiUrl = `${environment.apiUrl}/animal`;
+  private apiUrl: string;
   
   // Definiendo encabezados HTTP comunes para todas las solicitudes
   private httpOptions = {
@@ -18,7 +18,13 @@ export class AnimalService {
     })
   };
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private apiUrlService: ApiUrlService
+  ) { 
+    // Configuración automática según el entorno
+    this.apiUrl = this.apiUrlService.buildUrl('animal');
+  }
 
   getAnimals(): Observable<Animal[]> {
     return this.http.get<Animal[]>(this.apiUrl, this.httpOptions).pipe(

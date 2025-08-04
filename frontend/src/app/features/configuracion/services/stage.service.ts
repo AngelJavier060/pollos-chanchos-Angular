@@ -3,13 +3,13 @@ import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http
 import { Observable, throwError } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 import { Stage } from '../interfaces/stage.interface';
-import { environment } from '../../../../environments/environment';
+import { ApiUrlService } from '../../../core/services/api-url.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class StageService {
-  private apiUrl = `${environment.apiUrl}/api/stage`;
+  private apiUrl: string;
   
   // Definiendo encabezados HTTP comunes para todas las solicitudes
   private httpOptions = {
@@ -19,7 +19,13 @@ export class StageService {
     })
   };
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private apiUrlService: ApiUrlService
+  ) { 
+    // Configuración automática según el entorno
+    this.apiUrl = this.apiUrlService.buildUrl('stage');
+  }
 
   getStages(): Observable<Stage[]> {
     return this.http.get<Stage[]>(this.apiUrl, this.httpOptions).pipe(

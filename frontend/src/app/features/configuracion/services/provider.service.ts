@@ -3,13 +3,13 @@ import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http
 import { Observable, throwError } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 import { Provider } from '../interfaces/provider.interface';
-import { environment } from '../../../../environments/environment';
+import { ApiUrlService } from '../../../core/services/api-url.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ProviderService {
-  private apiUrl = `${environment.apiUrl}/api/provider`;
+  private apiUrl: string;
   
   private httpOptions = {
     headers: new HttpHeaders({
@@ -18,7 +18,12 @@ export class ProviderService {
     })
   };
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private apiUrlService: ApiUrlService
+  ) { 
+    this.apiUrl = this.apiUrlService.buildUrl('provider');
+  }
 
   getProviders(): Observable<Provider[]> {
     return this.http.get<Provider[]>(this.apiUrl, this.httpOptions).pipe(
