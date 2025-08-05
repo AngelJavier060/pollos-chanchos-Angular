@@ -9,5 +9,5 @@ RUN npm run build --configuration=production
 # Etapa de producción
 FROM nginx:alpine
 COPY --from=build /app/dist/avicola-frontend/ /usr/share/nginx/html/
-COPY nginx-ssl.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80 443
+COPY nginx-simple.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
