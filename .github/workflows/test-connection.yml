@@ -9,6 +9,13 @@ jobs:
     timeout-minutes: 5
 
     steps:
+    - name: Debug Connection Info
+      run: |
+        echo "🔍 Debugging SSH connection..."
+        echo "Server Host: ${{ secrets.SERVER_HOST }}"
+        echo "Server User: ${{ secrets.SERVER_USER }}"
+        echo "Server Port: ${{ secrets.SERVER_PORT || 22 }}"
+        
     - name: Test SSH Connection
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -17,6 +24,8 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: ${{ secrets.SERVER_PORT || 22 }}
         timeout: 30s
+        command_timeout: 60s
+        debug: true
         script: |
           echo "✅ SSH connection successful!"
           echo "Server: $(hostname)"
