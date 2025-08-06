@@ -6,6 +6,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
 import { ProductService } from '../../shared/services/product.service';
 import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/services/analisis-inventario.service';
+import { InventarioService, InventarioAlimento, MovimientoInventario } from '../pollos/services/inventario.service';
 import { 
   Product, Provider, TypeFood, UnitMeasurement, Animal, Stage 
 } from '../../shared/models/product.model';
@@ -29,8 +30,18 @@ export class InventarioComponent implements OnInit {
   analisisInventario: InventarioAnalisis | null = null;
   cargandoAnalisis = false;
   
+  // Inventario automático con disminución
+  inventarioAlimentos: InventarioAlimento[] = [];
+  inventariosStockBajo: InventarioAlimento[] = [];
+  movimientosSeleccionados: MovimientoInventario[] = [];
+  ultimaActualizacion: Date = new Date();
+  
+  // Movimientos de inventario
+  movimientosInventario: MovimientoInventario[] = [];
+  cargandoMovimientos = false;
+  
   // Vista actual
-  vistaActual: 'productos' | 'analisis' = 'productos';
+  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' | 'movimientos' = 'productos';
   
   productForm: FormGroup;
   searchForm: FormGroup;
@@ -40,9 +51,13 @@ export class InventarioComponent implements OnInit {
   showForm = false;
   isEditMode = false;
   
+  // Referencia a Math para usarlo en el template
+  Math = Math;
+  
   constructor(
     private productService: ProductService,
     private analisisService: AnalisisInventarioService,
+    private inventarioService: InventarioService,
     private fb: FormBuilder
   ) {
     this.productForm = this.fb.group({
@@ -74,6 +89,24 @@ export class InventarioComponent implements OnInit {
     this.loadRelatedEntities();
     this.loadProducts();
     this.cargarAnalisisInventario();
+    this.cargarInventarioAutomatico();
+    
+    // ✅ NUEVA FUNCIONALIDAD: Actualizar inventario automáticamente cada 30 segundos
+    // cuando se está viendo la vista de inventario automático
+    this.setupAutoRefresh();
+  }
+
+  /**
+   * Configurar actualización automática del inventario
+   */
+  private setupAutoRefresh(): void {
+    // Actualizar cada 30 segundos si estamos en la vista de inventario automático
+    setInterval(() => {
+      if (this.vistaActual === 'inventario-automatico') {
+        console.log('🔄 Auto-refresh: Actualizando inventario automáticamente...');
+        this.cargarInventarioAutomatico();
+      }
+    }, 30000); // 30 segundos
   }
   
   loadProducts(): void {
@@ -166,10 +199,25 @@ export class InventarioComponent implements OnInit {
   /**
    * Cambiar entre vistas
    */
-  cambiarVista(vista: 'productos' | 'analisis'): void {
+  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico' | 'movimientos'): void {
     this.vistaActual = vista;
-    if (vista === 'analisis' && !this.analisisInventario) {
-      this.cargarAnalisisInventario();
+    
+    // Cargar datos específicos según la vista
+    switch (vista) {
+      case 'analisis':
+        if (!this.analisisInventario) {
+          this.cargarAnalisisInventario();
+        }
+        break;
+      case 'inventario-automatico':
+        this.cargarInventarioAutomatico();
+        break;
+      case 'movimientos':
+        this.cargarMovimientos();
+        break;
+      case 'productos':
+        this.loadProducts();
+        break;
     }
   }
   
@@ -217,6 +265,155 @@ export class InventarioComponent implements OnInit {
     if (rentabilidad >= 20) return 'text-green-600';
     if (rentabilidad >= 10) return 'text-yellow-600';
     return 'text-red-600';
+  }
+  
+  // ============================================================================
+  // MÉTODOS PARA INVENTARIO AUTOMÁTICO CON DISMINUCIÓN
+  // ============================================================================
+  
+  /**
+   * Cargar inventario automático con control de stock
+   */
+  cargarInventarioAutomatico(): void {
+    console.log('📦 Cargando inventario automático...');
+    
+    // Cargar inventarios disponibles
+    this.inventarioService.obtenerInventarios().subscribe({
+      next: (inventarios) => {
+        console.log('✅ Inventarios cargados desde backend:', inventarios);
+        console.log('📊 Total inventarios recibidos:', inventarios.length);
+        
+        // Mostrar detalles de cada inventario con los datos ya calculados por el backend
+        inventarios.forEach((inv, index) => {
+          console.log(`📦 Inventario ${index + 1}:`, {
+            id: inv.id,
+            tipoAlimento: inv.tipoAlimento?.name || 'N/A',
+            stockActual: inv.cantidadStock,
+            stockOriginal: inv.cantidadOriginal,
+            totalConsumido: inv.totalConsumido,
+            unidadMedida: inv.unidadMedida,
+            stockMinimo: inv.stockMinimo
+          });
+        });
+        
+        this.inventarioAlimentos = inventarios;
+        this.ultimaActualizacion = new Date();
+        
+        // Si no hay inventarios, mostrar mensaje de ayuda
+        if (inventarios.length === 0) {
+          console.log('⚠️ No hay inventarios disponibles. Puede necesitar crear datos de ejemplo.');
+        } else {
+          console.log('🎉 Inventarios con totales calculados por backend asignados correctamente');
+        }
+      },
+      error: (error) => {
+        console.error('❌ Error cargando inventarios:', error);
+        console.log('💡 Intente crear datos de ejemplo si la base de datos está vacía');
+        this.inventarioAlimentos = [];
+      }
+    });
+    
+    // Cargar inventarios con stock bajo
+    this.inventarioService.obtenerInventariosStockBajo().subscribe({
+      next: (stockBajo) => {
+        console.log('⚠️ Inventarios con stock bajo:', stockBajo);
+        this.inventariosStockBajo = stockBajo;
+      },
+      error: (error) => {
+        console.error('❌ Error cargando stock bajo:', error);
+        this.inventariosStockBajo = [];
+      }
+    });
+  }
+
+  /**
+   * Crear datos de ejemplo para el inventario (para pruebas)
+   */
+  crearDatosEjemplo(): void {
+    console.log('🔧 Creando datos de ejemplo...');
+    
+    this.inventarioService.crearDatosEjemplo().subscribe({
+      next: (response) => {
+        console.log('✅ Datos de ejemplo creados:', response);
+        alert('Datos de ejemplo creados exitosamente. Actualizando inventario...');
+        
+        // Recargar el inventario después de crear los datos
+        this.cargarInventarioAutomatico();
+      },
+      error: (error) => {
+        console.error('❌ Error creando datos de ejemplo:', error);
+        alert('Error al crear datos de ejemplo. Verifique la consola para más detalles.');
+      }
+    });
+  }
+  
+  /**
+   * Sincronizar inventario con productos reales
+   */
+  sincronizarConProductosReales(): void {
+    console.log('🔄 Sincronizando inventario con productos reales...');
+    
+    this.inventarioService.sincronizarConProductos().subscribe({
+      next: (response) => {
+        console.log('✅ Sincronización completada:', response);
+        alert('Inventario sincronizado con productos reales exitosamente. Actualizando...');
+        
+        // Recargar el inventario después de sincronizar
+        this.cargarInventarioAutomatico();
+      },
+      error: (error) => {
+        console.error('❌ Error sincronizando inventario:', error);
+        alert('Error al sincronizar inventario. Verifique la consola para más detalles.');
+      }
+    });
+  }
+  
+  /**
+   * Ver movimientos de un producto específico
+   */
+  verMovimientos(inventario: InventarioAlimento): void {
+    console.log('📋 Consultando movimientos para:', inventario.tipoAlimento.name);
+    
+    // En este caso necesitamos los movimientos por tipo de alimento, no por lote
+    // Por ahora mostramos la información básica
+    this.movimientosSeleccionados = [];
+    
+    alert(`Producto: ${inventario.tipoAlimento.name}\nStock Actual: ${inventario.cantidadStock} ${inventario.unidadMedida}\nStock Mínimo: ${inventario.stockMinimo} ${inventario.unidadMedida}`);
+  }
+  
+  /**
+   * Calcular porcentaje de stock usado
+   */
+  calcularPorcentajeUsado(inventario: InventarioAlimento): number {
+    if (!inventario.cantidadOriginal || inventario.cantidadOriginal === 0) {
+      return 0;
+    }
+    
+    const usado = inventario.cantidadOriginal - inventario.cantidadStock;
+    return (usado / inventario.cantidadOriginal) * 100;
+  }
+  
+  /**
+   * Obtener color del indicador de stock
+   */
+  getColorStock(inventario: InventarioAlimento): string {
+    const porcentaje = (inventario.cantidadStock / inventario.stockMinimo) * 100;
+    
+    if (porcentaje <= 100) return 'bg-red-500'; // Stock crítico
+    if (porcentaje <= 150) return 'bg-yellow-500'; // Stock bajo
+    return 'bg-green-500'; // Stock normal
+  }
+  
+  /**
+   * Obtener estado del stock
+   */
+  getEstadoStock(inventario: InventarioAlimento): string {
+    if (inventario.cantidadStock <= inventario.stockMinimo) {
+      return 'CRÍTICO';
+    } else if (inventario.cantidadStock <= inventario.stockMinimo * 1.5) {
+      return 'BAJO';
+    }
+    return 'NORMAL';
   }
   
   searchProducts(): void {
@@ -427,5 +624,81 @@ export class InventarioComponent implements OnInit {
   resetFilters(): void {
     this.searchForm.reset();
     this.filteredProducts = this.products;
+  }
+
+  /**
+   * Calcular porcentaje de stock disponible
+   */
+  calcularPorcentajeStock(inventario: InventarioAlimento): number {
+    const porcentaje = (inventario.cantidadStock / (inventario.cantidadOriginal || inventario.cantidadStock || 1)) * 100;
+    return Math.min(100, Math.round(porcentaje));
+  }
+
+  /**
+   * Contar inventarios por estado
+   */
+  contarInventariosPorEstado(estado: string): number {
+    return this.inventarioAlimentos.filter(inv => this.getEstadoStock(inv) === estado).length;
+  }
+
+  /**
+   * Cargar movimientos de inventario
+   */
+  cargarMovimientos(): void {
+    this.cargandoMovimientos = true;
+    console.log('🔄 Cargando movimientos de inventario...');
+    
+    this.inventarioService.obtenerMovimientos().subscribe({
+      next: (movimientos) => {
+        console.log('✅ Movimientos cargados:', movimientos);
+        this.movimientosInventario = movimientos;
+        this.cargandoMovimientos = false;
+      },
+      error: (error) => {
+        console.error('❌ Error cargando movimientos:', error);
+        this.cargandoMovimientos = false;
+      }
+    });
+  }
+
+  /**
+   * Contar movimientos por tipo
+   */
+  contarMovimientosPorTipo(tipo: string): number {
+    return this.movimientosInventario.filter(mov => mov.tipoMovimiento === tipo).length;
+  }
+
+  /**
+   * Contar lotes únicos
+   */
+  contarLotesUnicos(): number {
+    const lotes = new Set(this.movimientosInventario
+      .filter(mov => mov.loteId)
+      .map(mov => mov.loteId));
+    return lotes.size;
+  }
+
+  /**
+   * Formatear fecha para mostrar
+   */
+  formatearFecha(fecha: string | Date): string {
+    const date = new Date(fecha);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  }
+
+  /**
+   * Formatear hora para mostrar
+   */
+  formatearHora(fecha: string | Date): string {
+    const date = new Date(fecha);
+    return date.toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   }
 }

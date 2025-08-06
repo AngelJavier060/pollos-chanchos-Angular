@@ -82,7 +82,7 @@
   <div *ngIf="estadisticas?.alertas?.length && estadisticas.alertas.length > 0" class="mb-8">
     <h3 class="text-lg font-semibold text-gray-800 mb-4">🚨 Alertas y Notificaciones</h3>
     <div class="space-y-3">
-      <div *ngFor="let alerta of estadisticas.alertas" 
+      <div *ngFor="let alerta of estadisticas?.alertas || []" 
            class="p-4 rounded-lg border" [ngClass]="getClaseAlerta(alerta.tipo)">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-3">
@@ -95,53 +95,6 @@
           <span class="px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-50">
             {{ alerta.tipo.toUpperCase() }}
           </span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Lotes Activos y Registro Rápido -->
-  <div class="mb-8">
-    <h3 class="text-lg font-semibold text-gray-800 mb-4">🐔 Lotes Activos - Registro de Mortalidad</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div *ngFor="let lote of lotes" 
-           class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-3">
-              <div class="p-2 bg-blue-100 rounded-lg">
-                <i class="fas fa-egg text-blue-600"></i>
-              </div>
-              <div>
-                <h4 class="font-semibold text-gray-800">{{ lote.codigo }}</h4>
-                <p class="text-sm text-gray-500">{{ lote.animal?.name }} - {{ lote.race?.name }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-3 mb-4">
-            <div class="flex justify-between">
-              <span class="text-sm text-gray-600">Pollos vivos:</span>
-              <span class="font-medium text-green-600">{{ lote.quantity }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-sm text-gray-600">Cantidad:</span>
-              <span class="font-medium">{{ lote.quantity }} pollos</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-sm text-gray-600">Estado:</span>
-              <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                {{ lote.status }}
-              </span>
-            </div>
-          </div>
-
-          <button 
-            (click)="abrirModalRegistro()"
-            class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
-            <i class="fas fa-plus mr-2"></i>
-            Registrar Mortalidad
-          </button>
         </div>
       </div>
     </div>
@@ -166,7 +119,7 @@
           (change)="aplicarFiltros()"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
           <option value="">Todas las causas</option>
-          <option *ngFor="let causa of causasMortalidad" [value]="causa">{{ causa }}</option>
+          <option *ngFor="let causa of causasMortalidad" [value]="causa.nombre">{{ causa.nombre }}</option>
         </select>
       </div>
       <div>
@@ -192,10 +145,10 @@
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2">
               <div class="bg-red-500 h-2 rounded-full transition-all duration-500" 
-                   [style.width.%]="causa.porcentaje"></div>
+                   [style.width.%]="causa.porcentaje || 0"></div>
             </div>
           </div>
-          <span class="ml-4 text-sm font-semibold text-red-600">{{ causa.porcentaje.toFixed(1) }}%</span>
+          <span class="ml-4 text-sm font-semibold text-red-600">{{ (causa.porcentaje || 0).toFixed(1) }}%</span>
         </div>
       </div>
     </div>
@@ -203,7 +156,7 @@
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <h3 class="text-lg font-semibold text-gray-800 mb-4">📈 Tendencia Semanal</h3>
       <div class="space-y-3">
-        <div *ngFor="let dia of estadisticas.tendenciaSemanal" 
+        <div *ngFor="let dia of estadisticas?.tendenciaSemanal || []" 
              class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <span class="text-sm font-medium text-gray-700">
             {{ dia.fecha | date:'dd/MM' }}
@@ -220,71 +173,77 @@
     </div>
   </div>
 
-  <!-- Historial de Registros -->
+  <!-- Historial de Registros - SIMPLIFICADO -->
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-    <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Historial de Mortalidad</h3>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-800">📋 Registros de Mortalidad</h3>
+    </div>
+
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Muertes</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Causa</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Mortalidad</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investigación</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr *ngFor="let registro of getRegistrosFiltrados()" class="hover:bg-gray-50">
+            <!-- Fecha -->
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div>
-                <div class="font-medium">{{ registro.fecha | date:'dd/MM/yyyy' }}</div>
-                <div class="text-gray-500">{{ registro.hora }}</div>
-              </div>
+              {{ registro.fechaRegistro | date:'dd/MM/yyyy HH:mm' }}
             </td>
+            
+            <!-- Lote -->
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-              {{ getLoteNombre(registro.loteId) }}
+              {{ getNombreLote(registro.loteId) }}
             </td>
+            
+            <!-- Número de Muertes -->
             <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                {{ registro.cantidadMuertes }}
+              <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-bold">
+                {{ registro.cantidadMuertos || 0 }}
               </span>
             </td>
+            
+            <!-- Causa (simple) -->
             <td class="px-6 py-4 text-sm text-gray-900">
-              <div class="max-w-xs truncate" [title]="registro.causaMortalidad">
-                {{ registro.causaMortalidad }}
-              </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              {{ registro.porcentajeMortalidad.toFixed(2) }}%
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span *ngIf="registro.requiereInvestigacion" 
-                    class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                Requiere
+              <span *ngIf="registro.causa?.nombre" class="text-gray-700">
+                {{ registro.causa.nombre }}
               </span>
-              <span *ngIf="!registro.requiereInvestigacion" 
-                    class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
-                No requiere
+              <span *ngIf="!registro.causa?.nombre" class="text-gray-400 italic">
+                Sin especificar
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ registro.usuarioRegistro }}
+            
+            <!-- Acciones (botón simple) -->
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <button 
+                *ngIf="!registro.causa?.nombre"
+                (click)="abrirModalCausa(registro)" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">
+                Agregar Causa
+              </button>
+              <span *ngIf="registro.causa?.nombre" class="text-green-600 text-xs">
+                ✓ Completo
+              </span>
+            </td>
+          </tr>
+          
+          <!-- Mensaje cuando no hay registros -->
+          <tr *ngIf="getRegistrosFiltrados().length === 0">
+            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+              <i class="fas fa-inbox text-4xl mb-2 text-gray-300"></i>
+              <p>No se encontraron registros de mortalidad</p>
             </td>
           </tr>
         </tbody>
       </table>
-
-      <div *ngIf="getRegistrosFiltrados().length === 0" 
-           class="text-center py-8 text-gray-500">
-        <i class="fas fa-clipboard-list text-4xl mb-4"></i>
-        <p>No se encontraron registros de mortalidad</p>
-      </div>
     </div>
   </div>
-</div>
 
 <!-- Modal de Registro de Mortalidad -->
 <div *ngIf="mostrarModalRegistro" 
@@ -303,7 +262,7 @@
             <p class="text-red-100">{{ loteSeleccionado?.codigo }} - {{ loteSeleccionado?.animal?.name }}</p>
           </div>
         </div>
-        <button (click)="cerrarModalMortalidad()" 
+        <button (click)="cerrarModalRegistro()" 
                 class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
           <i class="fas fa-times text-xl"></i>
         </button>
@@ -314,24 +273,24 @@
     <div class="p-6">
       
       <!-- Información del Lote -->
-      <div class="bg-gray-50 rounded-lg p-4 mb-6">
+      <div class="bg-gray-50 rounded-lg p-4 mb-6" *ngIf="loteSeleccionado">
         <h4 class="font-semibold text-gray-800 mb-3">📊 Información del Lote</h4>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-600 mb-1">Animales vivos actuales</label>
-            <div class="text-xl font-bold text-green-600">{{ nuevoRegistro.animalesVivosAntes }}</div>
+            <div class="text-xl font-bold text-green-600">{{ loteSeleccionado.quantity }}</div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Edad promedio</label>
-            <div class="text-xl font-bold text-blue-600">{{ nuevoRegistro.edadPromedio }} días</div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Lote seleccionado</label>
+            <div class="text-xl font-bold text-blue-600">{{ loteSeleccionado.name }}</div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Animales después</label>
-            <div class="text-xl font-bold text-orange-600">{{ nuevoRegistro.animalesVivosDespues }}</div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Después de mortalidad</label>
+            <div class="text-xl font-bold text-orange-600">{{ (loteSeleccionado.quantity - (nuevoRegistro.cantidadMuertos || 0)) }}</div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">% Mortalidad</label>
-            <div class="text-xl font-bold text-red-600">{{ nuevoRegistro.porcentajeMortalidad.toFixed(2) }}%</div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">% Estimado</label>
+            <div class="text-xl font-bold text-red-600">{{ calcularPorcentajeEstimado() }}%</div>
           </div>
         </div>
       </div>
@@ -343,50 +302,41 @@
         <div class="space-y-4">
           <h4 class="font-semibold text-gray-800 border-b pb-2">📝 Información Básica</h4>
           
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Fecha *</label>
-              <input 
-                type="date" 
-                [(ngModel)]="nuevoRegistro.fecha"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Hora *</label>
-              <input 
-                type="time" 
-                [(ngModel)]="nuevoRegistro.hora"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Lote *</label>
+            <select 
+              [(ngModel)]="nuevoRegistro.loteId"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">Seleccionar lote...</option>
+              <option *ngFor="let lote of lotes" [value]="lote.id">{{ lote.name }}</option>
+            </select>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad de muertes *</label>
             <input 
               type="number" 
-              [(ngModel)]="nuevoRegistro.cantidadMuertes"
-              (ngModelChange)="calcularAnimalesVivos()"
+              [(ngModel)]="nuevoRegistro.cantidadMuertos"
               min="1"
-              max="{{ nuevoRegistro.animalesVivosAntes }}"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Causa principal *</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Causa de mortalidad *</label>
             <select 
-              [(ngModel)]="nuevoRegistro.causaMortalidad"
+              [(ngModel)]="nuevoRegistro.causa"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
               <option value="">Seleccionar causa...</option>
-              <option *ngFor="let causa of causasMortalidad" [value]="causa">{{ causa }}</option>
+              <option *ngFor="let causa of causasMortalidad" [value]="causa">{{ causa.nombre }}</option>
             </select>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Descripción detallada</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones</label>
             <textarea 
-              [(ngModel)]="nuevoRegistro.descripcionDetallada"
+              [(ngModel)]="nuevoRegistro.observaciones"
               rows="3"
-              placeholder="Describe los síntomas, condiciones encontradas..."
+              placeholder="Observaciones adicionales sobre la mortalidad..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
           </div>
         </div>
@@ -397,11 +347,10 @@
           
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Peso promedio (kg)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Edad (días)</label>
               <input 
                 type="number" 
-                [(ngModel)]="nuevoRegistro.pesoPromedio"
-                step="0.1"
+                [(ngModel)]="nuevoRegistro.edad"
                 min="0"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
             </div>
@@ -409,59 +358,19 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación en lote</label>
               <input 
                 type="text" 
-                [(ngModel)]="nuevoRegistro.ubicacionLote"
+                [(ngModel)]="nuevoRegistro.ubicacion"
                 placeholder="Ej: Galpón A - Sección 1"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Temperatura (°C)</label>
-              <input 
-                type="number" 
-                [(ngModel)]="nuevoRegistro.temperaturaAmbiente"
-                step="0.1"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Humedad (%)</label>
-              <input 
-                type="number" 
-                [(ngModel)]="nuevoRegistro.humedadRelativa"
-                min="0"
-                max="100"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-            </div>
-          </div>
-
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Observaciones veterinario</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Tratamiento previo</label>
             <textarea 
-              [(ngModel)]="nuevoRegistro.observacionesVeterinario"
+              [(ngModel)]="nuevoRegistro.tratamientoPrevio"
               rows="3"
-              placeholder="Observaciones técnicas del veterinario..."
+              placeholder="Tratamientos o medicamentos aplicados previamente..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Acciones tomadas</label>
-            <textarea 
-              [(ngModel)]="nuevoRegistro.accionesTomadas"
-              rows="2"
-              placeholder="Medidas preventivas o correctivas aplicadas..."
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
-              [(ngModel)]="nuevoRegistro.requiereInvestigacion"
-              id="requiereInvestigacion"
-              class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500">
-            <label for="requiereInvestigacion" class="text-sm font-medium text-gray-700">
-              Requiere investigación adicional
-            </label>
           </div>
         </div>
       </div>
@@ -469,7 +378,7 @@
       <!-- Botones de Acción -->
       <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200 mt-6">
         <button 
-          (click)="cerrarModalMortalidad()" 
+          (click)="cerrarModalRegistro()" 
           class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
           Cancelar
         </button>
@@ -478,6 +387,60 @@
           class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
           <i class="fas fa-save mr-2"></i>
           Registrar Mortalidad
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Simple para Agregar Causa -->
+<div *ngIf="mostrarModalCausa" 
+     class="fixed inset-0 z-50 overflow-y-auto" 
+     aria-labelledby="modal-title" 
+     role="dialog" 
+     aria-modal="true">
+  
+  <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" (click)="cerrarModalCausa()"></div>
+    
+    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+      <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="sm:flex sm:items-start">
+          <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+            <i class="fas fa-clipboard-list text-blue-600"></i>
+          </div>
+          <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+              Agregar Causa de Mortalidad
+            </h3>
+            <div class="mt-4">
+              <p class="text-sm text-gray-500 mb-4">
+                Selecciona la causa de muerte para el registro del {{ registroSeleccionado?.fechaRegistro | date:'dd/MM/yyyy' }}
+              </p>
+              
+              <div class="space-y-2">
+                <button *ngFor="let causa of causasMortalidad"
+                        (click)="guardarCausa(causa.id)"
+                        class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <div class="flex items-center">
+                    <div class="w-3 h-3 rounded-full mr-3" [style.background-color]="causa.color"></div>
+                    <div>
+                      <div class="font-medium text-gray-900">{{ causa.nombre }}</div>
+                      <div class="text-sm text-gray-500">{{ causa.descripcion }}</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+        <button type="button" 
+                (click)="cerrarModalCausa()"
+                class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+          Cancelar
         </button>
       </div>
     </div>

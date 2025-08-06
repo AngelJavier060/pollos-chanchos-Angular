@@ -15,6 +15,18 @@
         <i class="fas fa-boxes mr-2"></i>Productos
       </button>
       <button 
+        (click)="cambiarVista('inventario-automatico')" 
+        [class]="vistaActual === 'inventario-automatico' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
+        <i class="fas fa-warehouse mr-2"></i>Inventario Automático
+      </button>
+      <button 
+        (click)="cambiarVista('movimientos')" 
+        [class]="vistaActual === 'movimientos' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
+        <i class="fas fa-exchange-alt mr-2"></i>Movimientos
+      </button>
+      <button 
         (click)="cambiarVista('analisis')" 
         [class]="vistaActual === 'analisis' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
@@ -526,3 +538,538 @@
 </div>
 
 </div> <!-- Fin de la vista de productos -->
+
+<!-- Vista de Inventario Automático - NUEVA FUNCIONALIDAD -->
+<div *ngIf="vistaActual === 'inventario-automatico'">
+  <div class="space-y-6">
+    <!-- Título de la sección -->
+    <div class="text-center">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">
+        <i class="fas fa-warehouse text-blue-600 mr-2"></i>
+        Inventario Automático con Control de Stock
+      </h2>
+      <p class="text-gray-600 mb-4">
+        Seguimiento en tiempo real de la disminución automática de productos según consumo por lotes
+      </p>
+      
+      <!-- Botón de actualización manual -->
+      <div class="flex justify-center space-x-4 mb-4">
+        <button 
+          (click)="cargarInventarioAutomatico()" 
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md">
+          <i class="fas fa-sync-alt mr-2"></i>
+          Actualizar Datos
+        </button>
+        <button 
+          (click)="sincronizarConProductosReales()" 
+          class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md">
+          <i class="fas fa-link mr-2"></i>
+          Sincronizar con Productos Reales
+        </button>
+        <button 
+          (click)="crearDatosEjemplo()" 
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md">
+          <i class="fas fa-database mr-2"></i>
+          Crear Datos Ejemplo
+        </button>
+      </div>
+      
+      <!-- Indicador de estado de datos -->
+      <div class="text-sm text-gray-500 mb-2">
+        <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+        Inventarios cargados: {{ inventarioAlimentos.length }} | 
+        Última actualización: {{ ultimaActualizacion.toLocaleTimeString() }}
+      </div>
+    </div>
+
+    <!-- Alertas de Stock Bajo -->
+    <div *ngIf="inventariosStockBajo.length > 0" class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-lg font-medium text-red-800">
+            ⚠️ Alertas de Stock Bajo ({{ inventariosStockBajo.length }})
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside">
+              <li *ngFor="let item of inventariosStockBajo">
+                <strong>{{ item.tipoAlimento.name }}</strong>: 
+                {{ item.cantidadStock }} {{ item.unidadMedida }} 
+                (Mínimo: {{ item.stockMinimo }} {{ item.unidadMedida }})
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumen de Inventario -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-blue-100 text-sm font-medium">Total Productos</p>
+            <p class="text-3xl font-bold">{{ inventarioAlimentos.length }}</p>
+          </div>
+          <div class="p-3 bg-blue-400 rounded-full">
+            <i class="fas fa-boxes text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-green-100 text-sm font-medium">Stock Normal</p>
+            <p class="text-3xl font-bold">
+              {{ contarInventariosPorEstado('NORMAL') }}
+            </p>
+          </div>
+          <div class="p-3 bg-green-400 rounded-full">
+            <i class="fas fa-check-circle text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-red-100 text-sm font-medium">Stock Crítico</p>
+            <p class="text-3xl font-bold">{{ inventariosStockBajo.length }}</p>
+          </div>
+          <div class="p-3 bg-red-400 rounded-full">
+            <i class="fas fa-exclamation-triangle text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensaje cuando no hay inventarios -->
+    <div *ngIf="inventarioAlimentos.length === 0" class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-r-lg shadow-sm text-center">
+      <div class="flex flex-col items-center">
+        <i class="fas fa-exclamation-triangle text-yellow-500 text-3xl mb-4"></i>
+        <h3 class="text-lg font-medium text-yellow-800 mb-2">
+          No se encontraron datos de inventario
+        </h3>
+        <p class="text-yellow-700 mb-4">
+          Para mostrar el inventario real basado en sus productos registrados:
+        </p>
+        <ul class="text-yellow-700 text-left mb-6">
+          <li class="mb-1">• Primero registre productos en la pestaña "Productos"</li>
+          <li class="mb-1">• Luego haga clic en "Sincronizar con Productos Reales"</li>
+          <li class="mb-1">• O use "Crear Datos Ejemplo" para pruebas</li>
+        </ul>
+        <div class="flex space-x-4">
+          <button 
+            (click)="sincronizarConProductosReales()" 
+            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+            <i class="fas fa-link mr-2"></i>
+            Sincronizar con Productos Reales
+          </button>
+          <button 
+            (click)="crearDatosEjemplo()" 
+            class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+            <i class="fas fa-database mr-2"></i>
+            Crear Datos de Ejemplo
+          </button>
+          <button 
+            (click)="cargarInventarioAutomatico()" 
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+            <i class="fas fa-sync-alt mr-2"></i>
+            Reintentar Carga
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de Inventario con Disminución Automática -->
+    <div *ngIf="inventarioAlimentos.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">
+          <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
+          Control de Stock en Tiempo Real
+        </h3>
+        <p class="text-sm text-gray-600 mt-1">
+          Los valores se actualizan automáticamente cuando se registra consumo de alimentos en los lotes
+        </p>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Producto
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Stock Original
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Stock Actual
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Consumido
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Stock Mínimo
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Progreso
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let inventario of inventarioAlimentos" class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0 h-10 w-10">
+                    <div class="h-10 w-10 rounded-full flex items-center justify-center" 
+                         [ngClass]="{
+                           'bg-green-100': inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'bg-red-100': inventario.tipoAlimento.categoria === 'MEDICINA'
+                         }">
+                      <i [ngClass]="{
+                           'fas fa-seedling text-green-600': inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'fas fa-pills text-red-600': inventario.tipoAlimento.categoria === 'MEDICINA',
+                           'fas fa-cube text-blue-600': !inventario.tipoAlimento.categoria
+                         }"></i>
+                    </div>
+                  </div>
+                  <div class="ml-4">
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ inventario.tipoAlimento.name }}
+                    </div>
+                    <div class="text-xs font-medium"
+                         [ngClass]="{
+                           'text-green-600': inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'text-red-600': inventario.tipoAlimento.categoria === 'MEDICINA',
+                           'text-gray-500': !inventario.tipoAlimento.categoria
+                         }">
+                      <i [ngClass]="{
+                           'fas fa-seedling': inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'fas fa-pills': inventario.tipoAlimento.categoria === 'MEDICINA'
+                         }" class="mr-1"></i>
+                      {{ inventario.tipoAlimento.categoria || 'SIN CATEGORÍA' }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="font-semibold text-blue-600">
+                  {{ inventario.cantidadOriginal }}
+                </span>
+                <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span class="font-bold" [ngClass]="{
+                  'text-red-600': getEstadoStock(inventario) === 'CRÍTICO',
+                  'text-yellow-600': getEstadoStock(inventario) === 'BAJO',
+                  'text-green-600': getEstadoStock(inventario) === 'NORMAL'
+                }">
+                  {{ inventario.cantidadStock }}
+                </span>
+                <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="font-semibold text-orange-600">
+                  {{ inventario.totalConsumido }}
+                </span>
+                <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="font-medium text-purple-600">
+                  {{ inventario.stockMinimo }}
+                </span>
+                <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      [ngClass]="{
+                        'bg-red-100 text-red-800': getEstadoStock(inventario) === 'CRÍTICO',
+                        'bg-yellow-100 text-yellow-800': getEstadoStock(inventario) === 'BAJO',
+                        'bg-green-100 text-green-800': getEstadoStock(inventario) === 'NORMAL'
+                      }">
+                  {{ getEstadoStock(inventario) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                  <div class="h-2.5 rounded-full transition-all duration-300"
+                       [ngClass]="getColorStock(inventario)"
+                       [style.width.%]="calcularPorcentajeStock(inventario)">
+                  </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                  {{ calcularPorcentajeStock(inventario) }}% disponible
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                <div class="flex justify-center space-x-2">
+                  <button 
+                    (click)="verMovimientos(inventario)" 
+                    class="text-blue-600 hover:text-blue-900 p-2 rounded-full hover:bg-blue-100 transition-colors"
+                    title="Ver historial de movimientos">
+                    <i class="fas fa-history"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="flex justify-center space-x-4">
+      <button 
+        (click)="cargarInventarioAutomatico()" 
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+        <i class="fas fa-sync-alt mr-2"></i>
+        Actualizar Inventario
+      </button>
+      
+      <!-- Botón de datos de ejemplo (solo visible cuando hay pocos inventarios) -->
+      <button 
+        *ngIf="inventarioAlimentos.length < 3"
+        (click)="crearDatosEjemplo()" 
+        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+        <i class="fas fa-plus mr-2"></i>
+        Agregar Datos de Ejemplo
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Vista de Movimientos de Inventario -->
+<div *ngIf="vistaActual === 'movimientos'">
+  <div class="space-y-6">
+    <!-- Título de la sección -->
+    <div class="text-center">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">
+        <i class="fas fa-exchange-alt text-purple-600 mr-2"></i>
+        Movimientos de Inventario
+      </h2>
+      <p class="text-gray-600 mb-4">
+        Historial completo de todos los movimientos y consumos por lote
+      </p>
+      
+      <!-- Botón de actualización -->
+      <button 
+        (click)="cargarMovimientos()" 
+        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md mb-4">
+        <i class="fas fa-sync-alt mr-2"></i>
+        Actualizar Movimientos
+      </button>
+    </div>
+
+    <!-- Indicador de carga -->
+    <div *ngIf="cargandoMovimientos" class="flex justify-center items-center py-12">
+      <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-500"></div>
+      <span class="ml-4 text-gray-600">Cargando movimientos...</span>
+    </div>
+
+    <!-- Resumen de movimientos -->
+    <div *ngIf="!cargandoMovimientos && movimientosInventario.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-purple-100 text-sm font-medium">Total Movimientos</p>
+            <p class="text-3xl font-bold">{{ movimientosInventario.length }}</p>
+          </div>
+          <div class="p-3 bg-purple-400 rounded-full">
+            <i class="fas fa-exchange-alt text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-orange-100 text-sm font-medium">Consumos por Lote</p>
+            <p class="text-3xl font-bold">{{ contarMovimientosPorTipo('CONSUMO_LOTE') }}</p>
+          </div>
+          <div class="p-3 bg-orange-400 rounded-full">
+            <i class="fas fa-utensils text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-green-100 text-sm font-medium">Entradas</p>
+            <p class="text-3xl font-bold">{{ contarMovimientosPorTipo('ENTRADA') }}</p>
+          </div>
+          <div class="p-3 bg-green-400 rounded-full">
+            <i class="fas fa-plus-circle text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-blue-100 text-sm font-medium">Lotes Activos</p>
+            <p class="text-3xl font-bold">{{ contarLotesUnicos() }}</p>
+          </div>
+          <div class="p-3 bg-blue-400 rounded-full">
+            <i class="fas fa-layer-group text-white text-2xl"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensaje cuando no hay movimientos -->
+    <div *ngIf="!cargandoMovimientos && movimientosInventario.length === 0" class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-r-lg shadow-sm text-center">
+      <div class="flex flex-col items-center">
+        <i class="fas fa-history text-yellow-500 text-3xl mb-4"></i>
+        <h3 class="text-lg font-medium text-yellow-800 mb-2">
+          No se encontraron movimientos de inventario
+        </h3>
+        <p class="text-yellow-700 mb-4">
+          Aún no hay movimientos registrados en el sistema.
+        </p>
+      </div>
+    </div>
+
+    <!-- Tabla de movimientos -->
+    <div *ngIf="!cargandoMovimientos && movimientosInventario.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">
+          <i class="fas fa-list text-purple-600 mr-2"></i>
+          Historial de Movimientos
+        </h3>
+        <p class="text-sm text-gray-600 mt-1">
+          Registro detallado de todos los movimientos de inventario ordenados por fecha
+        </p>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fecha/Hora
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Producto
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipo Movimiento
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Lote
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Cantidad
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Stock Anterior
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Stock Nuevo
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Usuario
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let movimiento of movimientosInventario; let i = index" [class]="i % 2 === 0 ? 'bg-white' : 'bg-gray-50'">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <div class="font-medium">{{ formatearFecha(movimiento.fechaMovimiento) }}</div>
+                <div class="text-xs text-gray-500">{{ formatearHora(movimiento.fechaMovimiento) }}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0 h-8 w-8">
+                    <div class="h-8 w-8 rounded-full flex items-center justify-center text-xs"
+                         [ngClass]="{
+                           'bg-green-100 text-green-600': movimiento.inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'bg-red-100 text-red-600': movimiento.inventario.tipoAlimento.categoria === 'MEDICINA',
+                           'bg-blue-100 text-blue-600': !movimiento.inventario.tipoAlimento.categoria
+                         }">
+                      <i [ngClass]="{
+                           'fas fa-seedling': movimiento.inventario.tipoAlimento.categoria === 'ALIMENTO',
+                           'fas fa-pills': movimiento.inventario.tipoAlimento.categoria === 'MEDICINA',
+                           'fas fa-cube': !movimiento.inventario.tipoAlimento.categoria
+                         }"></i>
+                    </div>
+                  </div>
+                  <div class="ml-3">
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ movimiento.inventario.tipoAlimento.name }}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      {{ movimiento.inventario.tipoAlimento.categoria || 'SIN CATEGORÍA' }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      [ngClass]="{
+                        'bg-orange-100 text-orange-800': movimiento.tipoMovimiento === 'CONSUMO_LOTE',
+                        'bg-green-100 text-green-800': movimiento.tipoMovimiento === 'ENTRADA',
+                        'bg-red-100 text-red-800': movimiento.tipoMovimiento === 'SALIDA',
+                        'bg-gray-100 text-gray-800': movimiento.tipoMovimiento === 'AJUSTE'
+                      }">
+                  <i [ngClass]="{
+                       'fas fa-utensils': movimiento.tipoMovimiento === 'CONSUMO_LOTE',
+                       'fas fa-plus-circle': movimiento.tipoMovimiento === 'ENTRADA',
+                       'fas fa-minus-circle': movimiento.tipoMovimiento === 'SALIDA',
+                       'fas fa-edit': movimiento.tipoMovimiento === 'AJUSTE'
+                     }" class="mr-1"></i>
+                  {{ movimiento.tipoMovimiento }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span *ngIf="movimiento.loteId" class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                  <i class="fas fa-layer-group mr-1"></i>
+                  {{ movimiento.loteId }}
+                </span>
+                <span *ngIf="!movimiento.loteId" class="text-gray-400">-</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span class="font-bold" [ngClass]="{
+                  'text-red-600': movimiento.tipoMovimiento === 'CONSUMO_LOTE' || movimiento.tipoMovimiento === 'SALIDA',
+                  'text-green-600': movimiento.tipoMovimiento === 'ENTRADA',
+                  'text-blue-600': movimiento.tipoMovimiento === 'AJUSTE'
+                }">
+                  {{ movimiento.cantidad }} {{ movimiento.inventario.unidadMedida }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ movimiento.stockAnterior }} {{ movimiento.inventario.unidadMedida }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                {{ movimiento.stockNuevo }} {{ movimiento.inventario.unidadMedida }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="text-gray-600">{{ movimiento.usuarioRegistro || 'Sistema' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Botón de actualización inferior -->
+    <div class="flex justify-center">
+      <button 
+        (click)="cargarMovimientos()" 
+        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
+        <i class="fas fa-sync-alt mr-2"></i>
+        Actualizar Lista de Movimientos
+      </button>
+    </div>
+  </div>
+</div>

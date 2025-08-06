@@ -22,15 +22,20 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   alertas: AlertaMortalidad[] = [];
   lotes: Lote[] = [];
   causasMortalidad: CausaMortalidad[] = [];
+  loteSeleccionado: Lote | null = null;
   
   // Variables de control de UI
   mostrarModalRegistro = false;
   mostrarModalEstadisticas = false;
   mostrarModalAlertas = false;
+  mostrarModalCausa = false;
   cargando = false;
   
+  // Registro seleccionado para agregar causa
+  registroSeleccionado: RegistroMortalidad | null = null;
+  
   // Filtros
-  filtroLote: number | null = null;
+  filtroLote: string | null = null;
   filtroFechaInicio: string = '';
   filtroFechaFin: string = '';
   filtroCausa: string = '';
@@ -39,7 +44,6 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   nuevoRegistro: Partial<RegistroMortalidad> = {
     cantidadMuertos: 1,
     observaciones: '',
-    peso: 0,
     edad: 0,
     ubicacion: '',
     confirmado: false
@@ -47,6 +51,15 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   
   // Suscripciones
   private subscriptions: Subscription = new Subscription();
+
+  // Estadísticas de lotes - Cache para mortalidad
+  private estadisticasLotes: Map<number, {
+    pollosRegistrados: number;
+    pollosVivos: number;
+    mortalidadTotal: number;
+    porcentajeMortalidad: number;
+    tieneDatos: boolean;
+  }> = new Map();
 
   constructor(
     private authService: AuthDirectService,
@@ -59,8 +72,6 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.user = this.authService.currentUserValue;
     this.cargarDatosIniciales();
-    
-    // ✅ VERIFICAR SI ES AUTOREGISTRO DESDE REGISTRO DIARIO
     this.verificarAutoregistro();
   }
 
@@ -74,32 +85,23 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   cargarDatosIniciales(): void {
     this.cargando = true;
     
-    // Cargar lotes
     const lotesSub = this.loteService.getLotes().subscribe({
-      next: (response: any) => {
-        if (response?.status === 200 && response.object) {
-          this.lotes = response.object.filter((lote: any) => 
-            lote.animal?.name?.toLowerCase().includes('pollo') && 
-            lote.status?.toLowerCase() === 'activo'
-          );
-        }
-      },
-      error: (error) => console.error('Error al cargar lotes:', error)
-    });
-    
-    this.subscriptions.add(lotesSub);
-    
-    const mortalidadSub = this.mortalidadService.getRegistrosMortalidad().subscribe({
-      next: (data) => {
-        this.registrosMortalidad = data;
-        this.calcularEstadisticas();
-        this.cargando = false;
+      next: (lotes: Lote[]) => {
+        this.lotes = lotes.filter((lote: Lote) => 
+          lote.race?.animal?.name?.toLowerCase().includes('pollo')
+        );
+        console.log('✅ Lotes filtrados para pollos:', this.lotes);
+        
+        // Una vez que los lotes están cargados, cargar la mortalidad
+        this.cargarRegistrosMortalidad();
       },
       error: (error) => {
-        console.error('Error al cargar registros de mortalidad:', error);
+        console.error('Error al cargar lotes:', error);
         this.cargando = false;
       }
     });
+    
+    this.subscriptions.add(lotesSub);
 
     const causasSub = this.mortalidadService.getCausas().subscribe({
       next: (data) => {
@@ -110,239 +112,125 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.subscriptions.add(mortalidadSub);
     this.subscriptions.add(causasSub);
+  }
+
+  /**
+   * Cargar registros de mortalidad
+   */
+  cargarRegistrosMortalidad(): void {
+    console.log('🔄 Cargando registros de mortalidad...');
+    const mortalidadSub = this.mortalidadService.getRegistrosMortalidad().subscribe({
+      next: (data) => {
+        console.log('📋 Datos de mortalidad recibidos del servicio:', data);
+        this.registrosMortalidad = data || [];
+        console.log('📋 Array asignado, total registros:', this.registrosMortalidad.length);
+        
+        if (this.registrosMortalidad.length > 0) {
+          console.log('📋 Primer registro:', this.registrosMortalidad[0]);
+        }
+        
+        this.cargarEstadisticasDesdeBackend();
+        this.cargando = false;
+      },
+      error: (error) => {
+        console.error('❌ Error al cargar registros de mortalidad:', error);
+        this.registrosMortalidad = [];
+        this.cargando = false;
+      }
+    });
+    this.subscriptions.add(mortalidadSub);
   }
 
   /**
    * Registrar nueva mortalidad
    */
   registrarMortalidad(): void {
+    console.log('🔄 Iniciando registro de mortalidad...');
+    console.log('📋 Datos del formulario:', this.nuevoRegistro);
+    
     if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.causa || !this.nuevoRegistro.cantidadMuertos) {
       alert('Por favor complete todos los campos obligatorios');
       return;
     }
     
-    const registro: Partial<RegistroMortalidad> = {
+    const registro: any = {
       loteId: this.nuevoRegistro.loteId!,
       cantidadMuertos: this.nuevoRegistro.cantidadMuertos!,
-      causa: this.nuevoRegistro.causa!,
+      causaId: this.nuevoRegistro.causa!.id,
       observaciones: this.nuevoRegistro.observaciones || '',
-      peso: this.nuevoRegistro.peso || 0,
       edad: this.nuevoRegistro.edad || 0,
       ubicacion: this.nuevoRegistro.ubicacion || '',
       confirmado: false,
-      fechaRegistro: new Date(),
       usuarioRegistro: this.user?.username || 'Desconocido'
     };
 
-    this.mortalidadService.registrarMortalidad(registro as RegistroMortalidad).subscribe({
+    console.log('📤 Enviando registro al backend:', registro);
+
+    this.mortalidadService.registrarMortalidadConCausa(registro).subscribe({
       next: (nuevoRegistro) => {
+        console.log('✅ Respuesta del backend:', nuevoRegistro);
         this.registrosMortalidad.unshift(nuevoRegistro);
-        this.calcularEstadisticas();
+        this.cargarEstadisticasDesdeBackend();
+        
+        // ✅ El backend ya actualiza automáticamente la cantidad del lote
+        // Recargar los lotes para obtener las cantidades actualizadas desde el backend
+        this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
+        
         this.cerrarModalRegistro();
-        console.log('✅ Mortalidad registrada exitosamente:', nuevoRegistro);
-        alert('Mortalidad registrada exitosamente');
+        console.log('✅ Mortalidad registrada exitosamente, cantidad del lote actualizada automáticamente por el backend');
+        
+        alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
       },
       error: (error) => {
-        console.error('Error al registrar mortalidad:', error);
+        console.error('❌ Error al registrar mortalidad:', error);
         alert('Error al registrar mortalidad. Por favor, intente de nuevo.');
       }
     });
   }
 
   /**
-   * Confirmar un registro de mortalidad
+   * Recargar lotes actualizados desde el backend después de registrar mortalidad
    */
-  confirmarRegistro(id: number): void {
-    if (confirm('¿Está seguro de confirmar este registro de mortalidad?')) {
-      this.mortalidadService.confirmarRegistro(id).subscribe({
-        next: () => {
-          const registro = this.registrosMortalidad.find(r => r.id === id);
-          if (registro) {
-            registro.confirmado = true;
-          }
-          console.log('✅ Registro confirmado');
-        },
-        error: (error) => {
-          console.error('Error al confirmar registro:', error);
-          alert('Error al confirmar el registro.');
-        }
-      });
-    }
-  }
-
-  /**
-   * Eliminar un registro de mortalidad
-   */
-  eliminarRegistro(id: number): void {
-    if (confirm('¿Está seguro de eliminar este registro? Esta acción no se puede deshacer.')) {
-      this.mortalidadService.eliminarRegistro(id).subscribe({
-        next: () => {
-          this.registrosMortalidad = this.registrosMortalidad.filter(r => r.id !== id);
-          this.calcularEstadisticas();
-          console.log('✅ Registro eliminado');
-        },
-        error: (error) => {
-          console.error('Error al eliminar registro:', error);
-          alert('Error al eliminar el registro.');
-        }
-      });
-    }
-  }
-
-  /**
-   * Marcar alerta como leída
-   */
-  marcarAlertaLeida(id: number): void {
-    const alerta = this.alertas.find(a => a.id === id);
-    if (alerta) {
-      alerta.leida = true;
-      console.log('✅ Alerta marcada como leída');
-    }
-  }
-
-  /**
-   * Calcular estadísticas
-   */
-  calcularEstadisticas(): void {
-    const registros = this.getRegistrosFiltrados();
+  private recargarLotesActualizados(loteId: string): void {
+    console.log('🔄 Recargando lotes actualizados desde el backend...');
     
-    const totalMuertes = registros.reduce((sum, r) => sum + r.cantidadMuertos, 0);
-    const totalLotes = new Set(registros.map(r => r.loteId)).size;
-    
-    // Calcular principales causas
-    const muertesPorCausa = this.registrosMortalidad.reduce((acc, registro) => {
-      const index = acc.findIndex(a => a.causa === registro.causa.nombre);
-      if (index >= 0) {
-        acc[index].muertes += registro.cantidadMuertos;
-      } else {
-        acc.push({
-          causa: registro.causa.nombre,
-          muertes: registro.cantidadMuertos,
-          porcentaje: 0
-        });
+    const lotesSub = this.loteService.getLotes().subscribe({
+      next: (lotes: Lote[]) => {
+        // Actualizar solo los lotes de pollos
+        const lotesPollos = lotes.filter((lote: Lote) => 
+          lote.race?.animal?.name?.toLowerCase().includes('pollo')
+        );
+        
+        // Encontrar el lote afectado para mostrar el cambio
+        const loteAfectado = lotesPollos.find(l => String(l.id) === loteId);
+        const loteAnterior = this.lotes.find(l => String(l.id) === loteId);
+        
+        if (loteAfectado && loteAnterior) {
+          console.log(`✅ Lote ${loteAfectado.codigo} actualizado correctamente:`);
+          console.log(`   - Cantidad anterior (frontend): ${loteAnterior.quantity}`);
+          console.log(`   - Nueva cantidad (backend): ${loteAfectado.quantity}`);
+        }
+        
+        // Actualizar la lista de lotes
+        this.lotes = lotesPollos;
+        console.log('✅ Lotes actualizados desde el backend');
+      },
+      error: (error) => {
+        console.error('❌ Error al recargar lotes:', error);
+        // Continúa sin problemas aunque falle la recarga
       }
-      return acc;
-    }, [] as { causa: string; muertes: number; porcentaje: number }[]);
-
-    const principalesCausas = muertesPorCausa.map(causa => ({
-      causa: causa.causa,
-      muertes: causa.muertes,
-      porcentaje: totalMuertes > 0 ? (causa.muertes / totalMuertes) * 100 : 0
-    }))
-      .sort((a, b) => b.muertes - a.muertes)
-      .slice(0, 5);
-
-    // Calcular tendencia semanal
-    const tendencia = new Map<string, number>();
-    registros.forEach(r => {
-      const fecha = new Date(r.fechaRegistro).toISOString().split('T')[0];
-      tendencia.set(fecha, (tendencia.get(fecha) || 0) + r.cantidadMuertos);
     });
-
-    const tendenciaSemanal = Array.from(tendencia.entries())
-      .map(([fecha, muertes]) => ({ fecha, muertes }))
-      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-      .slice(-7);
-
-    this.estadisticas = {
-      totalMuertes,
-      totalLotes,
-      tasaPromedioMortalidad: 0, // TODO: Calcular con datos reales
-      porcentajeMortalidad: totalMuertes > 0 ? (totalMuertes / (totalLotes * 1000)) * 100 : 0, // Asumiendo 1000 pollos por lote
-      causaMasFrecuente: principalesCausas[0]?.causa || 'Ninguna',
-      tendencia: this.calcularTendencia(tendenciaSemanal),
-      muertesPorDia: tendenciaSemanal.map(t => ({
-        fecha: t.fecha,
-        muertes: t.muertes
-      })),
-      muertesPorCausa: principalesCausas,
-      principalesCausas,
-      tendenciaSemanal,
-      alertas: this.alertas
-    };
-  }
-
-  /**
-   * Generar alertas
-   */
-  private generarAlertas(): void {
-    this.alertas = [];
     
-    // Alerta por alta mortalidad
-    const hoy = new Date().toISOString().split('T')[0];
-    const muertesHoy = this.registrosMortalidad
-      .filter(r => new Date(r.fechaRegistro).toISOString().split('T')[0] === hoy)
-      .reduce((sum, r) => sum + r.cantidadMuertos, 0);
-    
-    if (muertesHoy > 2) {
-      this.alertas.push({
-        id: Date.now(),
-        tipo: 'critica',
-        titulo: 'Alta mortalidad detectada',
-        mensaje: `Se registraron ${muertesHoy} muertes hoy`,
-        fechaCreacion: new Date(),
-        leida: false,
-        loteId: null
-      });
-    }
-  }
-
-  /**
-   * Aplicar filtros a los registros
-   */
-  aplicarFiltros(): void {
-    this.calcularEstadisticas();
-  }
-
-  /**
-   * Limpiar filtros
-   */
-  limpiarFiltros(): void {
-    this.filtroLote = null;
-    this.filtroFechaInicio = '';
-    this.filtroFechaFin = '';
-    this.filtroCausa = '';
-    this.aplicarFiltros();
-  }
-
-  /**
-   * Abrir modal de registro
-   */
-  abrirModalRegistro(): void {
-    this.nuevoRegistro = {
-      cantidadMuertos: 1,
-      observaciones: '',
-      peso: 0,
-      edad: 0,
-      ubicacion: '',
-      confirmado: false
-    };
-    this.mostrarModalRegistro = true;
-  }
-
-  /**
-   * Cerrar modal de registro
-   */
-  cerrarModalRegistro(): void {
-    this.mostrarModalRegistro = false;
-    this.nuevoRegistro = {};
+    this.subscriptions.add(lotesSub);
   }
 
   /**
    * Obtener nombre del lote por ID
    */
-  getNombreLote(loteId: number): string {
-    const lote = this.lotes.find(l => l.id === loteId);
-    return lote ? `Lote ${lote.id} - ${lote.race?.name || 'Sin raza'}` : `Lote ${loteId}`;
-  }
-
-  /**
-   * Obtener color de la causa de mortalidad
-   */
-  getColorCausa(causa: CausaMortalidad): string {
-    return causa.color;
+  getNombreLote(loteId: string): string {
+    const lote = this.lotes.find(l => String(l.id) === loteId);
+    return lote ? lote.name : `Lote ${loteId}`;
   }
 
   /**
@@ -352,7 +240,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     let registros = [...this.registrosMortalidad];
     
     if (this.filtroLote) {
-      registros = registros.filter(r => r.loteId === this.filtroLote);
+      registros = registros.filter(r => r.loteId === this.filtroLote || String(this.filtroLote) === r.loteId);
     }
     
     if (this.filtroFechaInicio) {
@@ -373,22 +261,95 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Obtener alertas no leídas
+   * Cargar estadísticas desde el backend
    */
-  getAlertasNoLeidas(): AlertaMortalidad[] {
-    return this.alertas.filter(a => !a.leida);
+  cargarEstadisticasDesdeBackend(): void {
+    console.log('📊 Cargando estadísticas desde el backend...');
+    
+    const estadisticasSub = this.mortalidadService.getEstadisticas().subscribe({
+      next: (data) => {
+        console.log('📊 Estadísticas recibidas del backend:', data);
+        
+        // Mapear los datos del backend al formato del frontend
+        this.estadisticas = {
+          totalMuertes: data.mortalidadHoy || 0,
+          totalLotes: this.lotes.length,
+          tasaPromedioMortalidad: 0,
+          porcentajeMortalidad: 0,
+          causaMasFrecuente: 'Ninguna',
+          tendencia: 'estable',
+          muertesPorDia: data.tendenciaUltimos7Dias || [],
+          muertesPorCausa: data.estadisticasPorCausa || [],
+          principalesCausas: data.estadisticasPorCausa || [],
+          tendenciaSemanal: data.tendenciaUltimos7Dias || [],
+          alertas: this.alertas
+        };
+        
+        console.log('✅ Estadísticas procesadas:', this.estadisticas);
+      },
+      error: (error) => {
+        console.error('❌ Error al cargar estadísticas desde el backend:', error);
+        // Fallback: usar cálculos locales como respaldo
+        this.calcularEstadisticasLocal();
+      }
+    });
+    
+    this.subscriptions.add(estadisticasSub);
   }
 
   /**
-   * Obtener clase CSS para el tipo de alerta
+   * Calcular estadísticas localmente (método de respaldo)
    */
-  getClaseAlerta(tipo: string): string {
-    switch (tipo) {
-      case 'critica': return 'bg-red-50 border-red-200 text-red-800';
-      case 'advertencia': return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'informativa': return 'bg-blue-50 border-blue-200 text-blue-800';
-      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+  private calcularEstadisticasLocal(): void {
+    const registros = this.getRegistrosFiltrados();
+    
+    const totalMuertes = registros.reduce((sum, r) => sum + r.cantidadMuertos, 0);
+    const totalLotes = new Set(registros.map(r => r.loteId)).size;
+    
+    this.estadisticas = {
+      totalMuertes,
+      totalLotes,
+      tasaPromedioMortalidad: 0,
+      porcentajeMortalidad: totalMuertes > 0 ? (totalMuertes / (totalLotes * 1000)) * 100 : 0,
+      causaMasFrecuente: 'Ninguna',
+      tendencia: 'estable',
+      muertesPorDia: [],
+      muertesPorCausa: [],
+      principalesCausas: [],
+      tendenciaSemanal: [],
+      alertas: this.alertas
+    };
+  }
+
+  /**
+   * Abrir modal de registro
+   */
+  abrirModalRegistro(lote?: Lote): void {
+    this.nuevoRegistro = {
+      cantidadMuertos: 1,
+      observaciones: '',
+      edad: 0,
+      ubicacion: '',
+      confirmado: false
+    };
+    
+    if (lote) {
+      this.loteSeleccionado = lote;
+      this.nuevoRegistro.loteId = String(lote.id);
+    } else {
+      this.loteSeleccionado = null;
     }
+    
+    this.mostrarModalRegistro = true;
+  }
+
+  /**
+   * Cerrar modal de registro
+   */
+  cerrarModalRegistro(): void {
+    this.mostrarModalRegistro = false;
+    this.nuevoRegistro = {};
+    this.loteSeleccionado = null;
   }
 
   /**
@@ -405,74 +366,181 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Exportar datos (placeholder)
-   */
-  exportarDatos(): void {
-    console.log('🔄 Exportando datos de mortalidad...');
-    alert('Funcionalidad de exportación en desarrollo');
-  }
-
-  /**
-   * Imprimir reporte (placeholder)
-   */
-  imprimirReporte(): void {
-    console.log('🖨️ Generando reporte para impresión...');
-    alert('Funcionalidad de impresión en desarrollo');
-  }
-
-  /**
-   * Calcular tendencia de mortalidad
-   */
-  private calcularTendencia(tendenciaSemanal: { fecha: string; muertes: number }[]): 'subiendo' | 'bajando' | 'estable' {
-    if (tendenciaSemanal.length < 2) return 'estable';
-    
-    const primerDia = tendenciaSemanal[0].muertes;
-    const ultimoDia = tendenciaSemanal[tendenciaSemanal.length - 1].muertes;
-    
-    const diferencia = ultimoDia - primerDia;
-    const porcentajeCambio = (diferencia / primerDia) * 100;
-    
-    if (porcentajeCambio > 10) return 'subiendo';
-    if (porcentajeCambio < -10) return 'bajando';
-    return 'estable';
-  }
-
-  /**
-   * ✅ VERIFICAR SI ES AUTOREGISTRO DESDE FORMULARIO DIARIO
+   * Verificar si es autoregistro desde formulario diario
    */
   verificarAutoregistro(): void {
     this.route.queryParams.subscribe(params => {
-      if (params['autoRegistro'] === 'true' && params['datos']) {
-        try {
-          const datosAutoregistro = JSON.parse(params['datos']);
-          console.log('🔄 Autoregistro de mortalidad recibido:', datosAutoregistro);
-          
-          // Prellenar el formulario con los datos recibidos
-          this.nuevoRegistro = {
-            loteId: Number(datosAutoregistro.loteId),
-            cantidadMuertos: Number(datosAutoregistro.cantidad),
-            observaciones: 'Registro automático desde alimentación.',
-            peso: 0,
-            edad: 0,
-            ubicacion: '',
-            confirmado: false,
-            fechaRegistro: new Date()
-          };
-          
-          // Abrir el modal automáticamente
-          this.mostrarModalRegistro = true;
-          
-          // Limpiar los query params
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: {},
-            replaceUrl: true
-          });
-          
-        } catch (error) {
-          console.error('❌ Error al procesar autoregistro:', error);
-        }
+      // Limpiar automáticamente cualquier parámetro de URL innecesario
+      if (Object.keys(params).length > 0) {
+        console.log('🧹 Limpiando parámetros de URL innecesarios:', params);
+        
+        // Remover todos los parámetros de la URL
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: {},
+          replaceUrl: true
+        });
       }
     });
+  }
+
+  /**
+   * Exportar datos a CSV
+   */
+  exportarDatos(): void {
+    try {
+      const registrosFiltrados = this.getRegistrosFiltrados();
+      if (registrosFiltrados.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+      }
+
+      const csvContent = this.convertirACSV(registrosFiltrados);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `mortalidad-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error al exportar datos:', error);
+      alert('Error al exportar datos');
+    }
+  }
+
+  /**
+   * Convertir registros a formato CSV
+   */
+  private convertirACSV(registros: any[]): string {
+    if (registros.length === 0) return '';
+    
+    const headers = ['Fecha', 'Lote', 'Cantidad Muertos', 'Observaciones', 'Edad'];
+    const csvRows = [headers.join(',')];
+
+    registros.forEach(registro => {
+      const row = [
+        registro.fechaRegistro,
+        this.getNombreLote(registro.loteId),
+        registro.cantidadMuertos,
+        registro.observaciones,
+        registro.edad
+      ];
+      csvRows.push(row.map(field => `"${field}"`).join(','));
+    });
+
+    return csvRows.join('\n');
+  }
+
+  /**
+   * Aplicar filtros a los datos
+   */
+  aplicarFiltros(): void {
+    // Los filtros se aplican automáticamente a través de getRegistrosFiltrados()
+    // Este método existe para compatibilidad con el template
+  }
+
+  /**
+   * Cargar estadísticas de mortalidad para todos los lotes
+   */
+  private async cargarEstadisticasLotes(): Promise<void> {
+    console.log('📊 Cargando estadísticas de mortalidad para los lotes...');
+    
+    const promesasEstadisticas = this.lotes.map(async (lote) => {
+      try {
+        // Obtener mortalidad total del backend
+        const mortalidadTotal = await this.mortalidadService.contarMortalidadPorLote(String(lote.id)).toPromise() || 0;
+        
+        const pollosRegistrados = lote.quantityOriginal || lote.quantity || 0;
+        const pollosVivos = lote.quantity || 0;
+        const porcentajeMortalidad = pollosRegistrados > 0 ? (mortalidadTotal / pollosRegistrados) * 100 : 0;
+        const tieneDatos = lote.quantityOriginal ? true : false;
+
+        // Guardar en cache
+        this.estadisticasLotes.set(lote.id!, {
+          pollosRegistrados,
+          pollosVivos,
+          mortalidadTotal,
+          porcentajeMortalidad,
+          tieneDatos
+        });
+
+        console.log(`📊 Estadísticas lote ${lote.codigo}:`, {
+          pollosRegistrados,
+          pollosVivos,
+          mortalidadTotal,
+          porcentajeMortalidad: porcentajeMortalidad.toFixed(1) + '%'
+        });
+
+      } catch (error) {
+        console.error(`❌ Error cargando estadísticas para lote ${lote.codigo}:`, error);
+        
+        // Fallback: usar cálculo local
+        const pollosRegistrados = lote.quantityOriginal || lote.quantity || 0;
+        const pollosVivos = lote.quantity || 0;
+        const mortalidadTotal = lote.quantityOriginal ? Math.max(0, pollosRegistrados - pollosVivos) : 0;
+        
+        this.estadisticasLotes.set(lote.id!, {
+          pollosRegistrados,
+          pollosVivos,
+          mortalidadTotal,
+          porcentajeMortalidad: 0,
+          tieneDatos: false
+        });
+      }
+    });
+
+    await Promise.all(promesasEstadisticas);
+    console.log('✅ Estadísticas de mortalidad cargadas para todos los lotes');
+  }
+
+  /**
+   * Obtener estadísticas completas del lote para mostrar en la tarjeta
+   */
+  getEstadisticasLote(lote: Lote): {
+    pollosRegistrados: number;
+    pollosVivos: number;
+    mortalidadTotal: number;
+    porcentajeMortalidad: number;
+    tieneDatos: boolean;
+  } {
+    // Usar datos del cache si están disponibles
+    if (lote.id && this.estadisticasLotes.has(lote.id)) {
+      return this.estadisticasLotes.get(lote.id)!;
+    }
+
+    // Fallback: calcular localmente
+    const pollosRegistrados = lote.quantityOriginal || lote.quantity || 0;
+    const pollosVivos = lote.quantity || 0;
+    const mortalidadTotal = lote.quantityOriginal ? Math.max(0, pollosRegistrados - pollosVivos) : 0;
+    const porcentajeMortalidad = pollosRegistrados > 0 ? (mortalidadTotal / pollosRegistrados) * 100 : 0;
+    const tieneDatos = lote.quantityOriginal ? true : false;
+
+    return {
+      pollosRegistrados,
+      pollosVivos,
+      mortalidadTotal,
+      porcentajeMortalidad,
+      tieneDatos
+    };
+  }
+
+  /**
+   * Calcular días de vida de un lote
+   */
+  calcularDiasDeVida(fechaNacimiento: Date | null): number {
+    if (!fechaNacimiento) return 0;
+    
+    const hoy = new Date();
+    const nacimiento = new Date(fechaNacimiento);
+    const diffTime = hoy.getTime() - nacimiento.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
   }
 }

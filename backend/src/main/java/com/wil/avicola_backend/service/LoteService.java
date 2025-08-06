@@ -49,6 +49,11 @@ public class LoteService {
         
         lote.setRace(raza);
         
+        // ✅ GUARDAR LA CANTIDAD ORIGINAL AL CREAR EL LOTE
+        if (lote.getQuantityOriginal() == null) {
+            lote.setQuantityOriginal(lote.getQuantity());
+        }
+        
         // Generamos el código secuencial según el tipo de animal
         String codigo = codigoLoteService.generarCodigoLote(raza);
         lote.setCodigo(codigo);
@@ -73,6 +78,12 @@ public class LoteService {
             lote_old.setQuantity(lote.getQuantity());
             lote_old.setCost(lote.getCost());
             lote_old.setName(lote.getName());
+            
+            // ✅ MANTENER LA CANTIDAD ORIGINAL - NO SE MODIFICA DESPUÉS DE LA CREACIÓN
+            // Solo establecemos quantityOriginal si no existe (para lotes creados antes de esta funcionalidad)
+            if (lote_old.getQuantityOriginal() == null && lote.getQuantityOriginal() == null) {
+                lote_old.setQuantityOriginal(lote.getQuantity());
+            }
             
             // Mantenemos el código original, no lo modificamos al actualizar
             // lote_old.setCodigo(lote.getCodigo());

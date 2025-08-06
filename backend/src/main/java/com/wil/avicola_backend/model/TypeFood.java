@@ -31,6 +31,9 @@ public class TypeFood {
     @NotBlank(message = "Por favor, ingrese nombre del tipo de alimento.")
     private String name;
 
+    @Builder.Default
+    private String categoria = "ALIMENTO"; // ALIMENTO o MEDICINA
+
     @CreatedDate
     LocalDateTime create_date;
     @LastModifiedDate

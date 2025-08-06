@@ -43,6 +43,37 @@ public class MortalidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+    /**
+     * Crear nuevo registro de mortalidad con causaId
+     */
+    @PostMapping("/registrar-con-causa")
+    public ResponseEntity<Map<String, Object>> crearRegistroConCausaId(@RequestBody Map<String, Object> requestData) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Extraer datos del request
+            RegistroMortalidad registro = new RegistroMortalidad();
+            registro.setLoteId((String) requestData.get("loteId"));
+            registro.setCantidadMuertos((Integer) requestData.get("cantidadMuertos"));
+            registro.setObservaciones((String) requestData.get("observaciones"));
+            registro.setEdad((Integer) requestData.get("edad"));
+            registro.setUbicacion((String) requestData.get("ubicacion"));
+            registro.setConfirmado((Boolean) requestData.get("confirmado"));
+            registro.setUsuarioRegistro((String) requestData.get("usuarioRegistro"));
+            
+            Long causaId = Long.valueOf(requestData.get("causaId").toString());
+            
+            RegistroMortalidad nuevoRegistro = mortalidadService.crearRegistroConCausaId(registro, causaId);
+            response.put("success", true);
+            response.put("message", "Registro de mortalidad creado exitosamente");
+            response.put("data", nuevoRegistro);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al crear el registro: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
     
     /**
      * Obtener registro por ID
@@ -149,7 +180,7 @@ public class MortalidadController {
      * Obtener registros por lote
      */
     @GetMapping("/lote/{loteId}")
-    public ResponseEntity<Map<String, Object>> obtenerRegistrosPorLote(@PathVariable Long loteId) {
+    public ResponseEntity<Map<String, Object>> obtenerRegistrosPorLote(@PathVariable String loteId) {
         Map<String, Object> response = new HashMap<>();
         try {
             List<RegistroMortalidad> registros = mortalidadService.obtenerRegistrosPorLote(loteId);
@@ -260,7 +291,7 @@ public class MortalidadController {
      * Contar muertes por lote
      */
     @GetMapping("/lote/{loteId}/contar")
-    public ResponseEntity<Map<String, Object>> contarMuertesPorLote(@PathVariable Long loteId) {
+    public ResponseEntity<Map<String, Object>> contarMuertesPorLote(@PathVariable String loteId) {
         Map<String, Object> response = new HashMap<>();
         try {
             Integer totalMuertes = mortalidadService.contarMuertesPorLote(loteId);

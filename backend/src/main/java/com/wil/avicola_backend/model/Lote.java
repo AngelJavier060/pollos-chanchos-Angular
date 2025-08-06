@@ -37,7 +37,10 @@ public class Lote {
     private String codigo; // Nuevo campo para código amigable (0001, 1001, etc.)
     
     @NotNull(message = "La cantidad es obligatoria")
-    private int quantity;
+    private int quantity; // Cantidad actual de animales vivos
+    
+    @Column(name = "quantity_original")
+    private Integer quantityOriginal; // Cantidad original registrada al crear el lote
     
     @NotNull(message = "La fecha de nacimiento es obligatoria")
     private Date birthdate;

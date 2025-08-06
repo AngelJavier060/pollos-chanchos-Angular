@@ -2,8 +2,10 @@ package com.wil.avicola_backend.service;
 
 import com.wil.avicola_backend.model.CausaMortalidad;
 import com.wil.avicola_backend.model.RegistroMortalidad;
+import com.wil.avicola_backend.model.Lote;
 import com.wil.avicola_backend.repository.CausaMortalidadRepository;
 import com.wil.avicola_backend.repository.MortalidadRepository;
+import com.wil.avicola_backend.repository.LoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +25,88 @@ public class MortalidadService {
     @Autowired
     private CausaMortalidadRepository causaMortalidadRepository;
     
+    @Autowired
+    private LoteRepository loteRepository;
+    
     // ========== OPERACIONES CRUD ==========
     
+    /**
+     * Crear un nuevo registro de mortalidad con causaId
+     */
+    public RegistroMortalidad crearRegistroConCausaId(RegistroMortalidad registro, Long causaId) {
+        // Buscar la causa por ID
+        Optional<CausaMortalidad> causaOpt = causaMortalidadRepository.findById(causaId);
+        if (causaOpt.isEmpty()) {
+            throw new RuntimeException("Causa de mortalidad no encontrada con ID: " + causaId);
+        }
+        
+        // Asignar la causa al registro
+        registro.setCausa(causaOpt.get());
+        registro.setFechaRegistro(LocalDateTime.now());
+        
+        // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE
+        try {
+            // Buscar lote directamente con el ID String
+            Optional<Lote> loteOpt = loteRepository.findById(registro.getLoteId());
+            
+            if (loteOpt.isPresent()) {
+                Lote lote = loteOpt.get();
+                int cantidadAnterior = lote.getQuantity();
+                int nuevaCantidad = Math.max(0, cantidadAnterior - registro.getCantidadMuertos());
+                lote.setQuantity(nuevaCantidad);
+                loteRepository.save(lote);
+                
+                System.out.println("✅ Lote actualizado automáticamente:");
+                System.out.println("   - Lote ID: " + lote.getId());
+                System.out.println("   - Código: " + lote.getCodigo()); 
+                System.out.println("   - Cantidad anterior: " + cantidadAnterior);
+                System.out.println("   - Animales muertos registrados: " + registro.getCantidadMuertos());
+                System.out.println("   - Nueva cantidad: " + nuevaCantidad);
+            } else {
+                System.err.println("⚠️ Advertencia: No se encontró el lote con ID: " + registro.getLoteId());
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error al actualizar la cantidad del lote: " + e.getMessage());
+            e.printStackTrace();
+            // Continuamos con el registro de mortalidad aunque falle la actualización del lote
+        }
+        
+        return mortalidadRepository.save(registro);
+    }
+
     /**
      * Crear un nuevo registro de mortalidad
      */
     public RegistroMortalidad crearRegistro(RegistroMortalidad registro) {
         registro.setFechaRegistro(LocalDateTime.now());
+        
+        // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE
+        try {
+            // Buscar lote directamente con el ID String
+            Optional<Lote> loteOpt = loteRepository.findById(registro.getLoteId());
+            
+            if (loteOpt.isPresent()) {
+                Lote lote = loteOpt.get();
+                int cantidadAnterior = lote.getQuantity();
+                int nuevaCantidad = Math.max(0, cantidadAnterior - registro.getCantidadMuertos());
+                lote.setQuantity(nuevaCantidad);
+                loteRepository.save(lote);
+                
+                System.out.println("✅ Lote actualizado automáticamente:");
+                System.out.println("   - Lote ID: " + lote.getId());
+                System.out.println("   - Código: " + lote.getCodigo()); 
+                System.out.println("   - Cantidad anterior: " + cantidadAnterior);
+                System.out.println("   - Animales muertos registrados: " + registro.getCantidadMuertos());
+                System.out.println("   - Nueva cantidad: " + nuevaCantidad);
+            } else {
+                System.err.println("⚠️ Advertencia: No se encontró el lote con ID: " + registro.getLoteId());
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error al actualizar la cantidad del lote: " + e.getMessage());
+            e.printStackTrace();
+            // Continuamos con el registro de mortalidad aunque falle la actualización del lote
+        }
+        
         return mortalidadRepository.save(registro);
     }
     
@@ -95,14 +172,14 @@ public class MortalidadService {
     /**
      * Obtener registros por lote
      */
-    public List<RegistroMortalidad> obtenerRegistrosPorLote(Long loteId) {
+    public List<RegistroMortalidad> obtenerRegistrosPorLote(String loteId) {
         return mortalidadRepository.findByLoteIdOrderByFechaRegistroDesc(loteId);
     }
     
     /**
      * Obtener registros por lote y confirmados
      */
-    public List<RegistroMortalidad> obtenerRegistrosPorLoteYConfirmados(Long loteId, Boolean confirmado) {
+    public List<RegistroMortalidad> obtenerRegistrosPorLoteYConfirmados(String loteId, Boolean confirmado) {
         return mortalidadRepository.findByLoteIdAndConfirmado(loteId, confirmado);
     }
     
@@ -123,7 +200,7 @@ public class MortalidadService {
     /**
      * Obtener registros por lote y rango de fechas
      */
-    public List<RegistroMortalidad> obtenerRegistrosPorLoteYRangoFechas(Long loteId, LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+    public List<RegistroMortalidad> obtenerRegistrosPorLoteYRangoFechas(String loteId, LocalDateTime fechaInicio, LocalDateTime fechaFin) {
         return mortalidadRepository.findByLoteIdAndFechaRegistroBetween(loteId, fechaInicio, fechaFin);
     }
     
@@ -147,7 +224,7 @@ public class MortalidadService {
     /**
      * Contar total de muertes por lote
      */
-    public Integer contarMuertesPorLote(Long loteId) {
+    public Integer contarMuertesPorLote(String loteId) {
         Integer count = mortalidadRepository.countMuertesByLoteId(loteId);
         return count != null ? count : 0;
     }
@@ -155,7 +232,7 @@ public class MortalidadService {
     /**
      * Contar muertes por lote en un rango de fechas
      */
-    public Integer contarMuertesPorLoteYRangoFechas(Long loteId, LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+    public Integer contarMuertesPorLoteYRangoFechas(String loteId, LocalDateTime fechaInicio, LocalDateTime fechaFin) {
         Integer count = mortalidadRepository.countMuertesByLoteIdAndFechaRange(loteId, fechaInicio, fechaFin);
         return count != null ? count : 0;
     }

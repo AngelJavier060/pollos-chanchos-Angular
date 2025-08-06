@@ -139,10 +139,30 @@
               <span class="text-gray-900 font-bold">{{ calcularDiasDeVida(lote.birthdate) }} días</span>
             </div>
             
+            <!-- Pollos Registrados para todos los lotes -->
             <div class="info-item flex items-center justify-between">
-              <span class="text-gray-600 font-medium">Cantidad:</span>
-              <span class="text-gray-900 font-bold">{{ lote.quantity }} pollos</span>
+              <span class="text-gray-600 font-medium">Pollos Registrados</span>
+              <span class="text-gray-900 font-bold">{{ obtenerPollosRegistrados(lote) }}</span>
             </div>
+            
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Pollos vivos:</span>
+              <span class="text-blue-700 font-bold">{{ lote.quantity }} pollos</span>
+            </div>
+            
+            <!-- Mortalidad real calculada -->
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Mortalidad</span>
+              <span class="text-gray-900 font-bold">{{ calcularMortalidadReal(lote) }}</span>
+            </div>
+            
+            <!-- Mostrar mortalidad solo si hay datos -->
+            <ng-container *ngIf="getEstadisticasLote(lote).tieneDatos && getEstadisticasLote(lote).mortalidadTotal > 0">
+              <div class="info-item flex items-center justify-between">
+                <span class="text-gray-600 font-medium">Mortalidad</span>
+                <span class="text-red-600 font-bold">{{ getEstadisticasLote(lote).mortalidadTotal }}</span>
+              </div>
+            </ng-container>
             
             <div class="info-item flex items-center justify-between" *ngIf="lote.race?.name">
               <span class="text-gray-600 font-medium">Raza:</span>
@@ -257,7 +277,12 @@
             <i class="fas fa-utensils text-2xl"></i>
             <div>
               <h2 class="text-2xl font-bold">Registro de Alimentación</h2>
-              <p class="text-green-100">Lote: {{ loteSeleccionado?.codigo }}</p>
+              <div class="flex items-center space-x-4 text-green-100">
+                <span>Lote: {{ loteSeleccionado?.codigo }}</span>
+                <span class="border-l border-green-400 pl-4">
+                  <i class="fas fa-box mr-1"></i> Con Inventario Automático
+                </span>
+              </div>
             </div>
           </div>
           <button (click)="cerrarModal()" 
@@ -279,9 +304,10 @@
             
             <!-- Información del Lote Seleccionado -->
             <div class="bg-blue-100 border border-blue-300 rounded-lg p-3">
-              <p class="text-blue-700 font-medium">Información del Lote</p>
-              <p class="font-bold text-blue-900 text-lg">{{ loteSeleccionado?.quantity || 0 }} animales</p>
+              <p class="text-blue-700 font-medium">Pollos en el Lote</p>
+              <p class="font-bold text-blue-900 text-lg">{{ loteSeleccionado?.quantity || 0 }} pollos vivos</p>
               <p class="text-blue-500 text-xs">Raza: {{ loteSeleccionado?.race?.name || 'No definida' }}</p>
+              <p class="text-blue-400 text-xs">Código: {{ loteSeleccionado?.codigo || 'N/A' }}</p>
             </div>
             
             <!-- Fecha del registro -->
@@ -392,6 +418,7 @@
                 <input 
                   type="number" 
                   [(ngModel)]="registroCompleto.cantidadAplicada"
+                  [value]="registroCompleto.cantidadAplicada || getCantidadTotalSugerida()"
                   [placeholder]="getPlaceholderCantidad()"
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                 
@@ -539,20 +566,66 @@
             <!-- Información de Animales -->
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Animales Vivos</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-heartbeat text-green-500 mr-1"></i>
+                  Pollos Vivos Actuales
+                </label>
                 <input 
                   type="number" 
                   [(ngModel)]="registroCompleto.animalesVivos"
                   [value]="loteSeleccionado?.quantity"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                  readonly
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-50 text-green-700 font-semibold focus:outline-none">
+                <p class="text-xs text-gray-500 mt-1">Este valor se actualiza automáticamente al registrar mortalidad</p>
               </div>
               
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Animales Muertos</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-times-circle text-red-500 mr-1"></i>
+                  Animales Muertos Hoy
+                </label>
                 <input 
                   type="number" 
                   [(ngModel)]="registroCompleto.animalesMuertos"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                  min="0"
+                  [max]="loteSeleccionado?.quantity || 0"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                <p class="text-xs text-red-500 mt-1" *ngIf="registroCompleto.animalesMuertos > 0">
+                  Se reducirá automáticamente la cantidad de pollos vivos del lote
+                </p>
+              </div>
+
+              <!-- Campo para causa de mortalidad -->
+              <div *ngIf="registroCompleto.animalesMuertos > 0" class="relative">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>
+                  Causa de Mortalidad
+                </label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="registroCompleto.causaMortalidad"
+                  (input)="filtrarCausasMortalidad($event)"
+                  (focus)="mostrarDropdownCausas = true"
+                  (blur)="ocultarDropdownCausas()"
+                  placeholder="Buscar o escribir causa de mortalidad"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  autocomplete="off">
+                
+                <!-- Dropdown de causas filtradas -->
+                <div *ngIf="mostrarDropdownCausas && causasMortalidadFiltradas.length > 0" 
+                     class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div *ngFor="let causa of causasMortalidadFiltradas" 
+                       (mousedown)="seleccionarCausaMortalidad(causa)"
+                       class="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                    <div class="flex items-center">
+                      <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="causa.color"></div>
+                      <div>
+                        <div class="font-medium text-gray-900">{{ causa.nombre }}</div>
+                        <div class="text-xs text-gray-500" *ngIf="causa.descripcion">{{ causa.descripcion }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               
               <div>
@@ -567,16 +640,42 @@
         </div>
 
         <!-- Botones de Acción -->
-        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-          <button (click)="cerrarModal()" 
-                  class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-            Cancelar
-          </button>
-          <button (click)="registrarAlimentacionCompleta()" 
-                  class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
-            <i class="fas fa-save mr-2"></i>
-            Registrar Alimentación
-          </button>
+        <div class="pt-6 border-t border-gray-200">
+          <!-- Información de Inventario Automático -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div class="flex items-start">
+              <div class="flex-shrink-0">
+                <i class="fas fa-box text-blue-500 text-lg"></i>
+              </div>
+              <div class="ml-3">
+                <h4 class="text-sm font-semibold text-blue-900">🤖 Gestión Automática de Inventario</h4>
+                <p class="text-sm text-blue-700 mt-1">
+                  El sistema deducirá automáticamente <strong>{{ registroCompleto.cantidadAplicada || getCantidadTotalSugerida() }} kg</strong> 
+                  del inventario de alimentos cuando registres este consumo.
+                </p>
+                <ul class="text-xs text-blue-600 mt-2 space-y-1">
+                  <li>✅ Actualización automática del stock</li>
+                  <li>✅ Registro de movimientos de inventario</li>
+                  <li>✅ Alertas de stock bajo</li>
+                  <li>✅ Trazabilidad completa</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex justify-end space-x-4">
+            <button (click)="cerrarModal()" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button (click)="registrarAlimentacionCompleta()" 
+                    [disabled]="loading"
+                    class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <i class="fas fa-sync-alt animate-spin mr-2" *ngIf="loading"></i>
+              <i class="fas fa-save mr-2" *ngIf="!loading"></i>
+              {{ loading ? 'Procesando...' : 'Registrar con Inventario Automático' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

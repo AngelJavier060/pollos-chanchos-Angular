@@ -43,6 +43,8 @@ export class AuthInterceptor implements HttpInterceptor {
       '/health',
       '/uploads/',
       '/api/plan-ejecucion/', // 🔥 AGREGAR: Todas las rutas de plan-ejecucion son públicas
+      '/api/mortalidad/', // 🔥 AGREGAR: Todas las rutas de mortalidad son públicas
+      '/api/lote/', // 🔥 AGREGAR: Todas las rutas de lote son públicas
       '/debug/' // 🔥 AGREGAR: Todas las rutas de debug son públicas
     ];
     

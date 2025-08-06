@@ -363,4 +363,223 @@ public class PlanAlimentacionController {
         
         return ResponseEntity.ok("Diagnóstico exitoso para ID: " + id + " - Data: " + rawData);
     }
+    
+    /**
+     * Registrar consumo de alimento con deducción automática de inventario
+     * 
+     * @param requestData Datos del consumo
+     * @param principal Usuario autenticado
+     * @return ResponseEntity con resultado
+     */
+    @PostMapping("/registrar-consumo")
+    public ResponseEntity<?> registrarConsumoAlimento(
+            @RequestBody Map<String, Object> requestData, 
+            Principal principal) {
+        
+        System.out.println("🍽️ POST /api/plan-alimentacion/registrar-consumo");
+        System.out.println("   - Request data: " + requestData);
+        System.out.println("   - Usuario: " + (principal != null ? principal.getName() : "Anónimo"));
+        
+        try {
+            // Extraer parámetros del request - CORREGIDO para manejar UUID
+            String loteId = requestData.get("loteId").toString(); // UUID como string
+            Long tipoAlimentoId = Long.valueOf(requestData.get("tipoAlimentoId").toString());
+            
+            // Manejar cantidad como String o Number
+            Object cantidadObj = requestData.get("cantidadKg");
+            java.math.BigDecimal cantidadKg;
+            if (cantidadObj instanceof Number) {
+                cantidadKg = java.math.BigDecimal.valueOf(((Number) cantidadObj).doubleValue());
+            } else {
+                cantidadKg = new java.math.BigDecimal(cantidadObj.toString());
+            }
+            
+            String observaciones = (String) requestData.get("observaciones");
+            String usuarioRegistro = principal != null ? principal.getName() : "Usuario desconocido";
+            
+            // Llamar al servicio
+            return planAlimentacionService.registrarConsumoAlimento(
+                loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones
+            );
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error en endpoint registrar-consumo: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest()
+                .body(Map.of(
+                    "success", false,
+                    "error", "Error procesando solicitud: " + e.getMessage()
+                ));
+        }
+    }
+    
+    // ============================================================================
+    // ENDPOINTS DE INVENTARIO - SISTEMA PROFESIONAL DE CONTROL DE STOCK
+    // ============================================================================
+    
+    /**
+     * Obtener todos los inventarios disponibles con stock actual
+     */
+    @GetMapping("/inventarios")
+    public ResponseEntity<?> obtenerInventarios() {
+        System.out.println("📦 Consultando inventarios disponibles...");
+        
+        try {
+            var inventarios = planAlimentacionService.obtenerTodosLosInventarios();
+            System.out.println("✅ Inventarios obtenidos: " + inventarios.size());
+            return ResponseEntity.ok(inventarios);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo inventarios: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error obteniendo inventarios: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Obtener historial de movimientos de inventario por lote
+     */
+    @GetMapping("/movimientos/lote/{loteId}")
+    public ResponseEntity<?> obtenerMovimientosPorLote(@PathVariable String loteId) {
+        System.out.println("📋 Consultando movimientos para lote: " + loteId);
+        
+        try {
+            var movimientos = planAlimentacionService.obtenerMovimientosPorLote(loteId);
+            System.out.println("✅ Movimientos obtenidos: " + movimientos.size());
+            return ResponseEntity.ok(movimientos);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo movimientos: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error obteniendo movimientos: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Obtener total consumido por lote y tipo de alimento
+     */
+    @GetMapping("/consumo-total/lote/{loteId}/alimento/{tipoAlimentoId}")
+    public ResponseEntity<?> obtenerTotalConsumidoPorLote(
+            @PathVariable String loteId, 
+            @PathVariable Long tipoAlimentoId) {
+        
+        System.out.println("🔍 Consultando consumo total - Lote: " + loteId + ", Alimento: " + tipoAlimentoId);
+        
+        try {
+            Double totalConsumido = planAlimentacionService.obtenerTotalConsumidoPorLote(loteId, tipoAlimentoId);
+            System.out.println("✅ Total consumido: " + totalConsumido + " kg");
+            return ResponseEntity.ok(totalConsumido);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo total consumido: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error obteniendo total consumido: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Obtener inventarios con stock bajo (alertas)
+     */
+    @GetMapping("/inventarios/stock-bajo")
+    public ResponseEntity<?> obtenerInventariosStockBajo() {
+        System.out.println("⚠️ Consultando inventarios con stock bajo...");
+        
+        try {
+            var stockBajo = planAlimentacionService.obtenerInventariosStockBajo();
+            System.out.println("✅ Inventarios con stock bajo: " + stockBajo.size());
+            return ResponseEntity.ok(stockBajo);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo stock bajo: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error obteniendo stock bajo: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Obtener total consumido por tipo de alimento
+     */
+    @GetMapping("/inventarios/consumido/tipo/{tipoAlimentoId}")
+    public ResponseEntity<?> obtenerTotalConsumido(@PathVariable Long tipoAlimentoId) {
+        System.out.println("📊 Calculando total consumido para tipo de alimento: " + tipoAlimentoId);
+        
+        try {
+            var totalConsumido = planAlimentacionService.calcularTotalConsumido(tipoAlimentoId);
+            System.out.println("✅ Total consumido calculado: " + totalConsumido + " kg");
+            
+            return ResponseEntity.ok(Map.of(
+                "tipoAlimentoId", tipoAlimentoId,
+                "totalConsumido", totalConsumido,
+                "unidadMedida", "kg"
+            ));
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error calculando total consumido: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error calculando total consumido: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Obtener todos los movimientos de inventario
+     */
+    @GetMapping("/inventarios/movimientos")
+    public ResponseEntity<?> obtenerMovimientosInventario() {
+        System.out.println("📋 Consultando movimientos de inventario...");
+        
+        try {
+            var movimientos = planAlimentacionService.obtenerTodosLosMovimientos();
+            System.out.println("✅ Movimientos obtenidos: " + movimientos.size());
+            return ResponseEntity.ok(movimientos);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo movimientos: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error obteniendo movimientos: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Sincronizar inventario con productos reales
+     */
+    @PostMapping("/inventarios/sincronizar-productos")
+    public ResponseEntity<?> sincronizarInventarioConProductos() {
+        System.out.println("🔄 Sincronizando inventario con productos reales...");
+        
+        try {
+            var resultado = planAlimentacionService.sincronizarInventarioConProductos();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Inventario sincronizado con productos reales exitosamente",
+                "inventarios_procesados", resultado
+            ));
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error sincronizando inventario: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error sincronizando inventario: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Limpiar inventarios genéricos obsoletos
+     */
+    @PostMapping("/inventarios/limpiar-genericos")
+    public ResponseEntity<?> limpiarInventariosGenericos() {
+        System.out.println("🧹 Limpiando inventarios genéricos obsoletos...");
+        
+        try {
+            var resultado = planAlimentacionService.limpiarInventariosGenericos();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Inventarios genéricos eliminados exitosamente",
+                "inventarios_eliminados", resultado
+            ));
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error limpiando inventarios: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error limpiando inventarios: " + e.getMessage()));
+        }
+    }
 }

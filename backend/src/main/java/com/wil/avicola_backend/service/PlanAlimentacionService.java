@@ -1,9 +1,11 @@
 package com.wil.avicola_backend.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,9 @@ public class PlanAlimentacionService {
     
     @Autowired
     private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private InventarioAlimentoService inventarioAlimentoService;
 
     /**
      * Obtener todos los planes (implementación real)
@@ -342,5 +347,141 @@ public class PlanAlimentacionService {
             System.err.println("❌ Service: Error: " + e.getMessage());
             return new ArrayList<>();
         }
+    }
+    
+    /**
+     * Registrar consumo de alimento con deducción automática de inventario
+     * 
+     * @param loteId ID del lote (UUID)
+     * @param tipoAlimentoId ID del tipo de alimento
+     * @param cantidadKg Cantidad en kilogramos
+     * @param usuarioRegistro Usuario que registra
+     * @param observaciones Observaciones adicionales
+     * @return ResponseEntity con resultado
+     */
+    @Transactional
+    public ResponseEntity<?> registrarConsumoAlimento(
+            String loteId, 
+            Long tipoAlimentoId, 
+            BigDecimal cantidadKg, 
+            String usuarioRegistro, 
+            String observaciones) {
+        
+        System.out.println("🍽️ Registrando consumo de alimento:");
+        System.out.println("   - Lote ID: " + loteId);
+        System.out.println("   - Tipo Alimento ID: " + tipoAlimentoId);
+        System.out.println("   - Cantidad: " + cantidadKg + " kg");
+        System.out.println("   - Usuario: " + usuarioRegistro);
+        
+        try {
+            // Validaciones básicas
+            if (loteId == null || tipoAlimentoId == null || cantidadKg == null) {
+                return ResponseEntity.badRequest()
+                    .body("Faltan parámetros obligatorios: loteId, tipoAlimentoId, cantidadKg");
+            }
+            
+            if (cantidadKg.compareTo(BigDecimal.ZERO) <= 0) {
+                return ResponseEntity.badRequest()
+                    .body("La cantidad debe ser mayor a cero");
+            }
+            
+            // Registrar consumo y deducir inventario automáticamente
+            var movimiento = inventarioAlimentoService.registrarConsumoLote(
+                tipoAlimentoId, 
+                cantidadKg, 
+                loteId, 
+                usuarioRegistro != null ? usuarioRegistro : "Usuario desconocido",
+                observaciones != null ? observaciones : "Consumo registrado desde aplicación"
+            );
+            
+            System.out.println("✅ Consumo registrado exitosamente - Movimiento ID: " + movimiento.getId());
+            
+            // Retornar información del movimiento
+            return ResponseEntity.ok().body(Map.of(
+                "success", true,
+                "message", "Consumo registrado exitosamente",
+                "movimientoId", movimiento.getId(),
+                "stockAnterior", movimiento.getStockAnterior(),
+                "stockNuevo", movimiento.getStockNuevo(),
+                "cantidadConsumida", movimiento.getCantidad()
+            ));
+            
+        } catch (RuntimeException e) {
+            System.err.println("❌ Error registrando consumo: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+                ));
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error interno: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "success", false,
+                    "error", "Error interno del servidor"
+                ));
+        }
+    }
+    
+    // ============================================================================
+    // MÉTODOS DE INVENTARIO - DELEGACIÓN A InventarioAlimentoService  
+    // ============================================================================
+    
+    /**
+     * Obtener todos los inventarios con cálculos completos
+     */
+    public List<com.wil.avicola_backend.dto.InventarioResponseDto> obtenerTodosLosInventarios() {
+        return inventarioAlimentoService.obtenerTodosLosInventariosConCalculos();
+    }
+    
+    /**
+     * Obtener todos los movimientos de inventario
+     */
+    public List<com.wil.avicola_backend.model.MovimientoInventario> obtenerTodosLosMovimientos() {
+        return inventarioAlimentoService.obtenerTodosLosMovimientos();
+    }
+    
+    /**
+     * Obtener movimientos de inventario por lote
+     */
+    public List<com.wil.avicola_backend.model.MovimientoInventario> obtenerMovimientosPorLote(String loteId) {
+        return inventarioAlimentoService.obtenerMovimientosPorLote(loteId);
+    }
+    
+    /**
+     * Obtener total consumido por lote y tipo de alimento
+     */
+    public Double obtenerTotalConsumidoPorLote(String loteId, Long tipoAlimentoId) {
+        return inventarioAlimentoService.obtenerTotalConsumidoPorLote(loteId, tipoAlimentoId);
+    }
+    
+    /**
+     * Obtener inventarios con stock bajo
+     */
+    public List<com.wil.avicola_backend.model.InventarioAlimento> obtenerInventariosStockBajo() {
+        return inventarioAlimentoService.obtenerInventariosStockBajo();
+    }
+
+    /**
+     * Calcular total consumido por tipo de alimento
+     */
+    public java.math.BigDecimal calcularTotalConsumido(Long tipoAlimentoId) {
+        return inventarioAlimentoService.calcularTotalConsumido(tipoAlimentoId);
+    }
+    
+    /**
+     * Sincronizar inventario con productos reales
+     */
+    public int sincronizarInventarioConProductos() {
+        return inventarioAlimentoService.sincronizarInventarioConProductos();
+    }
+    
+    /**
+     * Limpiar inventarios genéricos obsoletos
+     */
+    public int limpiarInventariosGenericos() {
+        return inventarioAlimentoService.limpiarInventariosGenericos();
     }
 }

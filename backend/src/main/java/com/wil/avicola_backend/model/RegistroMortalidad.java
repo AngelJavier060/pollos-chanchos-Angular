@@ -23,7 +23,7 @@ public class RegistroMortalidad {
     private Long id;
     
     @Column(name = "lote_id", nullable = false)
-    private Long loteId;
+    private String loteId; // Cambiado de Long a String para soportar UUID
     
     @Column(name = "cantidad_muertos", nullable = false)
     private Integer cantidadMuertos;

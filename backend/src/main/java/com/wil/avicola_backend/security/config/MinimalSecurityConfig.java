@@ -68,6 +68,12 @@ public class MinimalSecurityConfig {
                     .requestMatchers(HttpMethod.PUT, "/api/plan-alimentacion/**").permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/plan-alimentacion/**").permitAll()
                     .requestMatchers(HttpMethod.PATCH, "/api/plan-alimentacion/**").permitAll()
+                    // ENDPOINTS DE MORTALIDAD: todos los métodos HTTP para mortalidad
+                    .requestMatchers(HttpMethod.GET, "/api/mortalidad/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/mortalidad/**").permitAll()
+                    .requestMatchers(HttpMethod.PUT, "/api/mortalidad/**").permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/api/mortalidad/**").permitAll()
+                    .requestMatchers(HttpMethod.PATCH, "/api/mortalidad/**").permitAll()
                     // Permitir todas las peticiones OPTIONS para CORS
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     // Endpoints públicos - NO requieren autenticación
@@ -90,6 +96,7 @@ public class MinimalSecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/plan-ejecucion/debug/ping").permitAll()
                     // Otros endpoints públicos temporales
                     .requestMatchers("/animal/**", "/api/animal/**").permitAll()
+                    .requestMatchers("/api/lote/**", "/lote/**").permitAll() // Para cargar lotes en mortalidad
                     // Todo lo demás requiere autenticación
                     .anyRequest().authenticated();
                     

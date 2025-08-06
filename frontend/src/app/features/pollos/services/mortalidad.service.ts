@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { 
   RegistroMortalidad, 
@@ -13,7 +14,7 @@ import {
   providedIn: 'root'
 })
 export class MortalidadService {
-  private readonly API_URL = `${environment.apiUrl}/mortalidad`;
+  private readonly API_URL = `${environment.apiUrl}/api/mortalidad`;
   
   private mortalidadSubject = new BehaviorSubject<RegistroMortalidad[]>([]);
   public mortalidad$ = this.mortalidadSubject.asObservable();
@@ -32,21 +33,40 @@ export class MortalidadService {
    * Obtener todos los registros de mortalidad
    */
   getRegistrosMortalidad(filtros?: any): Observable<RegistroMortalidad[]> {
-    return this.http.get<RegistroMortalidad[]>(`${this.API_URL}/registros`, { params: filtros });
+    return this.http.get<{data: RegistroMortalidad[], success: boolean, count: number}>(`${this.API_URL}/registros`, { params: filtros })
+      .pipe(map(response => response.data || []));
   }
 
   /**
    * Obtener registros de mortalidad por lote
    */
-  getRegistrosPorLote(loteId: number): Observable<RegistroMortalidad[]> {
-    return this.http.get<RegistroMortalidad[]>(`${this.API_URL}/lote/${loteId}`);
+  getRegistrosPorLote(loteId: string): Observable<RegistroMortalidad[]> {
+    return this.http.get<{data: RegistroMortalidad[], success: boolean}>(`${this.API_URL}/lote/${loteId}`)
+      .pipe(map(response => response.data || []));
+  }
+
+  /**
+   * Contar mortalidad total por lote
+   */
+  contarMortalidadPorLote(loteId: string): Observable<number> {
+    return this.http.get<{data: number, success: boolean}>(`${this.API_URL}/lote/${loteId}/contar`)
+      .pipe(map(response => response.data || 0));
   }
 
   /**
    * Registrar nueva mortalidad
    */
   registrarMortalidad(registro: RegistroMortalidad): Observable<RegistroMortalidad> {
-    return this.http.post<RegistroMortalidad>(`${this.API_URL}/registrar`, registro);
+    return this.http.post<{data: RegistroMortalidad, success: boolean, message: string}>(`${this.API_URL}/registrar`, registro)
+      .pipe(map(response => response.data));
+  }
+
+  /**
+   * Registrar nueva mortalidad con causaId
+   */
+  registrarMortalidadConCausa(registro: any): Observable<RegistroMortalidad> {
+    return this.http.post<{data: RegistroMortalidad, success: boolean, message: string}>(`${this.API_URL}/registrar-con-causa`, registro)
+      .pipe(map(response => response.data));
   }
 
   /**
@@ -71,14 +91,15 @@ export class MortalidadService {
   }
 
   /**
-   * Obtener estadísticas de mortalidad
+   * Obtener estadísticas de mortalidad desde el backend
    */
-  getEstadisticas(fechaInicio?: Date, fechaFin?: Date): Observable<EstadisticasMortalidad> {
+  getEstadisticas(fechaInicio?: Date, fechaFin?: Date): Observable<any> {
     const params: any = {};
     if (fechaInicio) params.fechaInicio = fechaInicio.toISOString().split('T')[0];
     if (fechaFin) params.fechaFin = fechaFin.toISOString().split('T')[0];
     
-    return this.http.get<EstadisticasMortalidad>(`${this.API_URL}/estadisticas`, { params });
+    return this.http.get<{data: any, success: boolean}>(`${this.API_URL}/estadisticas`, { params })
+      .pipe(map(response => response.data || {}));
   }
 
   /**
@@ -99,7 +120,8 @@ export class MortalidadService {
    * Obtener causas de mortalidad disponibles
    */
   getCausas(): Observable<CausaMortalidad[]> {
-    return this.http.get<CausaMortalidad[]>(`${this.API_URL}/causas`);
+    return this.http.get<{data: CausaMortalidad[], success: boolean}>(`${this.API_URL}/causas`)
+      .pipe(map(response => response.data || []));
   }
 
   /**
@@ -227,7 +249,7 @@ export class MortalidadService {
   /**
    * Crear nueva alerta
    */
-  private crearAlerta(tipo: 'critica' | 'advertencia' | 'informativa', titulo: string, mensaje: string, loteId?: number, accion?: string): void {
+  private crearAlerta(tipo: 'critica' | 'advertencia' | 'informativa', titulo: string, mensaje: string, loteId?: string, accion?: string): void {
     const nuevaAlerta: AlertaMortalidad = {
       id: this.alertasCache.length + 1,
       tipo,

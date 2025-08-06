@@ -1,13 +1,12 @@
 export interface RegistroMortalidad {
   id?: number;
-  loteId: number;
+  loteId: string; // Cambiado de number a string para UUIDs
   loteName?: string;
   fechaRegistro: Date;
   cantidadMuertos: number;
   causa: CausaMortalidad;
   observaciones?: string;
   usuarioRegistro?: string;
-  peso?: number;
   edad: number;
   tratamientoPrevio?: string;
   ubicacion?: string;
@@ -42,7 +41,7 @@ export interface AlertaMortalidad {
   tipo: 'critica' | 'advertencia' | 'informativa';
   titulo: string;
   mensaje: string;
-  loteId?: number;
+  loteId?: string; // Cambiado de number a string para consistencia
   fechaCreacion: Date;
   leida: boolean;
   accionRequerida?: string;
