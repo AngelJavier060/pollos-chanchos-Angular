@@ -4,14 +4,23 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+
+    - name: Set up job
+      run: |
+        echo "🚀 Starting deployment to production server..."
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
 
     - name: Deploy and Restart Docker Compose
       uses: appleboy/ssh-action@v1.0.3
@@ -19,13 +28,59 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
-        port: 22
+        port: ${{ secrets.SERVER_PORT || 22 }}
+        timeout: 60s
+        command_timeout: 300s
         script: |
-          cd /opt/pollos-chanchos-Angular
-          git pull origin main
+          echo "🔄 Starting deployment process..."
+          
+          # Navegar al directorio del proyecto
+          cd /opt/pollos-chanchos-Angular || { echo "❌ Error: Directory not found"; exit 1; }
+          
+          # Hacer backup antes de actualizar
+          echo "📦 Creating backup..."
+          cp docker-compose.yml docker-compose.yml.backup.$(date +%Y%m%d_%H%M%S)
+          
+          # Actualizar código desde GitHub
+          echo "📥 Pulling latest code..."
+          git stash || true
+          git pull origin main || { echo "❌ Error: Git pull failed"; exit 1; }
+          
+          # Compilar backend
+          echo "🔨 Building backend..."
           cd backend
-          ./mvnw clean package -DskipTests
+          ./mvnw clean package -DskipTests || { echo "❌ Error: Maven build failed"; exit 1; }
           cd ..
-          docker-compose down
-          docker-compose up --build -d
-          docker system prune -f
+          
+          # Detener contenedores actuales
+          echo "🛑 Stopping current containers..."
+          docker-compose down || true
+          
+          # Limpiar recursos de Docker
+          echo "🧹 Cleaning Docker resources..."
+          docker system prune -f || true
+          
+          # Construir y levantar nuevos contenedores
+          echo "🚀 Starting new containers..."
+          docker-compose up --build -d || { echo "❌ Error: Docker compose failed"; exit 1; }
+          
+          # Verificar estado de los contenedores
+          echo "📊 Checking container status..."
+          sleep 10
+          docker-compose ps
+          
+          # Verificar logs si hay errores
+          if ! docker-compose ps | grep -q "Up"; then
+            echo "⚠️ Some containers may have issues. Checking logs..."
+            docker-compose logs --tail=50
+          fi
+          
+          echo "✅ Deployment completed successfully!"
+
+    - name: Post Checkout code
+      run: echo "✅ Deployment process completed"
+
+    - name: Complete job
+      run: |
+        echo "🎉 Production deployment finished!"
+        echo "🌐 Application should be available at: http://${{ secrets.SERVER_HOST }}:8088"
