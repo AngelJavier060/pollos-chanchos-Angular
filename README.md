@@ -102,3 +102,7 @@ El sistema incluye:
 - Sistema de roles
 - Carga de archivos
 - Reportes
+
+# Prueba de despliegue automático
+
+Este es un cambio de prueba para disparar el workflow de deploy en GitHub Actions.
