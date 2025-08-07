@@ -53,17 +53,4 @@ public interface MovimientoInventarioRepository extends JpaRepository<Movimiento
      */
     @Query("SELECT COALESCE(SUM(m.cantidad), 0) FROM MovimientoInventario m WHERE m.loteId = :loteId AND m.inventario.tipoAlimento.id = :tipoAlimentoId AND m.tipoMovimiento = 'CONSUMO_LOTE'")
     Double sumConsumoByLoteAndTipoAlimento(@Param("loteId") String loteId, @Param("tipoAlimentoId") Long tipoAlimentoId);
-    
-    /**
-     * Obtener movimientos por inventario y tipo de movimiento
-     */
-    List<MovimientoInventario> findByInventarioAndTipoMovimiento(
-        com.wil.avicola_backend.model.InventarioAlimento inventario, 
-        TipoMovimiento tipoMovimiento
-    );
-    
-    /**
-     * Obtener todos los movimientos ordenados por fecha descendente
-     */
-    List<MovimientoInventario> findAllByOrderByFechaMovimientoDesc();
 }

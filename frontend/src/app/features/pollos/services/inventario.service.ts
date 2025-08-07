@@ -10,8 +10,7 @@ export interface InventarioAlimento {
     name: string;
   };
   cantidadStock: number;
-  cantidadOriginal: number; // Ya calculado por el backend
-  totalConsumido: number; // Ya calculado por el backend
+  cantidadOriginal?: number; // Para mostrar la cantidad inicial
   unidadMedida: string;
   stockMinimo: number;
   observaciones: string;
@@ -69,9 +68,7 @@ export class InventarioService {
    * Obtener inventarios disponibles
    */
   obtenerInventarios(): Observable<InventarioAlimento[]> {
-    // Usar timestamp para evitar caché sin headers personalizados
-    const timestamp = Date.now();
-    return this.http.get<InventarioAlimento[]>(`${this.apiUrl}/inventarios?t=${timestamp}`);
+    return this.http.get<InventarioAlimento[]>(`${this.apiUrl}/inventarios`);
   }
 
   /**
@@ -96,30 +93,9 @@ export class InventarioService {
   }
 
   /**
-   * Obtener total consumido por tipo de alimento
-   */
-  obtenerTotalConsumido(tipoAlimentoId: number): Observable<{tipoAlimentoId: number, totalConsumido: number, unidadMedida: string}> {
-    return this.http.get<{tipoAlimentoId: number, totalConsumido: number, unidadMedida: string}>(`${this.apiUrl}/inventarios/consumido/tipo/${tipoAlimentoId}`);
-  }
-
-  /**
-   * Obtener todos los movimientos de inventario
-   */
-  obtenerMovimientos(): Observable<MovimientoInventario[]> {
-    return this.http.get<MovimientoInventario[]>(`${this.apiUrl}/inventarios/movimientos`);
-  }
-
-  /**
    * Crear datos de ejemplo para el inventario (solo para pruebas)
    */
   crearDatosEjemplo(): Observable<any> {
     return this.http.post(`${this.apiUrl}/inventarios/crear-datos-ejemplo`, {});
-  }
-  
-  /**
-   * Sincronizar inventario con productos reales
-   */
-  sincronizarConProductos(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/inventarios/sincronizar-productos`, {});
   }
 }

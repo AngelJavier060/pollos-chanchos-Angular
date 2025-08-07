@@ -1,12 +1,12 @@
+version: '3.8'
 services:
   mysql:
     image: mysql:8.0
-    container_name: pollos-chanchos-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: Alexandra1
+      MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: db_avicola
-      MYSQL_USER: root
-      MYSQL_PASSWORD: Alexandra1
+      MYSQL_USER: avicola_user
+      MYSQL_PASSWORD: avicola_password
     ports:
       - "3306:3306"
     volumes:
@@ -14,21 +14,19 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password
 
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: pollos-chanchos-backend
+    build: ./backend
     ports:
       - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=production
       - SERVER_PORT=8088
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/db_avicola
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=Alexandra1
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=db_avicola
+      - DB_USER=avicola_user
+      - DB_PASSWORD=avicola_password
     depends_on:
       - mysql
     networks:
@@ -36,17 +34,17 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: pollos-chanchos-frontend
+    build: ./frontend
     ports:
-      - "4200:80"
+      - "80:80"
+      - "443:443"
     depends_on:
       - backend
     networks:
       - app-network
     restart: unless-stopped
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 volumes:
   mysql_data:

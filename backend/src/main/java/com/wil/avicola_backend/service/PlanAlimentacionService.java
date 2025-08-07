@@ -430,17 +430,10 @@ public class PlanAlimentacionService {
     // ============================================================================
     
     /**
-     * Obtener todos los inventarios con cálculos completos
+     * Obtener todos los inventarios disponibles
      */
-    public List<com.wil.avicola_backend.dto.InventarioResponseDto> obtenerTodosLosInventarios() {
-        return inventarioAlimentoService.obtenerTodosLosInventariosConCalculos();
-    }
-    
-    /**
-     * Obtener todos los movimientos de inventario
-     */
-    public List<com.wil.avicola_backend.model.MovimientoInventario> obtenerTodosLosMovimientos() {
-        return inventarioAlimentoService.obtenerTodosLosMovimientos();
+    public List<com.wil.avicola_backend.model.InventarioAlimento> obtenerTodosLosInventarios() {
+        return inventarioAlimentoService.obtenerTodosLosInventarios();
     }
     
     /**
@@ -463,25 +456,11 @@ public class PlanAlimentacionService {
     public List<com.wil.avicola_backend.model.InventarioAlimento> obtenerInventariosStockBajo() {
         return inventarioAlimentoService.obtenerInventariosStockBajo();
     }
-
-    /**
-     * Calcular total consumido por tipo de alimento
-     */
-    public java.math.BigDecimal calcularTotalConsumido(Long tipoAlimentoId) {
-        return inventarioAlimentoService.calcularTotalConsumido(tipoAlimentoId);
-    }
     
     /**
-     * Sincronizar inventario con productos reales
+     * Crear datos de ejemplo para inventario (TEMPORAL)
      */
-    public int sincronizarInventarioConProductos() {
-        return inventarioAlimentoService.sincronizarInventarioConProductos();
-    }
-    
-    /**
-     * Limpiar inventarios genéricos obsoletos
-     */
-    public int limpiarInventariosGenericos() {
-        return inventarioAlimentoService.limpiarInventariosGenericos();
+    public int crearDatosEjemploInventario() {
+        return inventarioAlimentoService.crearDatosEjemploInventario();
     }
 }

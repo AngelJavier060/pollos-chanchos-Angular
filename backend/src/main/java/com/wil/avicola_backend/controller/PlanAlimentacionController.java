@@ -495,91 +495,26 @@ public class PlanAlimentacionController {
                 .body(Map.of("error", "Error obteniendo stock bajo: " + e.getMessage()));
         }
     }
-
-    /**
-     * Obtener total consumido por tipo de alimento
-     */
-    @GetMapping("/inventarios/consumido/tipo/{tipoAlimentoId}")
-    public ResponseEntity<?> obtenerTotalConsumido(@PathVariable Long tipoAlimentoId) {
-        System.out.println("📊 Calculando total consumido para tipo de alimento: " + tipoAlimentoId);
-        
-        try {
-            var totalConsumido = planAlimentacionService.calcularTotalConsumido(tipoAlimentoId);
-            System.out.println("✅ Total consumido calculado: " + totalConsumido + " kg");
-            
-            return ResponseEntity.ok(Map.of(
-                "tipoAlimentoId", tipoAlimentoId,
-                "totalConsumido", totalConsumido,
-                "unidadMedida", "kg"
-            ));
-            
-        } catch (Exception e) {
-            System.err.println("❌ Error calculando total consumido: " + e.getMessage());
-            return ResponseEntity.badRequest()
-                .body(Map.of("error", "Error calculando total consumido: " + e.getMessage()));
-        }
-    }
     
     /**
-     * Obtener todos los movimientos de inventario
+     * Crear datos de ejemplo para el inventario (TEMPORAL - SOLO PARA DEMOSTRACIÓN)
      */
-    @GetMapping("/inventarios/movimientos")
-    public ResponseEntity<?> obtenerMovimientosInventario() {
-        System.out.println("📋 Consultando movimientos de inventario...");
+    @PostMapping("/inventarios/crear-datos-ejemplo")
+    public ResponseEntity<?> crearDatosEjemplo() {
+        System.out.println("🎯 Creando datos de ejemplo para inventario...");
         
         try {
-            var movimientos = planAlimentacionService.obtenerTodosLosMovimientos();
-            System.out.println("✅ Movimientos obtenidos: " + movimientos.size());
-            return ResponseEntity.ok(movimientos);
-            
-        } catch (Exception e) {
-            System.err.println("❌ Error obteniendo movimientos: " + e.getMessage());
-            return ResponseEntity.badRequest()
-                .body(Map.of("error", "Error obteniendo movimientos: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Sincronizar inventario con productos reales
-     */
-    @PostMapping("/inventarios/sincronizar-productos")
-    public ResponseEntity<?> sincronizarInventarioConProductos() {
-        System.out.println("🔄 Sincronizando inventario con productos reales...");
-        
-        try {
-            var resultado = planAlimentacionService.sincronizarInventarioConProductos();
+            var resultado = planAlimentacionService.crearDatosEjemploInventario();
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Inventario sincronizado con productos reales exitosamente",
-                "inventarios_procesados", resultado
+                "message", "Datos de ejemplo creados exitosamente",
+                "inventarios_creados", resultado
             ));
             
         } catch (Exception e) {
-            System.err.println("❌ Error sincronizando inventario: " + e.getMessage());
+            System.err.println("❌ Error creando datos de ejemplo: " + e.getMessage());
             return ResponseEntity.badRequest()
-                .body(Map.of("error", "Error sincronizando inventario: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Limpiar inventarios genéricos obsoletos
-     */
-    @PostMapping("/inventarios/limpiar-genericos")
-    public ResponseEntity<?> limpiarInventariosGenericos() {
-        System.out.println("🧹 Limpiando inventarios genéricos obsoletos...");
-        
-        try {
-            var resultado = planAlimentacionService.limpiarInventariosGenericos();
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Inventarios genéricos eliminados exitosamente",
-                "inventarios_eliminados", resultado
-            ));
-            
-        } catch (Exception e) {
-            System.err.println("❌ Error limpiando inventarios: " + e.getMessage());
-            return ResponseEntity.badRequest()
-                .body(Map.of("error", "Error limpiando inventarios: " + e.getMessage()));
+                .body(Map.of("error", "Error creando datos de ejemplo: " + e.getMessage()));
         }
     }
 }

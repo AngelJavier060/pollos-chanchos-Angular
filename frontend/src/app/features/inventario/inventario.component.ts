@@ -34,14 +34,9 @@ export class InventarioComponent implements OnInit {
   inventarioAlimentos: InventarioAlimento[] = [];
   inventariosStockBajo: InventarioAlimento[] = [];
   movimientosSeleccionados: MovimientoInventario[] = [];
-  ultimaActualizacion: Date = new Date();
-  
-  // Movimientos de inventario
-  movimientosInventario: MovimientoInventario[] = [];
-  cargandoMovimientos = false;
   
   // Vista actual
-  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' | 'movimientos' = 'productos';
+  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' = 'productos';
   
   productForm: FormGroup;
   searchForm: FormGroup;
@@ -199,25 +194,13 @@ export class InventarioComponent implements OnInit {
   /**
    * Cambiar entre vistas
    */
-  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico' | 'movimientos'): void {
+  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico'): void {
     this.vistaActual = vista;
-    
-    // Cargar datos específicos según la vista
-    switch (vista) {
-      case 'analisis':
-        if (!this.analisisInventario) {
-          this.cargarAnalisisInventario();
-        }
-        break;
-      case 'inventario-automatico':
-        this.cargarInventarioAutomatico();
-        break;
-      case 'movimientos':
-        this.cargarMovimientos();
-        break;
-      case 'productos':
-        this.loadProducts();
-        break;
+    if (vista === 'analisis' && !this.analisisInventario) {
+      this.cargarAnalisisInventario();
+    }
+    if (vista === 'inventario-automatico') {
+      this.cargarInventarioAutomatico();
     }
   }
   
@@ -280,30 +263,12 @@ export class InventarioComponent implements OnInit {
     // Cargar inventarios disponibles
     this.inventarioService.obtenerInventarios().subscribe({
       next: (inventarios) => {
-        console.log('✅ Inventarios cargados desde backend:', inventarios);
-        console.log('📊 Total inventarios recibidos:', inventarios.length);
-        
-        // Mostrar detalles de cada inventario con los datos ya calculados por el backend
-        inventarios.forEach((inv, index) => {
-          console.log(`📦 Inventario ${index + 1}:`, {
-            id: inv.id,
-            tipoAlimento: inv.tipoAlimento?.name || 'N/A',
-            stockActual: inv.cantidadStock,
-            stockOriginal: inv.cantidadOriginal,
-            totalConsumido: inv.totalConsumido,
-            unidadMedida: inv.unidadMedida,
-            stockMinimo: inv.stockMinimo
-          });
-        });
-        
+        console.log('✅ Inventarios cargados:', inventarios);
         this.inventarioAlimentos = inventarios;
-        this.ultimaActualizacion = new Date();
         
         // Si no hay inventarios, mostrar mensaje de ayuda
         if (inventarios.length === 0) {
           console.log('⚠️ No hay inventarios disponibles. Puede necesitar crear datos de ejemplo.');
-        } else {
-          console.log('🎉 Inventarios con totales calculados por backend asignados correctamente');
         }
       },
       error: (error) => {
@@ -343,27 +308,6 @@ export class InventarioComponent implements OnInit {
       error: (error) => {
         console.error('❌ Error creando datos de ejemplo:', error);
         alert('Error al crear datos de ejemplo. Verifique la consola para más detalles.');
-      }
-    });
-  }
-  
-  /**
-   * Sincronizar inventario con productos reales
-   */
-  sincronizarConProductosReales(): void {
-    console.log('🔄 Sincronizando inventario con productos reales...');
-    
-    this.inventarioService.sincronizarConProductos().subscribe({
-      next: (response) => {
-        console.log('✅ Sincronización completada:', response);
-        alert('Inventario sincronizado con productos reales exitosamente. Actualizando...');
-        
-        // Recargar el inventario después de sincronizar
-        this.cargarInventarioAutomatico();
-      },
-      error: (error) => {
-        console.error('❌ Error sincronizando inventario:', error);
-        alert('Error al sincronizar inventario. Verifique la consola para más detalles.');
       }
     });
   }
@@ -639,66 +583,5 @@ export class InventarioComponent implements OnInit {
    */
   contarInventariosPorEstado(estado: string): number {
     return this.inventarioAlimentos.filter(inv => this.getEstadoStock(inv) === estado).length;
-  }
-
-  /**
-   * Cargar movimientos de inventario
-   */
-  cargarMovimientos(): void {
-    this.cargandoMovimientos = true;
-    console.log('🔄 Cargando movimientos de inventario...');
-    
-    this.inventarioService.obtenerMovimientos().subscribe({
-      next: (movimientos) => {
-        console.log('✅ Movimientos cargados:', movimientos);
-        this.movimientosInventario = movimientos;
-        this.cargandoMovimientos = false;
-      },
-      error: (error) => {
-        console.error('❌ Error cargando movimientos:', error);
-        this.cargandoMovimientos = false;
-      }
-    });
-  }
-
-  /**
-   * Contar movimientos por tipo
-   */
-  contarMovimientosPorTipo(tipo: string): number {
-    return this.movimientosInventario.filter(mov => mov.tipoMovimiento === tipo).length;
-  }
-
-  /**
-   * Contar lotes únicos
-   */
-  contarLotesUnicos(): number {
-    const lotes = new Set(this.movimientosInventario
-      .filter(mov => mov.loteId)
-      .map(mov => mov.loteId));
-    return lotes.size;
-  }
-
-  /**
-   * Formatear fecha para mostrar
-   */
-  formatearFecha(fecha: string | Date): string {
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-  }
-
-  /**
-   * Formatear hora para mostrar
-   */
-  formatearHora(fecha: string | Date): string {
-    const date = new Date(fecha);
-    return date.toLocaleTimeString('es-ES', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
   }
 }

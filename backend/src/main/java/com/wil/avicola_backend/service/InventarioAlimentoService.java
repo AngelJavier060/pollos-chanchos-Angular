@@ -31,9 +31,6 @@ public class InventarioAlimentoService {
     
     @Autowired
     private TypeFoodRepository typeFoodRepository;
-    
-    @Autowired
-    private com.wil.avicola_backend.repository.ProductRepository productRepository;
 
     /**
      * Registrar consumo de alimento por lote con deducción automática
@@ -223,68 +220,7 @@ public class InventarioAlimentoService {
     }
     
     /**
-     * Obtener todos los inventarios disponibles con datos calculados
-     */
-    public List<com.wil.avicola_backend.dto.InventarioResponseDto> obtenerTodosLosInventariosConCalculos() {
-        var inventarios = inventarioRepository.findAll();
-        
-        return inventarios.stream()
-            .map(this::convertirAInventarioResponseDto)
-            .collect(java.util.stream.Collectors.toList());
-    }
-    
-    /**
-     * Convertir InventarioAlimento a DTO con cálculos
-     * MEJORADO: Extraer el nombre real del producto desde las observaciones
-     */
-    private com.wil.avicola_backend.dto.InventarioResponseDto convertirAInventarioResponseDto(InventarioAlimento inventario) {
-        // Calcular total consumido
-        BigDecimal totalConsumido = calcularTotalConsumido(inventario.getTipoAlimento().getId());
-        
-        // Calcular cantidad original (stock actual + consumido)
-        BigDecimal cantidadOriginal = inventario.getCantidadStock().add(totalConsumido);
-        
-        // Extraer nombre real del producto desde las observaciones
-        String nombreProducto = extraerNombreProductoDeObservaciones(inventario.getObservaciones(), inventario.getTipoAlimento().getName());
-        
-        return com.wil.avicola_backend.dto.InventarioResponseDto.builder()
-            .id(inventario.getId())
-            .tipoAlimento(com.wil.avicola_backend.dto.InventarioResponseDto.TipoAlimentoDto.builder()
-                .id(inventario.getTipoAlimento().getId())
-                .name(nombreProducto) // Usar nombre real del producto
-                .categoria(inventario.getTipoAlimento().getCategoria())
-                .build())
-            .cantidadStock(inventario.getCantidadStock())
-            .cantidadOriginal(cantidadOriginal)
-            .totalConsumido(totalConsumido)
-            .unidadMedida(inventario.getUnidadMedida())
-            .stockMinimo(inventario.getStockMinimo())
-            .observaciones(inventario.getObservaciones())
-            .fechaCreacion(inventario.getFechaCreacion())
-            .fechaActualizacion(inventario.getFechaActualizacion())
-            .build();
-    }
-    
-    /**
-     * Extraer el nombre real del producto desde las observaciones
-     */
-    private String extraerNombreProductoDeObservaciones(String observaciones, String nombrePorDefecto) {
-        if (observaciones != null && observaciones.contains("Producto ID:")) {
-            try {
-                // Buscar el patrón "Producto ID: X | NombreProducto |"
-                String[] partes = observaciones.split("\\|");
-                if (partes.length >= 2) {
-                    return partes[1].trim(); // El nombre está en la segunda parte
-                }
-            } catch (Exception e) {
-                System.err.println("⚠️ Error extrayendo nombre del producto: " + e.getMessage());
-            }
-        }
-        return nombrePorDefecto; // Fallback al nombre del tipo
-    }
-
-    /**
-     * Obtener todos los inventarios disponibles (método original - DEPRECADO)
+     * Obtener todos los inventarios disponibles
      */
     public List<InventarioAlimento> obtenerTodosLosInventarios() {
         return inventarioRepository.findAll();
@@ -296,168 +232,58 @@ public class InventarioAlimentoService {
     public List<InventarioAlimento> obtenerInventariosStockBajo() {
         return inventarioRepository.findInventariosConStockBajo();
     }
-
-    /**
-     * Calcular el total consumido por tipo de alimento
-     */
-    public BigDecimal calcularTotalConsumido(Long tipoAlimentoId) {
-        try {
-            // Obtener inventario del tipo de alimento
-            var inventario = inventarioRepository.findByTipoAlimentoId(tipoAlimentoId);
-            if (inventario.isEmpty()) {
-                return BigDecimal.ZERO;
-            }
-            
-            // Calcular la suma de todos los movimientos de consumo para este inventario
-            return movimientoRepository
-                .findByInventarioAndTipoMovimiento(inventario.get(), TipoMovimiento.CONSUMO_LOTE)
-                .stream()
-                .map(MovimientoInventario::getCantidad)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                
-        } catch (Exception e) {
-            System.err.println("❌ Error calculando total consumido para tipo: " + tipoAlimentoId + " - " + e.getMessage());
-            return BigDecimal.ZERO;
-        }
-    }
     
     /**
-     * Sincronizar productos reales con inventario automático
-     * NUEVA LÓGICA: Crear un inventario individual para cada producto registrado
+     * Crear datos de ejemplo para inventario (TEMPORAL - SOLO DEMO)
      */
     @Transactional
-    public int sincronizarInventarioConProductos() {
-        System.out.println("🔄 Sincronizando inventario con productos reales (TODOS los productos individuales)...");
+    public int crearDatosEjemploInventario() {
+        System.out.println("🎯 Creando inventarios de ejemplo...");
         
         try {
-            // Obtener todos los productos registrados
-            var productos = (java.util.List<com.wil.avicola_backend.model.Product>) productRepository.findAll();
+            // Obtener algunos tipos de alimento existentes
+            var tiposAlimento = (java.util.List<com.wil.avicola_backend.model.TypeFood>) typeFoodRepository.findAll();
             
-            if (productos.isEmpty()) {
-                System.out.println("⚠️ No hay productos registrados, no se puede sincronizar inventario");
+            if (tiposAlimento.isEmpty()) {
+                System.out.println("⚠️ No hay tipos de alimento disponibles, no se pueden crear inventarios");
                 return 0;
             }
             
-            int sincronizados = 0;
+            int creados = 0;
             
-            // NUEVA ESTRATEGIA: Crear un inventario individual para CADA producto
-            // SIN eliminar los existentes, sino agregando nuevos
-            for (var producto : productos) {
-                // Solo procesar productos que tienen TypeFood asociado
-                if (producto.getTypeFood() == null) {
-                    System.out.println("   ⚠️ Producto sin tipo de alimento: " + producto.getName());
+            // Crear inventarios para los primeros 3 tipos de alimento
+            for (int i = 0; i < Math.min(3, tiposAlimento.size()); i++) {
+                var tipo = tiposAlimento.get(i);
+                
+                // Verificar si ya existe inventario para este tipo
+                var existente = inventarioRepository.findByTipoAlimento(tipo);
+                if (existente.isPresent()) {
+                    System.out.println("   - Inventario ya existe para: " + tipo.getName());
                     continue;
                 }
                 
-                // Verificar si ya existe un inventario con este producto específico
-                var inventarioExistente = inventarioRepository.findAll().stream()
-                    .filter(inv -> inv.getObservaciones() != null && 
-                           inv.getObservaciones().contains("Producto ID: " + producto.getId()))
-                    .findFirst();
+                // Crear inventario con valores de ejemplo
+                var inventario = InventarioAlimento.builder()
+                    .tipoAlimento(tipo)
+                    .cantidadStock(new java.math.BigDecimal(500 - (i * 200))) // 500, 300, 100
+                    .stockMinimo(new java.math.BigDecimal(50 - (i * 15))) // 50, 35, 20
+                    .unidadMedida("kg")
+                    .observaciones("Stock inicial de ejemplo para " + tipo.getName())
+                    .build();
                 
-                if (inventarioExistente.isPresent()) {
-                    // Actualizar inventario existente
-                    var inventario = inventarioExistente.get();
-                    inventario.setCantidadStock(new java.math.BigDecimal(producto.getQuantity()));
-                    inventario.setObservaciones("Producto ID: " + producto.getId() + " | " + producto.getName() + 
-                                               " | Precio: $" + producto.getPrice_unit() + 
-                                               " | Proveedor: " + (producto.getProvider() != null ? producto.getProvider().getName() : "N/A"));
-                    inventarioRepository.save(inventario);
-                    sincronizados++;
-                    
-                    System.out.println("   🔄 Inventario actualizado para: " + producto.getName() + 
-                                     " (ID: " + producto.getId() + ", Stock: " + producto.getQuantity() + " kg)");
-                } else {
-                    // Crear un nuevo inventario para este producto específico
-                    var nuevoInventario = InventarioAlimento.builder()
-                        .tipoAlimento(producto.getTypeFood())
-                        .cantidadStock(new java.math.BigDecimal(producto.getQuantity()))
-                        .stockMinimo(new java.math.BigDecimal(Math.max(10, producto.getQuantity() * 0.1))) // 10% como mínimo
-                        .unidadMedida("kg")
-                        .observaciones("Producto ID: " + producto.getId() + " | " + producto.getName() + 
-                                     " | Precio: $" + producto.getPrice_unit() + 
-                                     " | Proveedor: " + (producto.getProvider() != null ? producto.getProvider().getName() : "N/A"))
-                        .build();
-                    
-                    inventarioRepository.save(nuevoInventario);
-                    sincronizados++;
-                    
-                    System.out.println("   ✅ Inventario creado para: " + producto.getName() + 
-                                     " (ID: " + producto.getId() + ", Stock: " + producto.getQuantity() + " kg)");
-                }
+                inventarioRepository.save(inventario);
+                creados++;
+                
+                System.out.println("   ✅ Inventario creado para: " + tipo.getName() + 
+                                 " (Stock: " + inventario.getCantidadStock() + " kg)");
             }
             
-            System.out.println("✅ Sincronización completada: " + sincronizados + " inventarios procesados");
-            System.out.println("📊 Ahora se muestran TODOS los productos registrados por separado");
-            return sincronizados;
+            System.out.println("✅ Se crearon " + creados + " inventarios de ejemplo");
+            return creados;
             
         } catch (Exception e) {
-            System.err.println("❌ Error sincronizando inventario con productos: " + e.getMessage());
-            throw new RuntimeException("Error sincronizando inventario: " + e.getMessage());
+            System.err.println("❌ Error creando inventarios de ejemplo: " + e.getMessage());
+            throw new RuntimeException("Error creando inventarios de ejemplo: " + e.getMessage());
         }
-    }
-    
-    /**
-     * Limpiar inventarios genéricos obsoletos
-     * Elimina inventarios que no tienen productos específicos asociados
-     */
-    @Transactional
-    public int limpiarInventariosGenericos() {
-        System.out.println("🧹 Limpiando inventarios genéricos obsoletos...");
-        
-        try {
-            var todosInventarios = inventarioRepository.findAll();
-            int eliminados = 0;
-            
-            for (var inventario : todosInventarios) {
-                String observaciones = inventario.getObservaciones();
-                
-                // Identificar inventarios genéricos (sin Producto ID específico)
-                boolean esGenerico = observaciones == null || 
-                                   !observaciones.contains("Producto ID:") ||
-                                   observaciones.contains("Stock inicial de ejemplo") ||
-                                   observaciones.contains("Inventario creado automáticamente") ||
-                                   observaciones.contains("Sincronizado con producto:"); // Este formato es obsoleto
-                
-                if (esGenerico) {
-                    System.out.println("   🗑️ Eliminando inventario genérico: " + 
-                                     inventario.getTipoAlimento().getName() + 
-                                     " (ID: " + inventario.getId() + ")");
-                    
-                    // Eliminar todos los movimientos asociados primero
-                    try {
-                        var movimientos = movimientoRepository.findAllByOrderByFechaMovimientoDesc()
-                            .stream()
-                            .filter(mov -> mov.getInventario().getId().equals(inventario.getId()))
-                            .collect(java.util.stream.Collectors.toList());
-                        
-                        if (!movimientos.isEmpty()) {
-                            System.out.println("   ⚠️ Eliminando " + movimientos.size() + " movimientos asociados");
-                            movimientoRepository.deleteAll(movimientos);
-                        }
-                    } catch (Exception e) {
-                        System.err.println("   ⚠️ Error eliminando movimientos: " + e.getMessage());
-                    }
-                    
-                    // Ahora eliminar el inventario
-                    inventarioRepository.delete(inventario);
-                    eliminados++;
-                }
-            }
-            
-            System.out.println("✅ Limpieza completada: " + eliminados + " inventarios genéricos eliminados");
-            return eliminados;
-            
-        } catch (Exception e) {
-            System.err.println("❌ Error limpiando inventarios genéricos: " + e.getMessage());
-            throw new RuntimeException("Error en limpieza: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Obtener todos los movimientos de inventario
-     */
-    public List<MovimientoInventario> obtenerTodosLosMovimientos() {
-        return movimientoRepository.findAllByOrderByFechaMovimientoDesc();
     }
 }
