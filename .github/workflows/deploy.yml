@@ -39,11 +39,7 @@ jobs:
           git stash || true
           git pull origin main || { echo "❌ Git pull failed"; exit 1; }
           
-          # Compilar backend
-          echo "🔨 Building backend..."
-          cd backend
-          ./mvnw clean package -DskipTests || { echo "❌ Maven build failed"; exit 1; }
-          cd ..
+          # Compilación del backend eliminada: ahora todo el build ocurre dentro de Docker
           
           # Detener contenedores
           echo "🛑 Stopping containers..."
