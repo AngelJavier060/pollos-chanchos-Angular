@@ -23,9 +23,9 @@ services:
       - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=production
-  - SERVER_PORT=8088
-  - DB_HOST=mysql
-  - DB_PORT=3308
+      - SERVER_PORT=8088
+      - DB_HOST=mysql
+      - DB_PORT=3308
       - DB_NAME=db_avicola
       - DB_USER=avicola_user
       - DB_PASSWORD=avicola_password
