@@ -65,7 +65,3 @@ jobs:
         echo "🎉 Production deployment finished!"
         echo "🌐 Backend available at: http://${{ secrets.SERVER_HOST }}:8088"
         echo "🌐 Frontend available at: http://${{ secrets.SERVER_HOST }}:4200"
-      run: |
-        echo "🎉 Production deployment finished!"
-        echo "🌐 Backend available at: http://${{ secrets.SERVER_HOST }}:8088"
-        echo "🌐 Frontend available at: http://${{ secrets.SERVER_HOST }}:4200"
