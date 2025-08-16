@@ -2,6 +2,7 @@ version: '3.8'
 services:
   mysql:
     image: mysql:8.0
+    container_name: pollos-chanchos-angular-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: db_avicola
@@ -17,6 +18,7 @@ services:
 
   backend:
     build: ./backend
+    container_name: pollos-chanchos-angular-backend
     ports:
       - "8088:8088"
     environment:
@@ -35,9 +37,10 @@ services:
 
   frontend:
     build: ./frontend
+    container_name: pollos-chanchos-angular-frontend
     ports:
-      - "80:80"
-      - "443:443"
+      - "8004:80"      # <-- Solo cambia esta línea
+      # - "443:443"    # Comenta o elimina esta línea si Nginx maneja el SSL en el host
     depends_on:
       - backend
     networks:
