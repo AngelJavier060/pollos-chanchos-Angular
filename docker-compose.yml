@@ -24,9 +24,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=production
       - SERVER_PORT=8088
-  - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/db_avicola?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-  - SPRING_DATASOURCE_USERNAME=avicola_user
-  - SPRING_DATASOURCE_PASSWORD=avicola_password
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/db_avicola?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=avicola_user
+      - SPRING_DATASOURCE_PASSWORD=avicola_password
     depends_on:
       - mysql
     networks:
