@@ -483,7 +483,7 @@ export class ConfiguracionGeneralComponent implements OnInit {
   }
 
   loadBackendConfig(): void {
-    this.http.get(`${this.backendUrl}/config`).subscribe({
+  this.http.get(`${this.backendUrl}/api/config`).subscribe({
       next: (data) => {
         this.backendConfig = data;
         this.backendConfigError = '';
