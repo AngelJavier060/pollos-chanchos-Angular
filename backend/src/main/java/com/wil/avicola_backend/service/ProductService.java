@@ -40,7 +40,7 @@ public class ProductService {
     private CategoryService categoryService; // Añadido el servicio de categorías
 
     public ResponseEntity<?> findProducts() {
-        return ResponseEntity.ok().body(productRepository.findAll());
+        return ResponseEntity.ok().body(productRepository.findByActiveTrue());
     }
 
     public ResponseEntity<Product> saveProduct(
@@ -155,7 +155,9 @@ public class ProductService {
         try {
             if (productRepository.existsById(id)) {
                 Product product = productRepository.findById(id).get();
-                productRepository.deleteById(id);
+                // Soft delete: marcar como inactivo para no romper integridad referencial
+                product.setActive(Boolean.FALSE);
+                productRepository.save(product);
                 return ResponseEntity.status(HttpStatus.OK).body(product);
             }
             throw new RequestException("No existe producto.");

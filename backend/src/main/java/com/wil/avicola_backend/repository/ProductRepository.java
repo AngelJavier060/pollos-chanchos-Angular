@@ -37,4 +37,7 @@ public interface ProductRepository extends CrudRepository<Product, Long> {
     // relacion con categoria
     @Query("SELECT case when count(product)> 0 then true else false end FROM Product product WHERE product.category.id = ?1")
     boolean existsByCategory(long category_id);
+
+    // Listado solo de productos activos
+    Iterable<Product> findByActiveTrue();
 }
