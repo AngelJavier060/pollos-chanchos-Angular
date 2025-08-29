@@ -40,6 +40,8 @@ services:
       - app-network
     restart: unless-stopped
     # (Healthcheck removido para evitar depender de /actuator/health o /health)
+    volumes:
+      - uploads_data:/app/uploads
 
   frontend:
     build: ./frontend
@@ -64,6 +66,7 @@ services:
 
 volumes:
   mysql_data:
+  uploads_data:
 
 networks:
   app-network:
