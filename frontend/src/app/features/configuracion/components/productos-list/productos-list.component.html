@@ -1,0 +1,100 @@
+<div class="page-container">
+  <div class="form-card">
+    <div class="card-header">
+      <h1 class="main-title">Productos</h1>
+      <p class="subtitle">Catálogo de nombres de productos</p>
+    </div>
+
+    <div class="card-content">
+      <div class="toolbar">
+        <div class="search-block">
+          <label for="buscar">BUSCAR POR NOMBRE</label>
+          <div class="input-wrapper">
+            <input id="buscar" type="text" class="form-input" placeholder="Ej: Maíz" (input)="onSearchChange($event.target.value)" />
+            <span class="material-icons search-icon">search</span>
+          </div>
+        </div>
+        <button mat-raised-button color="primary" (click)="crear()" class="btn-new">
+          <span class="material-icons">add</span>
+          Nuevo
+        </button>
+      </div>
+
+      <div class="table-wrapper" *ngIf="!loading; else loadingTpl">
+        <table mat-table [dataSource]="data" class="mat-elevation-z1 custom-table">
+
+          <ng-container matColumnDef="nombre">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let p">{{ p.nombre }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="descripcion">
+            <th mat-header-cell *matHeaderCellDef>Descripción</th>
+            <td mat-cell *matCellDef="let p">{{ p.descripcion }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let p" class="actions-cell">
+              <button mat-icon-button color="primary" (click)="editar(p)" matTooltip="Editar" aria-label="Editar">
+                <span class="material-icons">edit</span>
+              </button>
+              <button mat-icon-button color="warn" (click)="eliminar(p)" matTooltip="Eliminar" aria-label="Eliminar">
+                <span class="material-icons">delete</span>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+        <div *ngIf="data.length === 0" class="empty">No hay registros</div>
+      </div>
+    </div>
+
+    <div class="loading-overlay" *ngIf="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  </div>
+</div>
+
+<ng-template #loadingTpl>
+  <div class="loading">
+    <mat-spinner diameter="32"></mat-spinner>
+    <span>Cargando...</span>
+  </div>
+</ng-template>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=swap');
+  .material-icons { font-family: 'Material Icons'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+
+  .page-container { padding: 2rem; }
+  .form-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; position: relative; }
+  .card-header { padding: 20px 24px; background-color: #f8f9fa; border-bottom: 1px solid #eee; }
+  .main-title { margin: 0; color: #1a237e; font-size: 24px; font-weight: 500; }
+  .subtitle { color: #666; margin: 8px 0 0; font-size: 14px; }
+  .card-content { padding: 16px 24px 24px; }
+
+  .toolbar { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
+  .toolbar .search-block { flex: 1; }
+  .search-block label { display: block; margin-bottom: 8px; font-weight: 500; color: #424242; font-size: 13px; letter-spacing: 0.5px; }
+  .input-wrapper { position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; transition: border-color .2s; }
+  .input-wrapper:focus-within { border-color: #4355b9; }
+  .form-input { width: 100%; border: none; padding: 10px 40px 10px 14px; font-size: 15px; outline: none; background: transparent; box-sizing: border-box; }
+  .search-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #757575; }
+  .btn-new { display: inline-flex; gap: 6px; }
+
+  .custom-table { width: 100%; border-radius: 6px; overflow: hidden; }
+  .custom-table th { background: #f5f6fb; color: #424242; font-weight: 600; }
+  .custom-table th, .custom-table td { padding: 12px 16px; }
+  .actions-cell { display: flex; gap: 6px; }
+  .empty { padding: 12px; color: #666; }
+  .loading { display: flex; align-items: center; gap: 8px; padding: 12px; }
+  .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,.8); display: flex; align-items: center; justify-content: center; z-index: 100; }
+
+  @media (max-width: 768px) {
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .btn-new { align-self: flex-end; }
+  }
+</style>

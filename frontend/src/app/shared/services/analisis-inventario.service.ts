@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, combineLatest, of } from 'rxjs';
-import { map, catchError, tap } from 'rxjs/operators';
+import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { LoteService } from '../../features/lotes/services/lote.service';
 import { ProductService } from './product.service';
 import { PlanNutricionalIntegradoService } from './plan-nutricional-integrado.service';
@@ -48,6 +48,13 @@ export interface InventarioAnalisis {
   promedioConsumoPorPollo: number;
   promedioCostoPorPollo: number;
   promedioRentabilidad: number;
+
+  // Totales de compras por animal (suma de productos comprados)
+  costoComprasPorAnimal?: {
+    pollos: number;
+    chanchos: number;
+    otros: number;
+  };
 }
 
 @Injectable({
@@ -105,7 +112,8 @@ export class AnalisisInventarioService {
         })
       )
     ]).pipe(
-      map(([lotes, productos, planes]) => {
+      // 🔁 Antes de analizar, si existe un plan de pollos, obtener sus detalles reales
+      switchMap(([lotes, productos, planes]) => {
         console.log('🔍 [AnalisisInventario] Datos combinados recibidos:', {
           lotes: lotes.length,
           productos: productos.length, 
@@ -123,29 +131,80 @@ export class AnalisisInventarioService {
         // Si no hay datos, devolver análisis vacío pero funcional
         if (lotes.length === 0 && productos.length === 0 && planes.length === 0) {
           console.warn('⚠️ [AnalisisInventario] No hay datos disponibles, devolviendo análisis vacío');
-          return this.getAnalisisVacio();
+          return of(this.getAnalisisVacio());
+        }
+        // Detectar un plan de pollos para asegurar que tenga detalles
+        const planPolloSimple = planes.find(plan => {
+          const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
+          const planName = plan.name?.toLowerCase() || '';
+          return animalName.includes('pollo') || planName.includes('pollo') || plan.animalId === 1;
+        });
+
+        if (planPolloSimple?.id) {
+          console.log('🔄 Cargando detalles del plan de pollos para análisis real. Plan ID:', planPolloSimple.id);
+          return this.planAlimentacionService.getDetallesByPlan(planPolloSimple.id).pipe(
+            map(detalles => {
+              // Inyectar detalles en el array de planes
+              const planesConDetalles = planes.map(p => p.id === planPolloSimple.id ? { ...p, detalles } : p);
+
+              // Análisis por lote usando datos reales de planes nutricionales
+              const analisisPorLote = this.analizarLotesConPlanesReales(lotesPollos, planesConDetalles, productos);
+              console.log('📊 [AnalisisInventario] Análisis por lote completado:', analisisPorLote.length);
+
+              // Consumo por períodos
+              const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
+              const consumoMensual = this.generarConsumoMensual(analisisPorLote);
+              const consumoAnual = this.generarConsumoAnual(analisisPorLote);
+
+              // Totales
+              const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
+              const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
+              const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
+              const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
+
+              // Promedios
+              const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
+              const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
+              const promedioRentabilidad = analisisPorLote.length > 0 ?
+                analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
+
+              const resultado = {
+                consumoSemanal,
+                consumoMensual,
+                consumoAnual,
+                analisisPorLote,
+                totalPollosVivos,
+                totalPollosMuertos,
+                totalConsumoAlimento,
+                totalCostoAlimento,
+                promedioConsumoPorPollo,
+                promedioCostoPorPollo,
+                promedioRentabilidad,
+                costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos)
+              };
+
+              console.log('✅ [AnalisisInventario] Análisis completado exitosamente (con detalles):', resultado);
+              return resultado;
+            })
+          );
         }
 
-        // Análisis por lote usando datos reales de planes nutricionales
+        // Si no hay plan de pollos, continuar con análisis estándar (posible estimación)
         const analisisPorLote = this.analizarLotesConPlanesReales(lotesPollos, planes, productos);
-        
-        console.log('📊 [AnalisisInventario] Análisis por lote completado:', analisisPorLote.length);
+        console.log('📊 [AnalisisInventario] Análisis por lote completado (sin detalles adicionales):', analisisPorLote.length);
 
-        // Consumo por períodos
         const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
         const consumoMensual = this.generarConsumoMensual(analisisPorLote);
         const consumoAnual = this.generarConsumoAnual(analisisPorLote);
-        
-        // Totales
+
         const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
         const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
         const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
         const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
-        
-        // Promedios
+
         const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
         const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
-        const promedioRentabilidad = analisisPorLote.length > 0 ? 
+        const promedioRentabilidad = analisisPorLote.length > 0 ?
           analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
 
         const resultado = {
@@ -159,11 +218,12 @@ export class AnalisisInventarioService {
           totalCostoAlimento,
           promedioConsumoPorPollo,
           promedioCostoPorPollo,
-          promedioRentabilidad
+          promedioRentabilidad,
+          costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos)
         };
 
-        console.log('✅ [AnalisisInventario] Análisis completado exitosamente:', resultado);
-        return resultado;
+        console.log('✅ [AnalisisInventario] Análisis completado exitosamente (estándar):', resultado);
+        return of(resultado);
       }),
       catchError(error => {
         console.error('❌ [AnalisisInventario] Error crítico en análisis:', error);
@@ -299,7 +359,7 @@ export class AnalisisInventarioService {
     let costoTotal = 0;
 
     // ✅ BUSCAR TODAS LAS ETAPAS/PRODUCTOS que corresponden a los días de vida
-    const etapasCorrespondientes = planPollo.detalles.filter((detalle: any) => 
+    let etapasCorrespondientes = planPollo.detalles.filter((detalle: any) => 
       diasVida >= detalle.dayStart && diasVida <= detalle.dayEnd
     );
 
@@ -356,11 +416,54 @@ export class AnalisisInventarioService {
       });
 
     } else {
-      console.warn(`No se encontró etapa para ${diasVida} días, usando estimación`);
-      return {
-        consumoEstimado: this.calcularConsumoEstimado(lote, diasVida),
-        costoEstimado: this.calcularCostoEstimado(this.calcularConsumoEstimado(lote, diasVida), diasVida)
-      };
+      // 🔄 Si no hay etapa que cubra exactamente los días de vida, usar la etapa más cercana
+      const etapasOrdenadas = [...planPollo.detalles].sort((a: any, b: any) => a.dayStart - b.dayStart);
+      const primera = etapasOrdenadas[0];
+      const ultima = etapasOrdenadas[etapasOrdenadas.length - 1];
+
+      if (diasVida < primera.dayStart) {
+        console.warn(`No hay etapa para ${diasVida} días (antes del rango). Usando primera etapa ${primera?.dayStart}-${primera?.dayEnd}.`);
+        etapasCorrespondientes = [primera];
+      } else if (diasVida > ultima.dayEnd) {
+        console.warn(`No hay etapa para ${diasVida} días (después del rango). Usando última etapa ${ultima?.dayStart}-${ultima?.dayEnd}.`);
+        etapasCorrespondientes = [ultima];
+      } else {
+        console.warn(`No se encontró etapa para ${diasVida} días, usando estimación`);
+        return {
+          consumoEstimado: this.calcularConsumoEstimado(lote, diasVida),
+          costoEstimado: this.calcularCostoEstimado(this.calcularConsumoEstimado(lote, diasVida), diasVida)
+        };
+      }
+
+      // Continuar con cálculo utilizando la etapa más cercana
+      let cantidadTotalDiariaKg = 0;
+      let costoTotalDiario = 0;
+      const productosUsados: any[] = [];
+
+      etapasCorrespondientes.forEach((etapa: any) => {
+        const cantidadProductoKg = etapa.quantityPerAnimal || 0;
+        cantidadTotalDiariaKg += cantidadProductoKg;
+
+        const producto = productos.find(p => p.id === etapa.product.id);
+        let costoProducto = 0;
+        if (producto && producto.price_unit) {
+          costoProducto = cantidadProductoKg * producto.price_unit;
+        } else {
+          const nombreProducto = etapa.product.name?.toLowerCase() || '';
+          const costoPorKg = this.obtenerCostoPorNombreProducto(nombreProducto);
+          costoProducto = cantidadProductoKg * costoPorKg;
+        }
+        costoTotalDiario += costoProducto;
+        productosUsados.push({
+          nombre: etapa.product.name,
+          cantidadKg: cantidadProductoKg,
+          costoUnitario: cantidadProductoKg ? costoProducto / cantidadProductoKg : 0,
+          costoTotal: costoProducto
+        });
+      });
+
+      consumoTotalKg = pollosVivos * cantidadTotalDiariaKg * diasVida;
+      costoTotal = pollosVivos * costoTotalDiario * diasVida;
     }
 
     return {
@@ -619,7 +722,41 @@ export class AnalisisInventarioService {
       totalCostoAlimento: 0,
       promedioConsumoPorPollo: 0,
       promedioCostoPorPollo: 0,
-      promedioRentabilidad: 0
+      promedioRentabilidad: 0,
+      costoComprasPorAnimal: { pollos: 0, chanchos: 0, otros: 0 }
     };
+  }
+
+  /**
+   * Calcular la suma de compras por animal desde el inventario de productos.
+   * Fórmula: sum(quantity * price_unit) agrupado por animal (pollos/chanchos/otros)
+   */
+  private calcularTotalesComprasPorAnimal(productos: Product[]): { pollos: number; chanchos: number; otros: number } {
+    let pollos = 0;
+    let chanchos = 0;
+    let otros = 0;
+
+    productos.forEach(p => {
+      const cantidad = Number(p.quantity) || 0;
+      const precio = Number(p.price_unit) || 0;
+      const total = cantidad * precio;
+
+      const name = (p.animal?.name || '').toLowerCase();
+      const byId = p.animal_id;
+      const nombreProd = (
+        (p.name || '') + ' ' + (p.typeFood?.name || '') + ' ' + (p.category?.name || '')
+      ).toLowerCase();
+
+      const esPollo = name.includes('pollo') || nombreProd.includes('pollo') || nombreProd.includes('ave') || nombreProd.includes('broiler') || byId === 1;
+      const esChancho = name.includes('chancho') || name.includes('cerdo') || nombreProd.includes('chancho') || nombreProd.includes('cerdo') || nombreProd.includes('porcino') || byId === 2;
+
+      if (esPollo) pollos += total;
+      else if (esChancho) chanchos += total;
+      else otros += total;
+    });
+
+    // Redondeo a 2 decimales
+    const r = (n: number) => Math.round(n * 100) / 100;
+    return { pollos: r(pollos), chanchos: r(chanchos), otros: r(otros) };
   }
 }

@@ -234,6 +234,24 @@ public class InventarioAlimentoService {
     }
     
     /**
+     * Obtener stock por lista de IDs de productos/tipos de alimento
+     */
+    public java.util.Map<Long, BigDecimal> getStockPorProductos(List<Long> productIds) {
+        java.util.Map<Long, BigDecimal> stockMap = new java.util.HashMap<>();
+        
+        for (Long productId : productIds) {
+            Optional<InventarioAlimento> inventarioOpt = inventarioRepository.findByTipoAlimentoId(productId);
+            if (inventarioOpt.isPresent()) {
+                stockMap.put(productId, inventarioOpt.get().getCantidadStock());
+            } else {
+                stockMap.put(productId, BigDecimal.ZERO);
+            }
+        }
+        
+        return stockMap;
+    }
+    
+    /**
      * Crear datos de ejemplo para inventario (TEMPORAL - SOLO DEMO)
      */
     @Transactional

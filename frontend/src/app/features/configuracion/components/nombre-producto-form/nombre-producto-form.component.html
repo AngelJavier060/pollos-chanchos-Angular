@@ -1,0 +1,69 @@
+<div class="page-container">
+  <div class="form-card">
+    <div class="card-header">
+      <h1 class="main-title">{{ isEditing ? 'Editar' : 'Nuevo' }} nombre de producto</h1>
+      <p class="subtitle">{{ isEditing ? 'Modifique los datos' : 'Ingrese los datos del nuevo registro' }}</p>
+    </div>
+
+    <div class="card-content">
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="form-group">
+          <label for="nombre">NOMBRE</label>
+          <div class="input-wrapper" [class.error-input]="form.get('nombre')?.invalid && form.get('nombre')?.touched">
+            <input id="nombre" type="text" class="form-input" formControlName="nombre" placeholder="Ej: Maíz molido" />
+          </div>
+          <div class="error-msg" *ngIf="form.get('nombre')?.hasError('required') && form.get('nombre')?.touched">
+            El nombre es requerido
+          </div>
+          <div class="error-msg" *ngIf="form.get('nombre')?.hasError('maxlength')">
+            Máximo 120 caracteres
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="descripcion">DESCRIPCIÓN</label>
+          <div class="input-wrapper">
+            <textarea id="descripcion" class="form-input" formControlName="descripcion" rows="3" placeholder="Opcional"></textarea>
+          </div>
+          <div class="error-msg" *ngIf="form.get('descripcion')?.hasError('maxlength')">
+            Máximo 255 caracteres
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button type="button" class="btn-cancel" (click)="cancelar()" [class.disabled]="saving">Cancelar</button>
+          <button type="submit" class="btn-save" [disabled]="form.invalid || saving">{{ isEditing ? 'Actualizar' : 'Guardar' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="loading-overlay" *ngIf="saving">
+      <mat-spinner diameter="50"></mat-spinner>
+    </div>
+  </div>
+</div>
+
+<style>
+  .page-container { padding: 2rem; max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .form-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; position: relative; }
+  .card-header { padding: 20px 24px; background-color: #f8f9fa; border-bottom: 1px solid #eee; }
+  .main-title { margin: 0; color: #1a237e; font-size: 24px; font-weight: 500; }
+  .subtitle { color: #666; margin: 8px 0 0; font-size: 14px; }
+  .card-content { padding: 24px; }
+  .form-group { margin-bottom: 24px; }
+  .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #424242; font-size: 13px; letter-spacing: 0.5px; }
+  .input-wrapper { position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; transition: border-color .2s; }
+  .input-wrapper:focus-within { border-color: #4355b9; }
+  .input-wrapper.error-input { border-color: #f44336; }
+  .form-input { width: 100%; border: none; padding: 12px 16px; font-size: 16px; outline: none; background: transparent; box-sizing: border-box; }
+  .error-msg { color: #f44336; font-size: 12px; margin-top: 4px; }
+  .button-group { display: flex; justify-content: flex-end; gap: 16px; margin-top: 32px; }
+  .btn-cancel, .btn-save { display: inline-flex; align-items: center; justify-content: center; min-width: 120px; padding: 10px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+  .btn-cancel { background: #f5f5f5; color: #333; }
+  .btn-cancel:hover { background: #e0e0e0; }
+  .btn-save { background: #4355b9; color: #fff; }
+  .btn-save:hover:not(:disabled) { background: #3949a3; }
+  .btn-save:disabled, .disabled { opacity: .7; cursor: not-allowed; }
+  .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,.8); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  @media (max-width: 768px) { .page-container { padding: 16px; } .button-group { flex-direction: column-reverse; } .btn-cancel, .btn-save { width: 100%; } }
+</style>

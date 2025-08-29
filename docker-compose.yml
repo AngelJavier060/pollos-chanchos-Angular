@@ -15,6 +15,12 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   backend:
     build: ./backend
@@ -28,10 +34,12 @@ services:
       - SPRING_DATASOURCE_USERNAME=avicola_user
       - SPRING_DATASOURCE_PASSWORD=avicola_password
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    # (Healthcheck removido para evitar depender de /actuator/health o /health)
 
   frontend:
     build: ./frontend
@@ -40,12 +48,19 @@ services:
       - "8004:80"
       # - "443:443"    # Comenta o elimina esta línea si Nginx maneja el SSL en el host
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     networks:
       - app-network
     restart: unless-stopped
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   mysql_data:

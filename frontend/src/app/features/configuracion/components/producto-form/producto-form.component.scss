@@ -1,0 +1,14 @@
+/* Estilos básicos para el formulario de producto */
+:host {
+  display: block;
+}
+
+.form-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+mat-form-field {
+  width: 100%;
+}

@@ -22,6 +22,8 @@ import { ConfiguracionGeneralComponent } from './components/configuracion-genera
 import { RaceComponent } from './components/race/race.component';
 import { AnimalConfigComponent } from './components/animal-config/animal-config.component';
 import { AnimalFormComponent } from './components/animal-form/animal-form.component';
+import { ProductosListComponent } from './components/productos-list/productos-list.component';
+import { NombreProductoFormComponent } from './components/nombre-producto-form/nombre-producto-form.component';
 
 const routes: Routes = [
   {
@@ -33,7 +35,11 @@ const routes: Routes = [
       { path: 'razas', component: RaceComponent },
       { path: 'animal-config', component: AnimalConfigComponent },
       { path: 'animal-config/nuevo', component: AnimalFormComponent },
-      { path: 'animal-config/editar/:id', component: AnimalFormComponent }
+      { path: 'animal-config/editar/:id', component: AnimalFormComponent },
+      // Productos (catálogo nombre_producto)
+      { path: 'productos', component: ProductosListComponent },
+      { path: 'productos/nuevo', component: NombreProductoFormComponent },
+      { path: 'productos/editar/:id', component: NombreProductoFormComponent }
     ]
   }
 ];
@@ -60,7 +66,9 @@ const routes: Routes = [
     ConfiguracionGeneralComponent,
     RaceComponent,
     AnimalConfigComponent,
-    AnimalFormComponent
+    AnimalFormComponent,
+    ProductosListComponent,
+    NombreProductoFormComponent
   ]
 })
 export class ConfiguracionModule { }

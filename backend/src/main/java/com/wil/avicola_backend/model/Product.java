@@ -14,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -39,6 +40,9 @@ public class Product {
     private Date date_compra;
     private double level_max;
     private double level_min;
+
+    @Column(nullable = false)
+    private Boolean active;
 
     @CreatedDate
     LocalDateTime create_date;

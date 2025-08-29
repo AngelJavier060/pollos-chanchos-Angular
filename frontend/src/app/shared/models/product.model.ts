@@ -58,6 +58,15 @@ export interface Category {
   name: string;
 }
 
+// Catálogo de nombres de productos (admin)
+export interface NombreProducto {
+  id?: number;
+  nombre: string;
+  descripcion?: string;
+  createDate?: Date;
+  updateDate?: Date;
+}
+
 // Interface para filtros de búsqueda
 export interface ProductFilter {
   name?: string;

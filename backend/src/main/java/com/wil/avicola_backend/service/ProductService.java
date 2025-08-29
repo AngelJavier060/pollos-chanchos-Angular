@@ -105,6 +105,11 @@ public class ProductService {
                 product.setName_stage("");
             }
 
+            // Asegurar valor por defecto para 'active' si viene null del cliente
+            if (product.getActive() == null) {
+                product.setActive(Boolean.TRUE);
+            }
+
             Product product_new = productRepository.save(product);
             logger.info("Producto guardado exitosamente con ID: {}", product_new.getId());
             return ResponseEntity.status(HttpStatus.OK).body(product_new);

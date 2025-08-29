@@ -8,7 +8,7 @@ import { ProductService } from '../../shared/services/product.service';
 import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/services/analisis-inventario.service';
 import { InventarioService, InventarioAlimento, MovimientoInventario } from '../pollos/services/inventario.service';
 import { 
-  Product, Provider, TypeFood, UnitMeasurement, Animal, Stage 
+  Product, Provider, TypeFood, UnitMeasurement, Animal, Stage, NombreProducto 
 } from '../../shared/models/product.model';
 
 @Component({
@@ -25,30 +25,32 @@ export class InventarioComponent implements OnInit {
   unitMeasurements: UnitMeasurement[] = [];
   animals: Animal[] = [];
   stages: Stage[] = [];
-  
+  // Catálogo administrado de nombres de producto
+  nombreProductos: NombreProducto[] = [];
+
   // Análisis de inventario
   analisisInventario: InventarioAnalisis | null = null;
   cargandoAnalisis = false;
-  
+
   // Inventario automático con disminución
   inventarioAlimentos: InventarioAlimento[] = [];
   inventariosStockBajo: InventarioAlimento[] = [];
   movimientosSeleccionados: MovimientoInventario[] = [];
-  
+
   // Vista actual
   vistaActual: 'productos' | 'analisis' | 'inventario-automatico' = 'productos';
-  
+
   productForm: FormGroup;
   searchForm: FormGroup;
-  
+
   selectedProduct: Product | null = null;
   isLoading = false;
   showForm = false;
   isEditMode = false;
-  
+
   // Referencia a Math para usarlo en el template
   Math = Math;
-  
+
   constructor(
     private productService: ProductService,
     private analisisService: AnalisisInventarioService,
@@ -70,7 +72,7 @@ export class InventarioComponent implements OnInit {
       animal_id: [null, [Validators.required]],
       stage_id: [null, [Validators.required]]
     });
-    
+
     this.searchForm = this.fb.group({
       name: [''],
       providerId: [null],
@@ -85,7 +87,7 @@ export class InventarioComponent implements OnInit {
     this.loadProducts();
     this.cargarAnalisisInventario();
     this.cargarInventarioAutomatico();
-    
+
     // ✅ NUEVA FUNCIONALIDAD: Actualizar inventario automáticamente cada 30 segundos
     // cuando se está viendo la vista de inventario automático
     this.setupAutoRefresh();
@@ -103,7 +105,7 @@ export class InventarioComponent implements OnInit {
       }
     }, 30000); // 30 segundos
   }
-  
+
   loadProducts(): void {
     this.isLoading = true;
     this.productService.getProducts().subscribe({
@@ -119,10 +121,10 @@ export class InventarioComponent implements OnInit {
       }
     });
   }
-  
+
   loadRelatedEntities(): void {
     this.isLoading = true;
-    
+
     // Cargar proveedores
     this.productService.getProviders().subscribe({
       next: (data) => {
@@ -131,7 +133,7 @@ export class InventarioComponent implements OnInit {
       },
       error: (err) => console.error('Error al cargar proveedores:', err)
     });
-    
+
     // Cargar tipos de alimentos
     this.productService.getTypeFoods().subscribe({
       next: (data) => {
@@ -140,7 +142,7 @@ export class InventarioComponent implements OnInit {
       },
       error: (err) => console.error('Error al cargar tipos de alimentos:', err)
     });
-    
+
     // Cargar unidades de medida
     this.productService.getUnitMeasurements().subscribe({
       next: (data) => {
@@ -149,7 +151,7 @@ export class InventarioComponent implements OnInit {
       },
       error: (err) => console.error('Error al cargar unidades de medida:', err)
     });
-    
+
     // Cargar animales
     this.productService.getAnimals().subscribe({
       next: (data) => {
@@ -158,21 +160,33 @@ export class InventarioComponent implements OnInit {
       },
       error: (err) => console.error('Error al cargar animales:', err)
     });
-    
+
     // Cargar etapas
     this.productService.getStages().subscribe({
       next: (data) => {
         console.log('Etapas cargadas:', data);
         this.stages = data;
-        this.isLoading = false;
       },
       error: (err) => {
         console.error('Error al cargar etapas:', err);
+      }
+    });
+
+    // Cargar catálogo de nombres de productos (configuración general)
+    this.productService.getNombreProductos().subscribe({
+      next: (data) => {
+        console.log('Nombre de productos cargados:', data);
+        this.nombreProductos = data || [];
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar nombres de productos:', err);
+        this.nombreProductos = [];
         this.isLoading = false;
       }
     });
   }
-  
+
   /**
    * Cargar análisis de inventario
    */

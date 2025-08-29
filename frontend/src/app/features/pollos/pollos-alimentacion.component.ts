@@ -332,20 +332,7 @@ export class PollosAlimentacionComponent implements OnInit {
     this.registroCompleto.animalesVivos = lote.quantity || 0;
     this.modalAbierto = true;
     
-    // ✅ CARGAR ALIMENTOS DISPONIBLES PARA EL LOTE
-    this.cargarAlimentosParaLote(lote);
-    
-    // Asignar automáticamente la cantidad total sugerida
-    setTimeout(() => {
-      this.registroCompleto.cantidadAplicada = this.getCantidadTotalSugerida();
-    }, 100);
-  }
-
-  // ✅ FUNCIÓN CRÍTICA - CARGAR ALIMENTOS DESDE BACKEND REAL
-  async cargarAlimentosParaLote(lote: Lote): Promise<void> {
-    console.log('🔍 Cargando alimentos REALES para lote:', lote.codigo);
-    console.log('🗓️ Fecha de nacimiento del lote:', lote.birthdate);
-    
+    // Calcular días de vida del lote
     const diasVida = this.calcularDiasDeVida(lote.birthdate);
     console.log('📅 Días de vida del lote:', diasVida);
     
@@ -497,48 +484,77 @@ export class PollosAlimentacionComponent implements OnInit {
       this.cargarAlimentosFallback(diasVida);
     }
   }
-  
-  // Función de fallback en caso de que no haya datos del backend
+
   private cargarAlimentosFallback(diasVida: number): void {
     console.log('🔄 Cargando alimentos de fallback para', diasVida, 'días');
     
     let etapaNombre = '';
+    let rangoEtapa = '';
     let alimentoPrincipal = '';
     let cantidadRecomendada = 0;
+    let vacunasProgramadas = '';
     
     if (diasVida <= 7) {
-      etapaNombre = 'Pre-inicial (0-7 días)';
+      etapaNombre = 'Pre-inicial';
+      rangoEtapa = '1 - 7 días';
       alimentoPrincipal = 'Concentrado Pre-inicial';
       cantidadRecomendada = 0.025;
+      vacunasProgramadas = 'Newcastle día 7, Bronquitis día 7';
     } else if (diasVida <= 21) {
-      etapaNombre = 'Inicial (8-21 días)';
+      etapaNombre = 'Inicial';
+      rangoEtapa = '8 - 21 días';
       alimentoPrincipal = 'Concentrado Inicial';
       cantidadRecomendada = 0.050;
+      vacunasProgramadas = 'Gumboro día 14, Newcastle día 21';
     } else if (diasVida <= 35) {
-      etapaNombre = 'Crecimiento I (22-35 días)';
+      etapaNombre = 'Crecimiento I';
+      rangoEtapa = '22 - 35 días';
       alimentoPrincipal = 'Balanceado Crecimiento';
       cantidadRecomendada = 0.085;
-    } else if (diasVida <= 42) {
-      etapaNombre = 'Crecimiento II (36-42 días)';
+      vacunasProgramadas = 'Newcastle día 28, Bronquitis día 35';
+    } else if (diasVida <= 49) {
+      etapaNombre = 'Crecimiento II';
+      rangoEtapa = '36 - 49 días';
       alimentoPrincipal = 'Balanceado Engorde';
       cantidadRecomendada = 0.120;
-    } else {
-      etapaNombre = 'Acabado (43+ días)';
+      vacunasProgramadas = 'Newcastle día 42';
+    } else if (diasVida <= 70) {
+      etapaNombre = 'Engorde';
+      rangoEtapa = '50 - 70 días';
+      alimentoPrincipal = 'Concentrado Engorde';
+      cantidadRecomendada = 0.140;
+      vacunasProgramadas = 'Newcastle día 56, Bronquitis día 63';
+    } else if (diasVida <= 120) {
+      etapaNombre = 'Acabado Temprano';
+      rangoEtapa = '71 - 120 días';
       alimentoPrincipal = 'Concentrado Finalizador';
       cantidadRecomendada = 0.150;
+      vacunasProgramadas = 'Newcastle día 84, Newcastle día 105';
+    } else if (diasVida <= 200) {
+      etapaNombre = 'Acabado Medio';
+      rangoEtapa = '121 - 200 días';
+      alimentoPrincipal = 'Concentrado Finalizador Plus';
+      cantidadRecomendada = 0.160;
+      vacunasProgramadas = 'Newcastle día 140, Newcastle día 175';
+    } else {
+      etapaNombre = 'Acabado Tardío';
+      rangoEtapa = `201+ días (${diasVida} días actuales)`;
+      alimentoPrincipal = 'Concentrado Mantenimiento';
+      cantidadRecomendada = 0.170;
+      vacunasProgramadas = 'Newcastle cada 60 días, próxima según calendario';
     }
     
     this.etapasDisponiblesLote = [
       {
         id: 1,
         alimentoRecomendado: alimentoPrincipal,
-        quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)), // ✅ FORMATO X.XX
+        quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)),
         unidad: 'kg',
         seleccionado: true,
         productosDetalle: [
           {
             nombre: alimentoPrincipal,
-            cantidad: parseFloat(cantidadRecomendada.toFixed(2)), // ✅ FORMATO X.XX
+            cantidad: parseFloat(cantidadRecomendada.toFixed(2)),
             unidad: 'kg'
           }
         ]
@@ -549,11 +565,11 @@ export class PollosAlimentacionComponent implements OnInit {
       nombre: etapaNombre,
       descripcion: `Etapa de fallback para pollos de ${diasVida} días`,
       alimentoRecomendado: alimentoPrincipal,
-      quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)), // ✅ FORMATO X.XX
+      quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)),
       productosDetalle: [
         {
           nombre: alimentoPrincipal,
-          cantidad: parseFloat(cantidadRecomendada.toFixed(2)), // ✅ FORMATO X.XX
+          cantidad: parseFloat(cantidadRecomendada.toFixed(2)),
           unidad: 'kg'
         }
       ]
@@ -728,7 +744,28 @@ export class PollosAlimentacionComponent implements OnInit {
     return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
   }
 
-  // Función requerida por el template para mostrar información de edad del lote
+  calcularDiasVida(lote: Lote): number {
+    if (!lote.birthdate) {
+      console.warn(`⚠️ Lote ${lote.codigo} no tiene fecha de nacimiento`);
+      return 0;
+    }
+    
+    const fechaNacimiento = new Date(lote.birthdate);
+    const fechaActual = new Date();
+    
+    // Validar que la fecha sea válida
+    if (isNaN(fechaNacimiento.getTime())) {
+      console.error(`❌ Fecha de nacimiento inválida para lote ${lote.codigo}:`, lote.birthdate);
+      return 0;
+    }
+    
+    const diferenciaTiempo = fechaActual.getTime() - fechaNacimiento.getTime();
+    const diasVida = Math.floor(diferenciaTiempo / (1000 * 3600 * 24));
+    
+    console.log(`📅 Lote ${lote.codigo}: ${diasVida} días de vida (nacido: ${fechaNacimiento.toLocaleDateString()})`);
+    return Math.max(0, diasVida); // Asegurar que no sea negativo
+  }
+
   getInfoEdadLote(lote: Lote | null): { 
     diasVida: number; 
     etapa: string; 

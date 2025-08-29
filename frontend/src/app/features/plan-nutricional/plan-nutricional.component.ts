@@ -43,7 +43,8 @@ export class PlanNutricionalComponent implements OnInit {
   alimentos: Product[] = [];
   medicinas: Product[] = [];
   typeFoods: TypeFood[] = [];
-  tipoProductoSeleccionado: 'alimento' | 'medicina' = 'alimento';
+  // Tipo de producto seleccionado (dinámico)
+  selectedTypeFood: TypeFood | null = null;
   
   // Loading states
   loading = false;
@@ -469,18 +470,25 @@ export class PlanNutricionalComponent implements OnInit {
       }
     });
     
-    // Cargar tipos de alimentos
+    // Cargar tipos de alimentos (dinámicos desde configuración)
     this.productService.getTypeFoods().subscribe({
       next: (typeFoods) => {
-        console.log('Tipos de alimentos cargados:', typeFoods);
-        this.typeFoods = typeFoods;
+        console.log('Tipos de productos cargados dinámicamente:', typeFoods);
+        this.typeFoods = typeFoods || [];
+        // Inicializar selección al primer tipo disponible si no hay selección
+        if (!this.selectedTypeFood && this.typeFoods.length > 0) {
+          this.selectedTypeFood = this.typeFoods[0];
+        }
       },
       error: (error) => {
-        console.error('Error al cargar tipos de alimentos:', error);
+        console.error('Error al cargar tipos de productos, usando fallback:', error);
         this.typeFoods = [
           { id: 1, name: 'Alimento' },
           { id: 2, name: 'Medicina' }
         ];
+        if (!this.selectedTypeFood) {
+          this.selectedTypeFood = this.typeFoods[0];
+        }
       }
     });
   }
@@ -560,9 +568,102 @@ export class PlanNutricionalComponent implements OnInit {
       })));
     }
   }
-  
+
   getProductosFiltrados(): Product[] {
-    return this.tipoProductoSeleccionado === 'alimento' ? this.alimentos : this.medicinas;
+    // 1) Filtrar por tipo seleccionado (dinámico)
+    let lista = this.productos;
+    if (this.selectedTypeFood) {
+      const typeId = this.selectedTypeFood.id;
+      const typeName = (this.selectedTypeFood.name || '').toLowerCase();
+      lista = lista.filter(p => {
+        const pTypeId = p.typeFood?.id;
+        const pTypeName = (p.typeFood?.name || '').toLowerCase();
+        // Coincidencia por id o por nombre (soporta datos antiguos)
+        return (pTypeId != null && pTypeId === typeId) || (pTypeName && pTypeName.includes(typeName));
+      });
+    }
+
+    // 2) Filtrar por animal (directo por id y con fallback por nombre)
+    const animalId = this.getAnimalIdForFiltering();
+    if (animalId) {
+      lista = lista.filter(p => this.productoEsParaAnimal(p, animalId));
+    }
+
+    // 3) Si no hay tipos cargados aún, usar fallback previo
+    if (!this.selectedTypeFood) {
+      return this.alimentos.length || this.medicinas.length
+        ? (this.alimentos.length > 0 ? this.alimentos : this.medicinas)
+        : lista;
+    }
+    return lista;
+  }
+
+  // Utilidades para UI de tipos dinámicos
+  setSelectedTypeFood(type: TypeFood): void {
+    this.selectedTypeFood = type;
+    // Limpiar selección de producto al cambiar tipo
+    this.detalleForm.get('productId')?.setValue('');
+  }
+
+  trackByTipoId(index: number, item: TypeFood): number {
+    return item.id;
+  }
+
+  getTipoProductoIcon(type: TypeFood): string {
+    const name = (type?.name || '').toLowerCase();
+    if (name.includes('alimento') || name.includes('alimentos') || name.includes('feed')) return 'fa-seedling';
+    if (name.includes('medicina') || name.includes('medic') || name.includes('tratamiento')) return 'fa-pills';
+    if (name.includes('vitamina') || name.includes('suplemento')) return 'fa-capsules';
+    if (name.includes('vacuna') || name.includes('syringe') || name.includes('inye')) return 'fa-syringe';
+    // Default
+    return 'fa-box';
+  }
+
+  /**
+   * Obtiene el animalId a usar para el filtrado de productos.
+   * Prioridad: animal del plan seleccionado (bloqueado) → valor del formulario detalle.
+   */
+  private getAnimalIdForFiltering(): number | null {
+    // Si hay plan seleccionado y tiene animal, usarlo
+    const planAnimal = this.selectedPlan ? (this.getAnimalFromPlan(this.selectedPlan) || null) : null;
+    if (planAnimal?.id) {
+      return Number(planAnimal.id);
+    }
+    // Si no, usar el animal seleccionado en el formulario
+    const formAnimalId = this.detalleForm?.get('animalId')?.value;
+    return formAnimalId ? Number(formAnimalId) : null;
+  }
+
+  /**
+   * Determina si un producto corresponde al animal indicado.
+   * 1) Match directo por product.animal_id o product.animal?.id
+   * 2) Fallback por texto en nombre/descripcion si no hay relación (datos antiguos)
+   */
+  private productoEsParaAnimal(p: Product, animalId: number): boolean {
+    // 1) Relación directa por id
+    if (p.animal_id != null && Number(p.animal_id) === Number(animalId)) return true;
+    if (p.animal?.id != null && Number(p.animal.id) === Number(animalId)) return true;
+
+    // 2) Fallback por nombre (pollos/chanchos u otros)
+    const animal = this.animales.find(a => a.id === Number(animalId));
+    const nombreAnimal = (animal?.name || '').toLowerCase();
+    const texto = `${p.name || ''} ${(p as any).description || ''}`.toLowerCase();
+
+    if (!nombreAnimal) return true; // si no podemos identificar el animal, no filtrar por texto
+
+    // Reglas básicas de coincidencia
+    const esPollo = nombreAnimal.includes('pollo') || nombreAnimal.includes('ave') || nombreAnimal.includes('broiler');
+    const esChancho = nombreAnimal.includes('chancho') || nombreAnimal.includes('cerdo') || nombreAnimal.includes('porcino');
+
+    if (esPollo) {
+      return texto.includes('pollo') || texto.includes('ave') || texto.includes('broiler');
+    }
+    if (esChancho) {
+      return texto.includes('chancho') || texto.includes('cerdo') || texto.includes('porcino');
+    }
+
+    // Para otros animales, intentar al menos por el nombre del animal
+    return texto.includes(nombreAnimal);
   }
 
   // ========== MÉTODOS OBSOLETOS ELIMINADOS ==========
@@ -635,7 +736,7 @@ export class PlanNutricionalComponent implements OnInit {
       // Convertir productId a número para comparación correcta
       const productId = parseInt(formData.productId);
       console.log('🔍 Buscando producto con ID:', productId, 'Tipo:', typeof productId);
-      console.log('🔽 Tipo de producto seleccionado:', this.tipoProductoSeleccionado);
+      console.log('🔽 Tipo de producto seleccionado:', this.selectedTypeFood?.name || '(sin selección)');
       
       // Buscar en la lista filtrada que realmente ve el usuario
       const productosDisponibles = this.getProductosFiltrados();
@@ -648,7 +749,7 @@ export class PlanNutricionalComponent implements OnInit {
         console.error('❌ No se encontró el producto con ID:', productId);
         console.error('📋 Productos filtrados disponibles:', productosDisponibles);
         console.error('📋 Todos los productos cargados:', this.productos);
-        alert(`No se encontró el producto con ID: ${productId} en la lista de ${this.tipoProductoSeleccionado}s. Verifique que el producto esté disponible y sea del tipo correcto.`);
+        alert(`No se encontró el producto con ID: ${productId} en la lista del tipo seleccionado. Verifique que el producto esté disponible y sea del tipo correcto.`);
         this.loading = false;
         return;
       }

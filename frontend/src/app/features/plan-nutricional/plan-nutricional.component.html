@@ -787,24 +787,15 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Tipo de Producto *
               </label>
-              <div class="grid grid-cols-2 gap-2">
-                <button 
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <button
+                  *ngFor="let tipo of typeFoods; trackBy: trackByTipoId"
                   type="button"
-                  (click)="tipoProductoSeleccionado = 'alimento'"
-                  [class]="tipoProductoSeleccionado === 'alimento' ? 
-                    'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'"
-                  class="px-4 py-2 rounded-md border transition-colors">
-                  <i class="fas fa-seedling mr-2"></i>
-                  Alimentos
-                </button>
-                <button 
-                  type="button"
-                  (click)="tipoProductoSeleccionado = 'medicina'"
-                  [class]="tipoProductoSeleccionado === 'medicina' ? 
-                    'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
-                  class="px-4 py-2 rounded-md border transition-colors">
-                  <i class="fas fa-pills mr-2"></i>
-                  Medicinas
+                  (click)="setSelectedTypeFood(tipo)"
+                  [ngClass]="selectedTypeFood?.id === tipo.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'"
+                  class="px-4 py-2 rounded-md border transition-colors text-left">
+                  <i class="fas {{ getTipoProductoIcon(tipo) }} mr-2"></i>
+                  {{ tipo.name }}
                 </button>
               </div>
             </div>
@@ -812,13 +803,13 @@
             <div class="mb-4">
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 <i class="fas fa-box mr-1"></i>
-                {{ tipoProductoSeleccionado === 'alimento' ? 'Alimento' : 'Medicina' }} *
+                {{ selectedTypeFood?.name || 'Producto' }} *
               </label>
               <select 
                 formControlName="productId"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">
-                  Seleccionar {{ tipoProductoSeleccionado === 'alimento' ? 'alimento' : 'medicina' }}
+                  Seleccionar {{ selectedTypeFood?.name?.toLowerCase() || 'producto' }}
                 </option>
                 <option *ngFor="let producto of getProductosFiltrados()" [value]="producto.id">
                   {{ producto.name }} 

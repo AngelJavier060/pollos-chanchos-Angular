@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, switchMap, of } from 'rxjs';
-import { Product, ProductFilter, Provider, TypeFood, UnitMeasurement, Animal, Stage, Category } from '../models/product.model';
+import { Product, ProductFilter, Provider, TypeFood, UnitMeasurement, Animal, Stage, Category, NombreProducto } from '../models/product.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -16,9 +16,11 @@ export class ProductService {
   private animalUrl = `${environment.apiUrl}/api/animal`;
   private stageUrl = `${environment.apiUrl}/api/stage`;
   private categoryUrl = `${environment.apiUrl}/api/category`;
-  
+  // Tentative endpoint for catálogo de nombres de productos (adjust if backend differs)
+  private nombreProductoUrl = `${environment.apiUrl}/api/nombre-producto`;
+
   constructor(private http: HttpClient) { }
-  
+
   // Configuración de encabezados HTTP para todas las peticiones
   private getHttpOptions() {
     return {
@@ -28,11 +30,11 @@ export class ProductService {
       })
     };
   }
-  
+
   // Obtener todos los productos
   getProducts(filter?: ProductFilter): Observable<Product[]> {
     let params = new HttpParams();
-    
+
     if (filter) {
       if (filter.name) params = params.set('name', filter.name);
       if (filter.providerId) params = params.set('providerId', filter.providerId.toString());
@@ -40,20 +42,20 @@ export class ProductService {
       if (filter.animalId) params = params.set('animalId', filter.animalId.toString());
       if (filter.stageId) params = params.set('stageId', filter.stageId.toString());
     }
-    
+
     return this.http.get<Product[]>(this.apiUrl, { params });
   }
-  
+
   // Obtener un producto por ID
   getProductById(id: number): Observable<Product> {
     return this.http.get<Product>(`${this.apiUrl}/${id}`);
   }
-  
+
   // Obtener categorías
   getCategories(): Observable<Category[]> {
     return this.http.get<Category[]>(this.categoryUrl);
   }
-  
+
   // Crear un nuevo producto - MEJORADO para buscar un ID de categoría válido
   createProduct(product: Product): Observable<Product> {
     // Crear un objeto simple con solo los datos básicos del producto
@@ -65,55 +67,84 @@ export class ProductService {
       date_compra: product.date_compra,
       level_min: product.level_min,
       level_max: product.level_max,
-      name_stage: '' // Aseguramos que este campo no sea nulo
+      name_stage: '', // Aseguramos que este campo no sea nulo
+      active: true    // Backend requiere este campo sin valor por defecto
     };
-    
+
     // Primero buscar una categoría válida
     return this.getCategories().pipe(
       switchMap(categories => {
         // Si hay categorías, usar la primera, de lo contrario usar ID 2
         const categoryId = categories && categories.length > 0 ? categories[0].id : 2;
-        
+
         // URL con los IDs como variables de ruta, usando la categoría encontrada
         const url = `${this.apiUrl}/${product.provider_id}/${product.typeFood_id}/${product.unitMeasurement_id}/${product.animal_id}/${product.stage_id}/${categoryId}`;
-        
+
         console.log('Enviando petición a:', url);
         console.log('Datos del producto:', productData);
-        
+
         // Enviamos la solicitud con el objeto product básico
         return this.http.post<Product>(url, productData);
       })
     );
   }
-  
+
   // Actualizar un producto existente
   updateProduct(product: Product): Observable<Product> {
     return this.http.put<Product>(this.apiUrl, product);
   }
-  
+
   // Eliminar un producto
   deleteProduct(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${id}`);
   }
-  
+
   // Servicios para obtener entidades relacionadas
   getProviders(): Observable<Provider[]> {
     return this.http.get<Provider[]>(this.providerUrl);
   }
-  
+
   getTypeFoods(): Observable<TypeFood[]> {
     return this.http.get<TypeFood[]>(this.typeFoodUrl);
   }
-  
+
   getUnitMeasurements(): Observable<UnitMeasurement[]> {
     return this.http.get<UnitMeasurement[]>(this.unitMeasurementUrl);
   }
-  
+
   getAnimals(): Observable<Animal[]> {
     return this.http.get<Animal[]>(this.animalUrl);
   }
-  
+
   getStages(): Observable<Stage[]> {
     return this.http.get<Stage[]>(this.stageUrl);
+  }
+
+  // =====================
+  // NombreProducto (Catálogo)
+  // =====================
+  getNombreProductos(search?: string): Observable<NombreProducto[]> {
+    let params = new HttpParams();
+    if (search && search.trim()) {
+      // Backend expects query param 'q'
+      params = params.set('q', search.trim());
+    }
+    return this.http.get<NombreProducto[]>(this.nombreProductoUrl, { params });
+  }
+
+  getNombreProductoById(id: number): Observable<NombreProducto> {
+    return this.http.get<NombreProducto>(`${this.nombreProductoUrl}/${id}`);
+  }
+
+  createNombreProducto(body: Partial<NombreProducto>): Observable<NombreProducto> {
+    return this.http.post<NombreProducto>(this.nombreProductoUrl, body, this.getHttpOptions());
+  }
+
+  updateNombreProducto(id: number, body: Partial<NombreProducto>): Observable<NombreProducto> {
+    return this.http.put<NombreProducto>(`${this.nombreProductoUrl}/${id}`, body, this.getHttpOptions());
+  }
+
+  deleteNombreProducto(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.nombreProductoUrl}/${id}`);
   }
 }
