@@ -361,6 +361,7 @@
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Unitario</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Compra</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Alimento</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
@@ -369,12 +370,15 @@
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr *ngIf="filteredProducts.length === 0 && !isLoading" class="hover:bg-gray-50">
-            <td colspan="7" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
+            <td colspan="8" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
           </tr>
           <tr *ngFor="let product of filteredProducts" class="hover:bg-gray-50">
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ product.name }}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.quantity }}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.price_unit }}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+              {{ product.date_compra ? (product.date_compra | date:'dd/MM/yyyy') : '-' }}
+            </td>
             <!-- Mostramos el nombre del provider directo si está disponible, sino usamos el helper -->
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
               {{ product.provider?.name || getProviderName(product.provider_id) }}

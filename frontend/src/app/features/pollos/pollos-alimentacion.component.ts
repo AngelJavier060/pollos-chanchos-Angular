@@ -766,6 +766,50 @@ export class PollosAlimentacionComponent implements OnInit {
     return Math.max(0, diasVida); // Asegurar que no sea negativo
   }
 
+  /**
+   * Calcular meses y días exactos desde una fecha de nacimiento hasta hoy
+   * Usa diferencias de calendario reales (no meses de 30 días fijos)
+   */
+  private calcularMesesYDiasDesde(fechaNacimiento: Date | null): { meses: number; dias: number } {
+    if (!fechaNacimiento) return { meses: 0, dias: 0 };
+
+    const inicio = new Date(fechaNacimiento);
+    const hoy = new Date();
+
+    // Normalizar horas para evitar desfases
+    inicio.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
+
+    let meses = (hoy.getFullYear() - inicio.getFullYear()) * 12 + (hoy.getMonth() - inicio.getMonth());
+
+    // Si aún no se ha cumplido el día del mes, restar un mes
+    if (hoy.getDate() < inicio.getDate()) {
+      meses -= 1;
+    }
+
+    // Calcular la fecha al sumar esos meses a la fecha de inicio
+    const referencia = new Date(inicio);
+    referencia.setMonth(referencia.getMonth() + meses);
+
+    // Días restantes entre referencia y hoy
+    const diffMs = hoy.getTime() - referencia.getTime();
+    const dias = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+    return { meses: Math.max(0, meses), dias };
+  }
+
+  /**
+   * Obtener edad en meses/días como texto para un lote
+   */
+  getEdadEnMesesTexto(lote: Lote | null): string {
+    if (!lote || !lote.birthdate) return '0 meses';
+    const { meses, dias } = this.calcularMesesYDiasDesde(lote.birthdate);
+    const mesesTxt = meses === 1 ? '1 mes' : `${meses} meses`;
+    if (dias <= 0) return mesesTxt;
+    const diasTxt = dias === 1 ? '1 día' : `${dias} días`;
+    return `${mesesTxt} y ${diasTxt}`;
+  }
+
   getInfoEdadLote(lote: Lote | null): { 
     diasVida: number; 
     etapa: string; 
