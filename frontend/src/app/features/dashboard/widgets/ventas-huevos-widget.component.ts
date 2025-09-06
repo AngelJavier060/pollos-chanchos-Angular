@@ -369,8 +369,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     this.cargarLotesAves();
     this.cargarAnimales();
     this.cargarBorradorLocal();
-    // Cargar ventas del día al abrir para ver datos reales del backend
-    this.cargarVentasHoy();
+    // Refrescar ventas usando el periodo seleccionado (mes por defecto)
+    this.aplicarFiltroVentas();
   }
 
   ngOnDestroy(): void {
@@ -499,7 +499,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       next: (res) => {
         const id = res?.id ?? '—';
         alert(`Venta de huevo guardada (id=${id})`);
-        this.cargarVentasHoy();
+        // Refrescar listado respetando el periodo activo
+        this.aplicarFiltroVentas();
         // Reset rápido del formulario manteniendo animal/lote/fecha
         this.nuevo = {
           fecha: this.nuevo.fecha,
@@ -631,7 +632,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     });
   }
 
-  filtroPeriodo: 'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'hoy';
+  filtroPeriodo: 'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'mes';
   fechaDesde: string = '';
   fechaHasta: string = '';
   mesSeleccion: string = '';// formato YYYY-MM
