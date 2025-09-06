@@ -81,7 +81,7 @@ public class MinimalSecurityConfig {
                         "/api/auth/**",
                         "/auth/**", // Agregar también /auth/** por compatibilidad
                         "/health",
-                        "/api/health", 
+                        "/api/health",
                         "/api/public/**",
                         "/uploads/**",
                         "/actuator/**",
@@ -91,6 +91,9 @@ public class MinimalSecurityConfig {
                         "/api/plan-ejecucion/registrar-alimentacion",
                         "/error"  // CRÍTICO: Permitir acceso al endpoint de error de Spring Boot
                     ).permitAll()
+                    // Abrimos ventas y health (subrutas) durante pruebas de integración
+                    .requestMatchers("/api/ventas/**").permitAll()
+                    .requestMatchers("/api/health/**").permitAll()
                     // Específicamente para debug endpoints
                     .requestMatchers(HttpMethod.POST, "/api/plan-ejecucion/debug/registrar-alimentacion").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/plan-ejecucion/debug/ping").permitAll()

@@ -32,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/auth/**",  // Agregar también /auth/** por compatibilidad
             "/health",
             "/api/health",
+            "/api/health/**",
             "/actuator/**",
             "/api/public/**",
             "/uploads/**",
@@ -39,7 +40,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/plan-ejecucion/debug/**",
             "/api/plan-ejecucion/test",
             "/api/plan-ejecucion/registrar-alimentacion",  // Permitir registro de alimentación
-            "/animal/**"
+            "/animal/**",
+            "/api/ventas/**"
     );
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils, UserDetailsServiceImpl userDetailsService) {

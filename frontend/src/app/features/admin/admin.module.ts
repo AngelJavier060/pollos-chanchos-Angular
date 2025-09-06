@@ -32,6 +32,20 @@ const routes: Routes = [
       },
       { path: 'lotes', component: LotesComponent, title: 'Gestión de Lotes' },
       { path: 'inventario', component: InventarioComponent, title: 'Inventario' },
+      {
+        path: 'ventas/huevos',
+        loadComponent: () => import('../ventas/ventas-huevos.page').then(m => m.VentasHuevosPage),
+        title: 'Venta de Huevo',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
+        path: 'ventas/animales',
+        loadComponent: () => import('../ventas/ventas-animales.page').then(m => m.VentasAnimalesPage),
+        title: 'Venta de Animales',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
       { path: 'plan-nutricional', component: PlanNutricionalComponent, title: 'Plan Nutricional' },
       { path: 'reportes', component: ReportesComponent, title: 'Reportes' },
       { path: 'profile', component: ProfileComponent, title: 'Perfil' },
