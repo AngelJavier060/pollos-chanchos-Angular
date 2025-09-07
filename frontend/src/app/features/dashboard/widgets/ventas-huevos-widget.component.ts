@@ -39,11 +39,11 @@ import { VentasService } from '../../../shared/services/ventas.service';
         </div>
       </div>
     </div>
-    <!-- Resumen de ventas (visible arriba) -->
+    <!-- Resumen de ventas (acumulado global: fijo, no cambia con filtros) -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div class="bg-blue-50 border border-blue-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-blue-700">Registros</div>
-        <div class="text-2xl font-bold text-blue-900">{{ ventasHoy?.length || 0 }}</div>
+        <div class="text-2xl font-bold text-blue-900">{{ totalRegistrosAcum }}</div>
       </div>
       <div class="bg-emerald-50 border border-emerald-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-emerald-700">Cantidad total</div>
@@ -51,7 +51,8 @@ import { VentasService } from '../../../shared/services/ventas.service';
       </div>
       <div class="bg-amber-50 border border-amber-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-amber-700">Monto total</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalMontoVentas | currency:'USD':'symbol-narrow' }}</div>
+        <div class="text-2xl font-bold text-amber-900">{{ totalMontoAcum | currency:'USD':'symbol-narrow' }}</div>
+        <div class="text-xs text-amber-700/80 mt-1">(Acumulado histórico)</div>
       </div>
     </div>
     <!-- Formulario de venta (registro directo) -->
@@ -69,7 +70,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <label class="block text-sm text-gray-600 mb-1">Lote (solo aves)</label>
           <select [(ngModel)]="loteSeleccionadoId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
             <option [ngValue]="null">Seleccione un lote</option>
-            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">{{ l.codigo || l.id }} - {{ l.name }}</option>
+            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }}</option>
           </select>
         </div>
         
@@ -118,7 +119,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
             </thead>
             <tbody>
               <tr *ngFor="let it of borrador; let i = index" class="border-t">
-                <td class="px-4 py-2">{{ it.loteCodigo || it.loteId }}</td>
+                <td class="px-4 py-2">{{ formatLoteCodigo(it.loteCodigo || it.loteId) }}</td>
                 <td class="px-4 py-2">{{ it.fecha }}</td>
                 <td class="px-4 py-2">{{ it.cantidad }}</td>
                 <td class="px-4 py-2">{{ it.precioUnit | currency:'USD':'symbol-narrow' }}</td>
@@ -158,7 +159,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
               <tr *ngFor="let v of ventasHoy" class="border-t">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
-                <td class="px-4 py-2">{{ v.loteCodigo || v.loteId }}</td>
+                <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingId===v.id; else viewCant"> 
                     <input type="number" [(ngModel)]="editModel.cantidad" min="0" class="w-24 border rounded px-2 py-1" />
@@ -375,6 +376,17 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+  }
+
+  // Formatea código/ID de lote a 'LoteXYZ' usando SIEMPRE los últimos 3 dígitos (evita 'Lote3001').
+  formatLoteCodigo(valor: any): string {
+    if (valor == null) return 'Lote001';
+    const raw = String(valor).trim();
+    // Extraer solo dígitos del valor (si ya viene como 'Lote003' también funciona)
+    const digits = (raw.match(/\d+/g) || []).join('');
+    const last3 = (digits || '1').slice(-3); // por defecto '001'
+    const num = Number(last3) || 1;
+    return `Lote${num.toString().padStart(3, '0')}`;
   }
 
   private cargarProductos(): void {
@@ -624,11 +636,21 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
 
   // --- Ventas del día (desde backend) ---
   ventasHoy: any[] = [];
+  // Acumulado global (todas las ventas)
+  ventasAll: any[] = [];
   cargarVentasHoy(): void {
     const hoy = this.hoyISO();
     this.ventasService.listarVentasHuevos(hoy, hoy).subscribe({
       next: (data) => this.ventasHoy = data || [],
       error: () => this.ventasHoy = []
+    });
+  }
+
+  private cargarVentasAcum(): void {
+    // Sin from/to para traer todas las ventas acumuladas
+    this.ventasService.listarVentasHuevos().subscribe({
+      next: (data) => this.ventasAll = data || [],
+      error: () => this.ventasAll = []
     });
   }
 
@@ -688,6 +710,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       next: (data) => this.ventasHoy = data || [],
       error: () => this.ventasHoy = []
     });
+    // Mantener actualizado el acumulado fijo
+    this.cargarVentasAcum();
   }
 
   get totalCantidadVentas(): number {
@@ -696,6 +720,15 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
 
   get totalMontoVentas(): number {
     return (this.ventasHoy || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
+  }
+
+  // Acumulados fijos (no dependen del filtro)
+  get totalRegistrosAcum(): number { return (this.ventasAll || []).length; }
+  get totalCantidadAcum(): number {
+    return (this.ventasAll || []).reduce((acc, v) => acc + (Number(v?.cantidad) || 0), 0);
+  }
+  get totalMontoAcum(): number {
+    return (this.ventasAll || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
   }
 
   exportVentasCSV(): void {

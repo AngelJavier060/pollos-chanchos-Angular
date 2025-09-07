@@ -14,11 +14,11 @@ import { Animal } from '../../../shared/models/product.model';
   imports: [CommonModule, FormsModule],
   template: `
   <div class="space-y-6">
-    <!-- Resumen de ventas de animales -->
+    <!-- Resumen de ventas de animales (acumulado global fijo) -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div class="bg-blue-50 border border-blue-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-blue-700">Registros</div>
-        <div class="text-2xl font-bold text-blue-900">{{ ventasAnimalesHoy?.length || 0 }}</div>
+        <div class="text-2xl font-bold text-blue-900">{{ totalRegistrosAnimAcum }}</div>
       </div>
       <div class="bg-emerald-50 border border-emerald-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-emerald-700">Cantidad total</div>
@@ -26,7 +26,8 @@ import { Animal } from '../../../shared/models/product.model';
       </div>
       <div class="bg-amber-50 border border-amber-100 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-amber-700">Monto total</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalMontoVentasAnim | currency:'USD':'symbol-narrow' }}</div>
+        <div class="text-2xl font-bold text-amber-900">{{ totalMontoAnimAcum | currency:'USD':'symbol-narrow' }}</div>
+        <div class="text-xs text-amber-700/80 mt-1">(Acumulado histórico)</div>
       </div>
       <div class="bg-white border border-gray-200 rounded p-4">
         <div class="text-xs uppercase tracking-wide text-gray-600">Costo de Pollos</div>
@@ -53,7 +54,7 @@ import { Animal } from '../../../shared/models/product.model';
           <select [(ngModel)]="venta.loteId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
             <option [ngValue]="null">Seleccione un lote</option>
             <ng-container *ngFor="let l of lotesFiltradosPorAnimal">
-              <option [ngValue]="l.id">{{ l.codigo || l.id }} - {{ l.name }} ({{ l.quantity || 0 }} animales)</option>
+              <option [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }} ({{ l.quantity || 0 }} animales)</option>
             </ng-container>
           </select>
         </div>
@@ -120,7 +121,7 @@ import { Animal } from '../../../shared/models/product.model';
               <tr *ngFor="let v of ventasAnimalesHoy" class="border-t">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
-                <td class="px-4 py-2">{{ v.loteCodigo || v.loteId }}</td>
+                <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
                 <td class="px-4 py-2">{{ getAnimalNameVenta(v) }}</td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingIdAnim===v.id; else viewCantA"> 
@@ -190,7 +191,7 @@ import { Animal } from '../../../shared/models/product.model';
             </thead>
             <tbody>
               <tr *ngFor="let it of borrador; let i = index" class="border-t">
-                <td class="px-4 py-2">{{ it.loteCodigo || it.loteId }}</td>
+                <td class="px-4 py-2">{{ formatLoteCodigo(it.loteCodigo || it.loteId) }}</td>
                 <td class="px-4 py-2">{{ it.animal }}</td>
                 <td class="px-4 py-2">{{ it.fecha }}</td>
                 <td class="px-4 py-2">{{ it.cantidad }}</td>
@@ -311,6 +312,18 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     this.cargarBorradorLocal();
     // Cargar ventas del día al abrir
     this.cargarVentasAnimalesHoy();
+    // Cargar acumulado global fijo
+    this.cargarVentasAnimAcum();
+  }
+
+  // Formatea código/ID de lote a 'Lote001', 'Lote002', etc.
+  formatLoteCodigo(valor: any): string {
+    if (valor == null) return 'Lote001';
+    const raw = String(valor).trim();
+    const digits = (raw.match(/\d+/g) || []).join('');
+    const last3 = (digits || '1').slice(-3);
+    const num = Number(last3) || 1;
+    return `Lote${num.toString().padStart(3, '0')}`;
   }
 
   // Helpers para mostrar el animal en ventas guardadas
@@ -384,6 +397,22 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
 
   get totalMontoVentasAnim(): number {
     return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
+  }
+
+  // --- Acumulado global fijo (no depende del filtro) ---
+  ventasAnimAll: any[] = [];
+  private cargarVentasAnimAcum(): void {
+    this.ventasService.listarVentasAnimales().subscribe({
+      next: (data) => this.ventasAnimAll = data || [],
+      error: () => this.ventasAnimAll = []
+    });
+  }
+  get totalRegistrosAnimAcum(): number { return (this.ventasAnimAll || []).length; }
+  get totalCantidadAnimAcum(): number {
+    return (this.ventasAnimAll || []).reduce((acc, v) => acc + (Number(v?.cantidad) || 0), 0);
+  }
+  get totalMontoAnimAcum(): number {
+    return (this.ventasAnimAll || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
   }
 
   // --- Resúmenes por especie ---
@@ -728,6 +757,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       next: (data) => this.ventasAnimalesHoy = data || [],
       error: () => this.ventasAnimalesHoy = []
     });
+    // Refrescar acumulado fijo en paralelo
+    this.cargarVentasAnimAcum();
   }
   
 }

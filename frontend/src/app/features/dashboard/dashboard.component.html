@@ -1,84 +1,56 @@
-<!-- Dashboard principal con pestañas de ventas -->
-<div class="space-y-6">
-  <section class="welcome-section">
-    <h1 class="text-2xl font-bold">Panel de Control</h1>
-    <p class="text-gray-600">Vista de ventas (solo lectura) usando datos actuales</p>
-  </section>
+<ng-container *ngIf="false">
+  <!-- Dashboard principal con pestañas de ventas -->
+  <!-- 
+    <div class="space-y-6">
+      <section class="welcome-section">
+        <h1 class="text-2xl font-bold">Panel de Control</h1>
+        <p class="text-gray-600">Vista de ventas (solo lectura) usando datos actuales</p>
+      </section>
 
-  <!-- Pestañas -->
-  <div class="flex items-center gap-2 border-b">
-    <button (click)="setTab('huevos')"
-            class="px-4 py-2 -mb-px border-b-2"
-            [class.border-blue-600]="activeTab==='huevos'"
-            [class.text-blue-700]="activeTab==='huevos'"
-            [class.border-transparent]="activeTab!=='huevos'"
-            [class.text-gray-600]="activeTab!=='huevos'">
-      Venta de Huevo
-    </button>
-    <button (click)="setTab('animales')"
-            class="px-4 py-2 -mb-px border-b-2"
-            [class.border-blue-600]="activeTab==='animales'"
-            [class.text-blue-700]="activeTab==='animales'"
-            [class.border-transparent]="activeTab!=='animales'"
-            [class.text-gray-600]="activeTab!=='animales'">
-      Venta de Animales
-    </button>
+      Pestañas
+      <div class="flex items-center gap-2 border-b">
+        <button (click)="setTab('huevos')"
+                class="px-4 py-2 -mb-px border-b-2"
+                [class.border-blue-600]="activeTab==='huevos'"
+                [class.text-blue-700]="activeTab==='huevos'"
+                [class.border-transparent]="activeTab!=='huevos'"
+                [class.text-gray-600]="activeTab!=='huevos'">
+          Venta de Huevo
+      </div>
+      <div class="metric-card">
+        <h3>Salud del Lote</h3>
+        <div class="value">98%</div>
+      </div>
+    </section>
+
+    <section class="actions-section">
+      <h2>Acciones Rápidas</h2>
+      <div class="quick-actions">
+        <button>
+          <i class="fas fa-plus"></i>
+          Registrar Producción
+        </button>
+        <button>
+          <i class="fas fa-clipboard-list"></i>
+          Control de Inventario
+        </button>
+        <button>
+          <i class="fas fa-heartbeat"></i>
+          Registro Sanitario
+        </button>
+      </div>
+    </section>
+
+    <section class="alerts-section">
+      <h2>Alertas y Notificaciones</h2>
+      <div class="alert-card">
+        <h4>Nivel de Alimento Bajo</h4>
+        <p>El inventario de alimento está por debajo del 20%. Se recomienda reabastecimiento.</p>
+      </div>
+      <div class="alert-card">
+        <h4>Vacunación Programada</h4>
+        <p>Próxima vacunación programada para el lote A-123 en 3 días.</p>
+      </div>
+    </section>
   </div>
-
-  <!-- Contenido de pestañas -->
-  <div *ngIf="activeTab==='huevos'">
-    <app-ventas-huevos-widget></app-ventas-huevos-widget>
-  </div>
-  <div *ngIf="activeTab==='animales'">
-    <app-ventas-animales-widget></app-ventas-animales-widget>
-  </div>
-
-  <section class="metrics-grid">
-    <div class="metric-card">
-      <h3>Total de Aves</h3>
-      <div class="value">5,234</div>
-    </div>
-    <div class="metric-card">
-      <h3>Producción de Huevos</h3>
-      <div class="value">3,890</div>
-    </div>
-    <div class="metric-card">
-      <h3>Alimento Disponible</h3>
-      <div class="value">850 kg</div>
-    </div>
-    <div class="metric-card">
-      <h3>Salud del Lote</h3>
-      <div class="value">98%</div>
-    </div>
-  </section>
-
-  <section class="actions-section">
-    <h2>Acciones Rápidas</h2>
-    <div class="quick-actions">
-      <button>
-        <i class="fas fa-plus"></i>
-        Registrar Producción
-      </button>
-      <button>
-        <i class="fas fa-clipboard-list"></i>
-        Control de Inventario
-      </button>
-      <button>
-        <i class="fas fa-heartbeat"></i>
-        Registro Sanitario
-      </button>
-    </div>
-  </section>
-
-  <section class="alerts-section">
-    <h2>Alertas y Notificaciones</h2>
-    <div class="alert-card">
-      <h4>Nivel de Alimento Bajo</h4>
-      <p>El inventario de alimento está por debajo del 20%. Se recomienda reabastecimiento.</p>
-    </div>
-    <div class="alert-card">
-      <h4>Vacunación Programada</h4>
-      <p>Próxima vacunación programada para el lote A-123 en 3 días.</p>
-    </div>
-  </section>
-</div> 
+-->

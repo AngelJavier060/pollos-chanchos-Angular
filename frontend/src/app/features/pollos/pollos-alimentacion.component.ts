@@ -146,6 +146,16 @@ export class PollosAlimentacionComponent implements OnInit {
     return this.selectedDate.toISOString().split('T')[0];
   }
 
+  // Formatear código/ID de lote como 'LoteXYZ' usando los últimos 3 dígitos
+  formatLoteCodigo(valor: any): string {
+    if (valor == null) return 'Lote001';
+    const raw = String(valor).trim();
+    const digits = (raw.match(/\d+/g) || []).join('');
+    const last3 = (digits || '1').slice(-3);
+    const num = Number(last3) || 1;
+    return `Lote${num.toString().padStart(3, '0')}`;
+  }
+
   updateSelectedDate(event: any): void {
     this.selectedDate = new Date(event.target.value);
   }

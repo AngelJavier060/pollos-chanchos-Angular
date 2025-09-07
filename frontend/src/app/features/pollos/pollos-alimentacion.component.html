@@ -124,7 +124,7 @@
           <!-- Header del Lote -->
           <div class="lote-header mb-4">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-xl font-bold text-gray-900">{{ lote.codigo }}</h3>
+              <h3 class="text-xl font-bold text-gray-900">{{ formatLoteCodigo(lote.codigo) }}</h3>
               <span class="status-badge bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
                 Activo
               </span>
@@ -282,7 +282,7 @@
             <div>
               <h2 class="text-2xl font-bold">Registro de Alimentación</h2>
               <div class="flex items-center space-x-4 text-green-100">
-                <span>Lote: {{ loteSeleccionado?.codigo }}</span>
+                <span>Lote: {{ formatLoteCodigo(loteSeleccionado?.codigo) }}</span>
                 <span class="border-l border-green-400 pl-4">
                   <i class="fas fa-box mr-1"></i> Con Inventario Automático
                 </span>
@@ -312,7 +312,7 @@
               <p class="text-blue-700 font-medium">Pollos en el Lote</p>
               <p class="font-bold text-blue-900 text-lg">{{ loteSeleccionado?.quantity || 0 }} pollos vivos</p>
               <p class="text-blue-500 text-xs">Raza: {{ loteSeleccionado?.race?.name || 'No definida' }}</p>
-              <p class="text-blue-400 text-xs">Código: {{ loteSeleccionado?.codigo || 'N/A' }}</p>
+              <p class="text-blue-400 text-xs">Código: {{ formatLoteCodigo(loteSeleccionado?.codigo) || 'N/A' }}</p>
             </div>
             
             <!-- Fecha del registro -->

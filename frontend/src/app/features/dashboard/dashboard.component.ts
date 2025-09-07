@@ -1,25 +1,20 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { VentasHuevosWidgetComponent } from './widgets/ventas-huevos-widget.component';
-import { VentasAnimalesWidgetComponent } from './widgets/ventas-animales-widget.component';
+import { DashboardD3Component } from './dashboard-d3.component';
 
 @Component({
   selector: 'app-dashboard',
-  templateUrl: './dashboard.component.html',
+  template: '<app-dashboard-d3></app-dashboard-d3>',
   standalone: true,
-  imports: [CommonModule, RouterModule, VentasHuevosWidgetComponent, VentasAnimalesWidgetComponent]
+  imports: [CommonModule, RouterModule, DashboardD3Component]
 })
 export class DashboardComponent implements OnInit {
-  activeTab: 'huevos' | 'animales' = 'huevos';
+  // Sin tabs por ahora: solo gráficas interactivas
 
   constructor() { }
 
   ngOnInit(): void {
     // Aquí podemos cargar datos iniciales del dashboard
-  }
-
-  setTab(tab: 'huevos' | 'animales') {
-    this.activeTab = tab;
   }
 }

@@ -1,1 +1,83 @@
 // Estilos específicos para el módulo de plan nutricional 
+
+// Contenedor scrollable para evitar que el contenido largo impida guardar
+.plan-nutricional-container {
+  // Que siempre exista scroll si el contenido supera la pantalla
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  position: relative;
+
+  // Estilo de barra de desplazamiento (WebKit)
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9; // slate-100
+    border-radius: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%); // azul suave
+    border-radius: 8px;
+    border: 2px solid #f1f5f9;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  }
+}
+
+// Asegurar que tablas/controles internos respeten el ancho y no generen scroll horizontal
+.plan-nutricional-container .overflow-x-auto {
+  overflow-x: auto;
+}
+
+// Hacer sticky los tabs superiores dentro del contenedor para mejor UX
+.plan-nutricional-container .sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+// Contenedor con scroll para el tab 'Etapas'
+.etapas-scroll {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+// Panel del modal con scroll interno para formularios largos
+.modal-panel {
+  height: 90vh; // altura fija para que la barra aparezca siempre
+  display: flex;
+  flex-direction: column;
+  overflow-y: scroll; // siempre mostrar scroll
+  -webkit-overflow-scrolling: touch;
+
+  // Scrollbar azul visible en todo el panel
+  &::-webkit-scrollbar { width: 12px; }
+  &::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 8px; }
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 8px;
+    border: 2px solid #e5e7eb;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: #1d4ed8 #e5e7eb;
+}
+.modal-panel form {
+  flex: 1 1 auto;
+  overflow: visible; // desactivar segunda barra de scroll
+  padding-right: 0;
+}
+.modal-panel .actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
