@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 
 // Interfaces para morbilidad
 export interface RegistroMorbilidadRequest {
-  loteId: number;
+  loteId: string;
   fecha: string;
   hora: string;
   cantidadEnfermos: number;
@@ -28,7 +28,7 @@ export interface RegistroMorbilidadRequest {
 
 export interface RegistroMorbilidadResponse {
   id: number;
-  loteId: number;
+  loteId: string;
   fecha: string;
   hora: string;
   cantidadEnfermos: number;
@@ -85,7 +85,7 @@ export class MorbilidadBackendService {
   /**
    * ✅ OBTENER REGISTROS POR LOTE
    */
-  obtenerRegistrosPorLote(loteId: number): Observable<RegistroMorbilidadResponse[]> {
+  obtenerRegistrosPorLote(loteId: string): Observable<RegistroMorbilidadResponse[]> {
     return this.http.get<RegistroMorbilidadResponse[]>(`${this.apiUrl}/lote/${loteId}`);
   }
 

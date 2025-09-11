@@ -2,7 +2,7 @@ import { Race } from '../../configuracion/interfaces/race.interface';
 import { Animal } from '../../configuracion/interfaces/animal.interface';
 
 export interface Lote {
-  id?: number;  // Cambiado de string a number para coincidir con el backend
+  id?: string;  // UUID que viene del backend
   codigo?: string; // Nueva propiedad para el código secuencial amigable
   name: string; // Campo obligatorio para el nombre descriptivo del lote
   quantity: number; // Cantidad actual de animales vivos
@@ -11,6 +11,7 @@ export interface Lote {
   cost: number;
   create_date?: Date;
   update_date?: Date;
+  fechaCierre?: Date | null; // Fecha en la que el lote quedó en 0 (histórico)
   race: Race;
   // Añadimos animal_id opcional por si necesitas usar la relación directa con Animal
   race_animal_id?: number;

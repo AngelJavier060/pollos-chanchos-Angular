@@ -217,7 +217,7 @@ export class ChanchosLotesComponent implements OnInit {
   /**
    * TrackBy para optimizar rendering
    */
-  trackByLote(index: number, lote: Lote): number {
+  trackByLote(index: number, lote: Lote): any {
     return lote.id || index;
   }
 } 

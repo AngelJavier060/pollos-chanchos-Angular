@@ -260,7 +260,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   abrirModalRegistro(): void {
     const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
     this.nuevoRegistro = {
-      loteId: 0,
+      loteId: '',
       fechaRegistro: new Date(),
       cantidadEnfermos: 1,
       sintomas: [],
@@ -390,7 +390,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     
     if (this.busquedaLote) {
       registros = registros.filter(r => 
-        r.loteId.toString().includes(this.busquedaLote) ||
+        String(r.loteId).includes(this.busquedaLote) ||
         this.getNombreLote(r.loteId).toLowerCase().includes(this.busquedaLote.toLowerCase())
       );
     }
@@ -401,8 +401,8 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   /**
    * Obtener nombre del lote
    */
-  getNombreLote(loteId: number): string {
-    const lote = this.lotesPollos.find(l => l.id === loteId);
+  getNombreLote(loteId: string): string {
+    const lote = this.lotesPollos.find(l => String(l.id) === loteId);
     return lote ? `Lote ${lote.id} - ${lote.race?.name || 'Sin raza'}` : `Lote ${loteId}`;
   }
 
@@ -442,7 +442,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
           
           // Prellenar el formulario con los datos recibidos
           this.nuevoRegistro = {
-            loteId: Number(datosAutoregistro.loteId),
+            loteId: String(datosAutoregistro.loteId),
             cantidadEnfermos: Number(datosAutoregistro.cantidad),
             fechaRegistro: new Date(),
             sintomas: [],

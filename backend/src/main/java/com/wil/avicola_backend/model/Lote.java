@@ -55,6 +55,9 @@ public class Lote {
     LocalDateTime create_date;
     @LastModifiedDate
     LocalDateTime update_date;
+    
+    @Column(name = "fecha_cierre")
+    private LocalDateTime fechaCierre; // fecha en la que el lote quedó con 0 animales (histórico)
 
     @ManyToOne
     @JoinColumn(name = "race_id")

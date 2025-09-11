@@ -53,7 +53,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
   private subscriptions: Subscription = new Subscription();
 
   // Estadísticas de lotes - Cache para mortalidad
-  private estadisticasLotes: Map<number, {
+  private estadisticasLotes: Map<string, {
     pollosRegistrados: number;
     pollosVivos: number;
     mortalidadTotal: number;
@@ -149,44 +149,71 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     console.log('🔄 Iniciando registro de mortalidad...');
     console.log('📋 Datos del formulario:', this.nuevoRegistro);
     
-    if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.causa || !this.nuevoRegistro.cantidadMuertos) {
-      alert('Por favor complete todos los campos obligatorios');
+    // Validación mínima: lote y cantidad > 0. La causa es opcional.
+    if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.cantidadMuertos || this.nuevoRegistro.cantidadMuertos <= 0) {
+      alert('Por favor seleccione un lote y especifique la cantidad de animales muertos (> 0)');
       return;
     }
     
-    const registro: any = {
-      loteId: this.nuevoRegistro.loteId!,
-      cantidadMuertos: this.nuevoRegistro.cantidadMuertos!,
-      causaId: this.nuevoRegistro.causa!.id,
-      observaciones: this.nuevoRegistro.observaciones || '',
-      edad: this.nuevoRegistro.edad || 0,
-      ubicacion: this.nuevoRegistro.ubicacion || '',
-      confirmado: false,
-      usuarioRegistro: this.user?.username || 'Desconocido'
-    };
+    // Si hay causa, usar el endpoint con causa; si no, usar el endpoint simple
+    if (this.nuevoRegistro.causa && this.nuevoRegistro.causa.id) {
+      const registroConCausa: any = {
+        loteId: this.nuevoRegistro.loteId!,
+        cantidadMuertos: this.nuevoRegistro.cantidadMuertos!,
+        causaId: this.nuevoRegistro.causa.id,
+        observaciones: this.nuevoRegistro.observaciones || '',
+        edad: this.nuevoRegistro.edad || 0,
+        ubicacion: this.nuevoRegistro.ubicacion || '',
+        confirmado: false,
+        usuarioRegistro: this.user?.username || 'Desconocido'
+      };
 
-    console.log('📤 Enviando registro al backend:', registro);
+      console.log('📤 Enviando registro CON causa al backend:', registroConCausa);
 
-    this.mortalidadService.registrarMortalidadConCausa(registro).subscribe({
-      next: (nuevoRegistro) => {
-        console.log('✅ Respuesta del backend:', nuevoRegistro);
-        this.registrosMortalidad.unshift(nuevoRegistro);
-        this.cargarEstadisticasDesdeBackend();
-        
-        // ✅ El backend ya actualiza automáticamente la cantidad del lote
-        // Recargar los lotes para obtener las cantidades actualizadas desde el backend
-        this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
-        
-        this.cerrarModalRegistro();
-        console.log('✅ Mortalidad registrada exitosamente, cantidad del lote actualizada automáticamente por el backend');
-        
-        alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
-      },
-      error: (error) => {
-        console.error('❌ Error al registrar mortalidad:', error);
-        alert('Error al registrar mortalidad. Por favor, intente de nuevo.');
-      }
-    });
+      this.mortalidadService.registrarMortalidadConCausa(registroConCausa).subscribe({
+        next: (nuevoRegistro) => {
+          console.log('✅ Respuesta del backend:', nuevoRegistro);
+          this.registrosMortalidad.unshift(nuevoRegistro);
+          this.cargarEstadisticasDesdeBackend();
+          this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
+          this.cerrarModalRegistro();
+          console.log('✅ Mortalidad registrada exitosamente con causa, lote actualizado');
+          alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+        },
+        error: (error) => {
+          console.error('❌ Error al registrar mortalidad con causa:', error);
+          alert('Error al registrar mortalidad. Por favor, intente de nuevo.');
+        }
+      });
+    } else {
+      const registroSimple: any = {
+        loteId: this.nuevoRegistro.loteId!,
+        cantidadMuertos: this.nuevoRegistro.cantidadMuertos!,
+        observaciones: this.nuevoRegistro.observaciones || '',
+        edad: this.nuevoRegistro.edad || 0,
+        ubicacion: this.nuevoRegistro.ubicacion || '',
+        confirmado: false,
+        usuarioRegistro: this.user?.username || 'Desconocido'
+      };
+
+      console.log('📤 Enviando registro SIN causa al backend:', registroSimple);
+
+      this.mortalidadService.registrarMortalidad(registroSimple).subscribe({
+        next: (nuevoRegistro) => {
+          console.log('✅ Respuesta del backend:', nuevoRegistro);
+          this.registrosMortalidad.unshift(nuevoRegistro);
+          this.cargarEstadisticasDesdeBackend();
+          this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
+          this.cerrarModalRegistro();
+          console.log('✅ Mortalidad registrada exitosamente sin causa, lote actualizado');
+          alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+        },
+        error: (error) => {
+          console.error('❌ Error al registrar mortalidad sin causa:', error);
+          alert('Error al registrar mortalidad. Por favor, intente de nuevo.');
+        }
+      });
+    }
   }
 
   /**
@@ -370,11 +397,37 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
    */
   verificarAutoregistro(): void {
     this.route.queryParams.subscribe(params => {
-      // Limpiar automáticamente cualquier parámetro de URL innecesario
-      if (Object.keys(params).length > 0) {
-        console.log('🧹 Limpiando parámetros de URL innecesarios:', params);
-        
-        // Remover todos los parámetros de la URL
+      if (!params) return;
+      const loteId = params['loteId'];
+      const cantidad = params['cantidad'];
+      const causaNombre = params['causa'];
+
+      // Si llegan parámetros desde alimentación, prellenar y abrir modal automáticamente
+      if (loteId || cantidad || causaNombre) {
+        console.log('🧭 Autocompletando registro de mortalidad desde parámetros:', params);
+
+        // Prefill de datos mínimos
+        this.nuevoRegistro = {
+          loteId: String(loteId || ''),
+          cantidadMuertos: Number(cantidad) > 0 ? Number(cantidad) : 1,
+          observaciones: this.nuevoRegistro.observaciones || '',
+          edad: this.nuevoRegistro.edad || 0,
+          ubicacion: this.nuevoRegistro.ubicacion || '',
+          confirmado: false
+        };
+
+        // Intentar asignar la causa por nombre si está en parámetros
+        if (causaNombre && this.causasMortalidad && this.causasMortalidad.length > 0) {
+          const causa = this.causasMortalidad.find(c => c.nombre.toLowerCase() === String(causaNombre).toLowerCase());
+          if (causa) {
+            (this.nuevoRegistro as any).causa = causa;
+          }
+        }
+
+        // Abrir modal de registro
+        this.mostrarModalRegistro = true;
+
+        // Limpiar parámetros de URL para evitar re-procesos
         this.router.navigate([], {
           relativeTo: this.route,
           queryParams: {},
@@ -462,7 +515,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
         const tieneDatos = lote.quantityOriginal ? true : false;
 
         // Guardar en cache
-        this.estadisticasLotes.set(lote.id!, {
+        this.estadisticasLotes.set(String(lote.id!), {
           pollosRegistrados,
           pollosVivos,
           mortalidadTotal,
@@ -485,7 +538,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
         const pollosVivos = lote.quantity || 0;
         const mortalidadTotal = lote.quantityOriginal ? Math.max(0, pollosRegistrados - pollosVivos) : 0;
         
-        this.estadisticasLotes.set(lote.id!, {
+        this.estadisticasLotes.set(String(lote.id!), {
           pollosRegistrados,
           pollosVivos,
           mortalidadTotal,
@@ -510,8 +563,8 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     tieneDatos: boolean;
   } {
     // Usar datos del cache si están disponibles
-    if (lote.id && this.estadisticasLotes.has(lote.id)) {
-      return this.estadisticasLotes.get(lote.id)!;
+    if (lote.id && this.estadisticasLotes.has(String(lote.id))) {
+      return this.estadisticasLotes.get(String(lote.id))!;
     }
 
     // Fallback: calcular localmente

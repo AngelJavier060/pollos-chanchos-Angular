@@ -285,9 +285,9 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   productosFiltrados: Product[] = [];
   productosHuevos: Product[] = [];
   lotesAves: Lote[] = [];
-  loteSeleccionadoId: number | null = null;
+  loteSeleccionadoId: string | null = null;
   get loteSeleccionado(): Lote | null {
-    return this.lotesAves.find(l => l.id === this.loteSeleccionadoId) || null;
+    return this.lotesAves.find(l => l.id === this.loteSeleccionadoId!) || null;
   }
 
   // Formatear fecha que venga como array [yyyy,mm,dd] o string ISO
@@ -350,7 +350,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   }
 
   // Borrador local de ventas (sin backend)
-  borrador: Array<{ loteId: number; loteCodigo?: string; fecha: string; cantidad: number; precioUnit: number; totalLinea: number; }>= [];
+  borrador: Array<{ loteId: string; loteCodigo?: string; fecha: string; cantidad: number; precioUnit: number; totalLinea: number; }>= [];
   nuevo: { fecha: string; cantidad: number; precioUnit: number; totalLinea: number; } = {
     fecha: this.hoyISO(),
     cantidad: 1,
@@ -535,7 +535,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     const precioNum = Number(String(this.nuevo.precioUnit ?? 0).replace(',', '.')) || 0;
     const cantidadNum = Number(this.nuevo.cantidad ?? 1) || 1;
     const it = {
-      loteId: this.loteSeleccionado.id,
+      loteId: String(this.loteSeleccionado.id),
       loteCodigo: this.loteSeleccionado.codigo,
       fecha: this.nuevo.fecha,
       cantidad: cantidadNum,

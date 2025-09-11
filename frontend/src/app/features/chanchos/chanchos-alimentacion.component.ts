@@ -32,7 +32,7 @@ interface RegistroAlimentacionCompleto {
   observacionesGenerales: string;
   
   // Control interno
-  loteId: number;
+  loteId: string;
   usuarioId: number;
   stockAnterior: number;
   stockPosterior: number;
@@ -54,7 +54,7 @@ interface RegistroHistorial {
 
 // Interface para lotes cerrados/históricos
 interface LoteHistorico {
-  loteId: number;
+  loteId: string;
   codigo: string;
   fechaInicio: string;
   fechaCierre: string;
@@ -121,7 +121,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
     observacionesVenta: '',
     observacionesSalud: '',
     observacionesGenerales: '',
-    loteId: 0,
+    loteId: '',
     usuarioId: 0,
     stockAnterior: 0,
     stockPosterior: 0,
@@ -138,25 +138,25 @@ export class ChanchosAlimentacionComponent implements OnInit {
   };
 
   // Simulación de historial de registros por lote
-  private historialSimulado: { [loteId: number]: RegistroHistorial[] } = {
-    1: [
+  private historialSimulado: { [loteId: string]: RegistroHistorial[] } = {
+    '1': [
       { fecha: '2024-01-15', cantidad: 2.5, animalesVivos: 15, observaciones: 'Consumo normal' },
       { fecha: '2024-01-14', cantidad: 2.5, animalesVivos: 15, observaciones: 'Sin novedad' }
     ],
-    2: [
+    '2': [
       { fecha: '2024-01-15', cantidad: 8.0, animalesVivos: 25, observaciones: 'Consumo óptimo' },
       { fecha: '2024-01-14', cantidad: 8.0, animalesVivos: 25, animalesVendidos: 2, valorVenta: 300.00, observaciones: 'Venta parcial' }
     ]
   };
 
   // Control de animales vivos actual por lote (simulación)
-  private animalesVivosActuales: { [loteId: number]: number } = {};
+  private animalesVivosActuales: { [loteId: string]: number } = {};
 
   // Histórico de lotes cerrados
   private lotesHistoricos: LoteHistorico[] = [];
 
   // Información del plan de alimentación por lote
-  planInfo: { [loteId: number]: PlanInfo } = {};
+  planInfo: { [loteId: string]: PlanInfo } = {};
 
   // Datos del modal
   modalData: ModalData = {
@@ -181,7 +181,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
   /**
    * Método trackBy para optimizar el renderizado
    */
-  trackByLote(index: number, lote: Lote): number {
+  trackByLote(index: number, lote: Lote): any {
     return lote.id || index;
   }
 
@@ -286,7 +286,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
       observacionesVenta: '',
       observacionesSalud: '',
       observacionesGenerales: '',
-      loteId: this.loteSeleccionado?.id || 0,
+      loteId: String(this.loteSeleccionado?.id || ''),
       usuarioId: this.user?.id || 0,
       stockAnterior: 0,
       stockPosterior: 0,
@@ -314,7 +314,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
       observacionesVenta: '',
       observacionesSalud: '',
       observacionesGenerales: '',
-      loteId: 0,
+      loteId: '',
       usuarioId: 0,
       stockAnterior: 0,
       stockPosterior: 0,

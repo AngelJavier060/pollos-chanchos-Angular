@@ -46,16 +46,18 @@ public class MortalidadService {
         
         // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE
         try {
-            // Buscar lote directamente con el ID String
-            Optional<Lote> loteOpt = loteRepository.findById(registro.getLoteId());
-            
-            if (loteOpt.isPresent()) {
-                Lote lote = loteOpt.get();
+            // Resolver lote por ID o, si no existe, por código usando el mismo valor recibido
+            Lote lote = resolveLoteByIdOrCodigo(registro.getLoteId());
+            if (lote != null) {
+                // Normalizar: guardar siempre el UUID del lote en el registro
+                registro.setLoteId(lote.getId());
+
                 int cantidadAnterior = lote.getQuantity();
                 int nuevaCantidad = Math.max(0, cantidadAnterior - registro.getCantidadMuertos());
                 lote.setQuantity(nuevaCantidad);
+                actualizarFechaCierreLote(lote, cantidadAnterior);
                 loteRepository.save(lote);
-                
+
                 System.out.println("✅ Lote actualizado automáticamente:");
                 System.out.println("   - Lote ID: " + lote.getId());
                 System.out.println("   - Código: " + lote.getCodigo()); 
@@ -63,7 +65,7 @@ public class MortalidadService {
                 System.out.println("   - Animales muertos registrados: " + registro.getCantidadMuertos());
                 System.out.println("   - Nueva cantidad: " + nuevaCantidad);
             } else {
-                System.err.println("⚠️ Advertencia: No se encontró el lote con ID: " + registro.getLoteId());
+                System.err.println("⚠️ Advertencia: No se encontró el lote por ID ni por código: " + registro.getLoteId());
             }
         } catch (Exception e) {
             System.err.println("❌ Error al actualizar la cantidad del lote: " + e.getMessage());
@@ -82,16 +84,18 @@ public class MortalidadService {
         
         // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE
         try {
-            // Buscar lote directamente con el ID String
-            Optional<Lote> loteOpt = loteRepository.findById(registro.getLoteId());
-            
-            if (loteOpt.isPresent()) {
-                Lote lote = loteOpt.get();
+            // Resolver lote por ID o, si no existe, por código usando el mismo valor recibido
+            Lote lote = resolveLoteByIdOrCodigo(registro.getLoteId());
+            if (lote != null) {
+                // Normalizar: guardar siempre el UUID del lote en el registro
+                registro.setLoteId(lote.getId());
+
                 int cantidadAnterior = lote.getQuantity();
                 int nuevaCantidad = Math.max(0, cantidadAnterior - registro.getCantidadMuertos());
                 lote.setQuantity(nuevaCantidad);
+                actualizarFechaCierreLote(lote, cantidadAnterior);
                 loteRepository.save(lote);
-                
+
                 System.out.println("✅ Lote actualizado automáticamente:");
                 System.out.println("   - Lote ID: " + lote.getId());
                 System.out.println("   - Código: " + lote.getCodigo()); 
@@ -99,7 +103,7 @@ public class MortalidadService {
                 System.out.println("   - Animales muertos registrados: " + registro.getCantidadMuertos());
                 System.out.println("   - Nueva cantidad: " + nuevaCantidad);
             } else {
-                System.err.println("⚠️ Advertencia: No se encontró el lote con ID: " + registro.getLoteId());
+                System.err.println("⚠️ Advertencia: No se encontró el lote por ID ni por código: " + registro.getLoteId());
             }
         } catch (Exception e) {
             System.err.println("❌ Error al actualizar la cantidad del lote: " + e.getMessage());
@@ -332,4 +336,24 @@ public class MortalidadService {
             throw new RuntimeException("Causa de mortalidad no encontrada con ID: " + id);
         }
     }
-} 
+
+    // ========== Helpers ==========
+    private Lote resolveLoteByIdOrCodigo(String idOrCodigo) {
+        if (idOrCodigo == null || idOrCodigo.isBlank()) return null;
+        try {
+            Optional<Lote> byId = loteRepository.findById(idOrCodigo);
+            if (byId.isPresent()) return byId.get();
+        } catch (Exception ignored) {}
+        // Intentar por código usando el mismo valor
+        return loteRepository.findByCodigo(idOrCodigo).orElse(null);
+    }
+
+    private void actualizarFechaCierreLote(Lote lote, int cantidadAnterior) {
+        int cantidadActual = lote.getQuantity();
+        if (cantidadAnterior > 0 && cantidadActual == 0) {
+            lote.setFechaCierre(LocalDateTime.now());
+        } else if (cantidadAnterior == 0 && cantidadActual > 0) {
+            lote.setFechaCierre(null);
+        }
+    }
+}

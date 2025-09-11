@@ -3,7 +3,10 @@ package com.wil.avicola_backend.controller;
 import com.wil.avicola_backend.model.Enfermedad;
 import com.wil.avicola_backend.model.Medicamento;
 import com.wil.avicola_backend.model.RegistroMorbilidad;
+import com.wil.avicola_backend.model.RegistroMortalidad;
 import com.wil.avicola_backend.service.MorbilidadService;
+import com.wil.avicola_backend.dto.ConvertirMortalidadDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -20,12 +23,12 @@ import java.util.Optional;
 @RequestMapping("/api/morbilidad")
 @CrossOrigin(origins = "*")
 public class MorbilidadController {
-    
+
     @Autowired
     private MorbilidadService morbilidadService;
-    
+
     // ========== OPERACIONES CRUD ==========
-    
+
     /**
      * Crear nuevo registro de morbilidad
      */
@@ -44,7 +47,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registro por ID
      */
@@ -68,7 +71,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener todos los registros
      */
@@ -87,7 +90,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Actualizar registro
      */
@@ -106,7 +109,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Eliminar registro
      */
@@ -124,7 +127,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Cambiar estado de tratamiento
      */
@@ -144,9 +147,45 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
-    // ========== CONSULTAS ESPECÍFICAS ==========
-    
+
+    /**
+     * Recuperar morbilidad (no altera stock)
+     */
+    @PatchMapping("/{id}/recuperar")
+    public ResponseEntity<Map<String, Object>> recuperar(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            RegistroMorbilidad actualizado = morbilidadService.recuperar(id);
+            response.put("success", true);
+            response.put("message", "Registro marcado como RECUPERADO");
+            response.put("data", actualizado);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al recuperar: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Convertir a mortalidad (crea registro y descuenta stock)
+     */
+    @PostMapping("/{id}/convertir-a-mortalidad")
+    public ResponseEntity<Map<String, Object>> convertirAMortalidad(@PathVariable Long id, @RequestBody ConvertirMortalidadDTO body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            RegistroMortalidad creado = morbilidadService.convertirAMortalidad(id, body);
+            response.put("success", true);
+            response.put("message", "Registro movido a mortalidad y stock actualizado");
+            response.put("data", creado);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al convertir a mortalidad: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     /**
      * Obtener registros por lote
      */
@@ -165,7 +204,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registros activos
      */
@@ -184,14 +223,13 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registros por rango de fechas
      */
     @GetMapping("/rango-fechas")
-    public ResponseEntity<Map<String, Object>> obtenerRegistrosPorRangoFechas(
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fechaInicio,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fechaFin) {
+    public ResponseEntity<Map<String, Object>> obtenerRegistrosPorRangoFechas(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fechaInicio,
+                                                                              @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fechaFin) {
         Map<String, Object> response = new HashMap<>();
         try {
             List<RegistroMorbilidad> registros = morbilidadService.obtenerRegistrosPorRangoFechas(fechaInicio, fechaFin);
@@ -205,7 +243,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registros por estado
      */
@@ -225,7 +263,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registros que requieren aislamiento
      */
@@ -244,7 +282,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener registros contagiosos
      */
@@ -263,7 +301,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener revisiones del día
      */
@@ -271,10 +309,8 @@ public class MorbilidadController {
     public ResponseEntity<Map<String, Object>> obtenerRevisionesDelDia(@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fecha) {
         Map<String, Object> response = new HashMap<>();
         try {
-            if (fecha == null) {
-                fecha = LocalDate.now();
-            }
-            List<RegistroMorbilidad> registros = morbilidadService.obtenerRevisionesDelDia(fecha);
+            LocalDate f = (fecha != null) ? fecha : LocalDate.now();
+            List<RegistroMorbilidad> registros = morbilidadService.obtenerRevisionesDelDia(f);
             response.put("success", true);
             response.put("data", registros);
             response.put("count", registros.size());
@@ -285,9 +321,9 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     // ========== ESTADÍSTICAS ==========
-    
+
     /**
      * Obtener estadísticas generales
      */
@@ -296,31 +332,14 @@ public class MorbilidadController {
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> estadisticas = new HashMap<>();
-            
-            // Registros activos
             estadisticas.put("registrosActivos", morbilidadService.obtenerRegistrosActivos().size());
-            
-            // Estadísticas por enfermedad
             estadisticas.put("estadisticasPorEnfermedad", morbilidadService.obtenerEstadisticasPorEnfermedad());
-            
-            // Estadísticas por estado
             estadisticas.put("estadisticasPorEstado", morbilidadService.obtenerEstadisticasPorEstado());
-            
-            // Eficacia de medicamentos
             estadisticas.put("eficaciaMedicamentos", morbilidadService.obtenerEficaciaMedicamentos());
-            
-            // Tendencia últimos 7 días
             estadisticas.put("tendenciaUltimos7Dias", morbilidadService.obtenerTendenciaDiaria(7));
-            
-            // Costo total
             estadisticas.put("costoTotalTratamientos", morbilidadService.obtenerCostoTotalTratamientos());
-            
-            // Registros que requieren aislamiento
             estadisticas.put("registrosAislamiento", morbilidadService.obtenerRegistrosQueRequierenAislamiento().size());
-            
-            // Registros contagiosos
             estadisticas.put("registrosContagiosos", morbilidadService.obtenerRegistrosContagiosos().size());
-            
             response.put("success", true);
             response.put("data", estadisticas);
             return ResponseEntity.ok(response);
@@ -330,7 +349,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Contar enfermos por lote
      */
@@ -340,11 +359,9 @@ public class MorbilidadController {
         try {
             Integer totalEnfermos = morbilidadService.contarEnfermosPorLote(loteId);
             Integer enfermosActivos = morbilidadService.contarEnfermosActivosPorLote(loteId);
-            
             Map<String, Object> datos = new HashMap<>();
             datos.put("totalEnfermos", totalEnfermos);
             datos.put("enfermosActivos", enfermosActivos);
-            
             response.put("success", true);
             response.put("data", datos);
             return ResponseEntity.ok(response);
@@ -354,7 +371,7 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     /**
      * Obtener tendencia diaria
      */
@@ -372,9 +389,9 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     // ========== GESTIÓN DE ENFERMEDADES ==========
-    
+
     /**
      * Obtener todas las enfermedades
      */
@@ -392,9 +409,9 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    
+
     // ========== GESTIÓN DE MEDICAMENTOS ==========
-    
+
     /**
      * Obtener todos los medicamentos
      */
@@ -412,4 +429,4 @@ public class MorbilidadController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-} 
+}

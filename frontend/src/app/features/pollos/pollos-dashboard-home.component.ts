@@ -25,7 +25,7 @@ export class PollosDashboardHomeComponent implements OnInit {
   selectedDate = new Date();
   
   // Variables para registro diario
-  registrosDiarios: { [loteId: number]: RegistroDiario } = {};
+  registrosDiarios: { [loteId: string]: RegistroDiario } = {};
   
   // ✅ NUEVAS VARIABLES PARA FORMULARIO DE REGISTRO DIARIO
   mostrarFormularioRegistro = false;
@@ -60,7 +60,7 @@ export class PollosDashboardHomeComponent implements OnInit {
   /**
    * Método trackBy para optimizar el renderizado de la lista de lotes
    */
-  trackByLote(index: number, lote: Lote): number {
+  trackByLote(index: number, lote: Lote): any {
     return lote.id || index;
   }
 
@@ -84,7 +84,7 @@ export class PollosDashboardHomeComponent implements OnInit {
   validarRegistro(lote: Lote): boolean {
     if (!lote.id) return false;
     
-    const registro = this.getRegistroDiario(lote.id);
+    const registro = this.getRegistroDiario(String(lote.id));
     return registro.cantidadAplicada > 0 && registro.animalesVivos > 0;
   }
 
@@ -193,7 +193,7 @@ export class PollosDashboardHomeComponent implements OnInit {
 
   // Inicializar registro diario para un lote
   inicializarRegistroDiario(lote: Lote): void {
-    const loteId = lote.id;
+    const loteId = String(lote.id || '');
     if (!loteId || this.registrosDiarios[loteId]) return;
     
     const etapa = this.getEtapaActual(lote);
@@ -212,7 +212,7 @@ export class PollosDashboardHomeComponent implements OnInit {
 
   // Registrar alimentación diaria
   async registrarAlimentacionDiaria(lote: Lote): Promise<void> {
-    const loteId = lote.id;
+    const loteId = String(lote.id || '');
     if (!loteId) {
       console.error('❌ ID del lote no válido:', lote.codigo);
       return;
@@ -249,7 +249,7 @@ export class PollosDashboardHomeComponent implements OnInit {
 
   // Omitir alimentación del día
   omitirAlimentacion(lote: Lote): void {
-    const loteId = lote.id;
+    const loteId = String(lote.id || '');
     if (!loteId) return;
     
     console.log('⚠️ Alimentación omitida para lote:', lote.codigo);
@@ -286,7 +286,7 @@ export class PollosDashboardHomeComponent implements OnInit {
   /**
    * Obtener registro diario para un lote específico
    */
-  getRegistroDiario(loteId: number | undefined): RegistroDiario {
+  getRegistroDiario(loteId: string | undefined): RegistroDiario {
     // Validar que loteId sea válido
     if (!loteId) {
       return this.getDefaultRegistroDiario();
@@ -320,7 +320,7 @@ export class PollosDashboardHomeComponent implements OnInit {
   /**
    * Actualizar registro diario
    */
-  updateRegistroDiario(loteId: number | undefined, campo: string, event: any): void {
+  updateRegistroDiario(loteId: string | undefined, campo: string, event: any): void {
     // Validar que loteId sea válido
     if (!loteId) {
       console.warn('❌ ID del lote no válido para actualizar registro');

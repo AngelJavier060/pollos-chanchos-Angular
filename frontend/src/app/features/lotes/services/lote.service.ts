@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, catchError, map, throwError } from 'rxjs';
+import { HttpParams } from '@angular/common/http';
 import { Lote } from '../interfaces/lote.interface';
 import { environment } from '../../../../environments/environment';
 
@@ -50,7 +51,8 @@ export class LoteService {
         codigo: lote.codigo,
         name: lote.name,
         quantity: Number(lote.quantity),
-        birthdate: lote.birthdate ? new Date(lote.birthdate) : null,
+        quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
+        birthdate: this.parseDate(lote.birthdate),
         cost: Number(lote.cost),
         race: {
           id: lote.race?.id || 0,
@@ -60,8 +62,9 @@ export class LoteService {
             name: animalName
           }
         },
-        create_date: lote.create_date ? new Date(lote.create_date) : undefined,
-        update_date: lote.update_date ? new Date(lote.update_date) : undefined
+        create_date: this.parseDate(lote.create_date) || undefined,
+        update_date: this.parseDate(lote.update_date) || undefined,
+        fechaCierre: this.parseDate(lote.fechaCierre)
       };
     });
   }
@@ -109,7 +112,7 @@ export class LoteService {
     );
   }
 
-  deleteLote(id: number): Observable<void> {
+  deleteLote(id: string): Observable<void> {
     const url = `${this.apiUrl}/${id}`;
     return this.http.delete<void>(url, this.httpOptions).pipe(
       catchError((error) => this.handleError(error))
@@ -140,7 +143,8 @@ export class LoteService {
       codigo: lote.codigo,
       name: lote.name,
       quantity: Number(lote.quantity),
-      birthdate: lote.birthdate ? new Date(lote.birthdate) : null,
+      quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
+      birthdate: this.parseDate(lote.birthdate),
       cost: Number(lote.cost),
       race: {
         id: lote.race?.id || 0,
@@ -150,8 +154,9 @@ export class LoteService {
           name: animalName
         }
       },
-      create_date: lote.create_date ? new Date(lote.create_date) : undefined,
-      update_date: lote.update_date ? new Date(lote.update_date) : undefined
+      create_date: this.parseDate(lote.create_date) || undefined,
+      update_date: this.parseDate(lote.update_date) || undefined,
+      fechaCierre: this.parseDate(lote.fechaCierre)
     };
   }
 
@@ -218,5 +223,84 @@ export class LoteService {
     }
 
     return throwError(() => new Error(errorMessage));
+  }
+
+  // ===== Nuevos métodos para endpoints del backend =====
+  getResumen(animalId?: number): Observable<any> {
+    let params = new HttpParams();
+    if (animalId != null) {
+      params = params.set('animalId', String(animalId));
+    }
+    return this.http.get<any>(`${this.apiUrl}/resumen`, { params }).pipe(
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  getActivos(animalId?: number): Observable<Lote[]> {
+    let params = new HttpParams();
+    if (animalId != null) {
+      params = params.set('animalId', String(animalId));
+    }
+    return this.http.get<any[]>(`${this.apiUrl}/activos`, { params }).pipe(
+      map(lotes => this.transformLotes(lotes)),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  getHistorico(animalId?: number): Observable<Lote[]> {
+    let params = new HttpParams();
+    if (animalId != null) {
+      params = params.set('animalId', String(animalId));
+    }
+    return this.http.get<any[]>(`${this.apiUrl}/historico`, { params }).pipe(
+      map(lotes => this.transformLotes(lotes)),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  getHistoricoPorFechas(options: { desde?: Date | string; hasta?: Date | string; animalId?: number } = {}): Observable<Lote[]> {
+    let params = new HttpParams();
+    if (options.desde) {
+      const d = typeof options.desde === 'string' ? options.desde : options.desde.toISOString().split('T')[0];
+      params = params.set('desde', d);
+    }
+    if (options.hasta) {
+      const h = typeof options.hasta === 'string' ? options.hasta : options.hasta.toISOString().split('T')[0];
+      params = params.set('hasta', h);
+    }
+    if (options.animalId != null) {
+      params = params.set('animalId', String(options.animalId));
+    }
+    return this.http.get<any[]>(`${this.apiUrl}/historico-fechas`, { params }).pipe(
+      map(lotes => this.transformLotes(lotes)),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  // ===== Helpers de fecha =====
+  private parseDate(value: any): Date | null {
+    if (value == null) return null;
+    // Epoch millis o número
+    if (typeof value === 'number') {
+      return new Date(value);
+    }
+    // ISO string
+    if (typeof value === 'string') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Array [yyyy, MM, dd, HH, mm, ss, nanos]
+    if (Array.isArray(value) && value.length >= 3) {
+      const [y, m, d, hh = 0, mm = 0, ss = 0] = value;
+      return new Date(y, (m - 1), d, hh, mm, ss);
+    }
+    // Objeto con campos year, month, day
+    if (typeof value === 'object' && 'year' in value && 'month' in value && 'day' in value) {
+      const y = (value as any).year;
+      const m = (value as any).month;
+      const d = (value as any).day;
+      return new Date(y, (m - 1), d);
+    }
+    return null;
   }
 }

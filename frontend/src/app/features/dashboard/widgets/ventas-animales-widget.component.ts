@@ -290,8 +290,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   // Flag para ocultar el panel de especie/buscar sin afectar el resto
   mostrarPanelExplorador = false;
   // Borrador local de ventas de animales
-  borrador: Array<{ loteId: number; loteCodigo?: string; animal: string; fecha: string; cantidad: number; precioUnit: number; total: number; }>= [];
-  venta: { loteId: number | null; fecha: string; cantidad: number; precioUnit: number; total: number } = {
+  borrador: Array<{ loteId: string; loteCodigo?: string; animal: string; fecha: string; cantidad: number; precioUnit: number; total: number; }>= [];
+  venta: { loteId: string | null; fecha: string; cantidad: number; precioUnit: number; total: number } = {
     loteId: null,
     fecha: VentasAnimalesWidgetComponent.hoyISO(),
     cantidad: 1,
@@ -512,10 +512,11 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     return this.lotes.find(l => l.id === this.venta.loteId) || null;
   }
 
-  // Lotes filtrados por animal seleccionado desde configuración
+  // Lotes filtrados por animal seleccionado desde configuración - solo lotes con stock disponible
   get lotesFiltradosPorAnimal(): Lote[] {
-    if (this.animalSeleccionadoId == null) return this.lotes;
-    return (this.lotes || []).filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
+    const lotesConStock = (this.lotes || []).filter(l => (l.quantity || 0) > 0);
+    if (this.animalSeleccionadoId == null) return lotesConStock;
+    return lotesConStock.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
   }
 
   onSelectLote(): void {
@@ -595,7 +596,7 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     }
 
     const item = {
-      loteId: lote.id!,
+      loteId: String(lote.id!),
       loteCodigo: lote.codigo,
       animal: lote.race?.animal?.name || 'N/D',
       fecha: this.venta.fecha,

@@ -175,7 +175,7 @@
       <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
         <button 
           type="button" 
-          class="px-5 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+          class="px-5 py-2.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           (click)="toggleForm()">
           <div class="flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -256,8 +256,14 @@
     </div>
   </div>
   
+  <!-- Barra de pestañas -->
+  <div class="flex items-center gap-2 mb-4">
+    <button (click)="activeTab = 'activos'" [ngClass]="{'bg-blue-600 text-white': activeTab === 'activos', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'activos'}" class="px-4 py-2 rounded-lg transition-colors">Activos</button>
+    <button (click)="activeTab = 'historico'" [ngClass]="{'bg-blue-600 text-white': activeTab === 'historico', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'historico'}" class="px-4 py-2 rounded-lg transition-colors">Histórico por fechas</button>
+  </div>
+
   <!-- Sección de Lotes Activos con filtros dinámicos -->
-  <div class="bg-blue-50 p-6 rounded-lg border border-blue-100">
+  <div *ngIf="activeTab === 'activos'" class="bg-blue-50 p-6 rounded-lg border border-blue-100">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold text-blue-700">Lotes Activos</h2>
       <div class="flex items-center gap-4">
@@ -295,7 +301,8 @@
           <tr>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Original</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales Vivos</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Nacimiento</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
@@ -305,12 +312,27 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
           <tr *ngIf="lotesFiltrados.length === 0">
-            <td colspan="8" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
+            <td colspan="9" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
           </tr>
           <tr *ngFor="let lote of lotesFiltrados" class="hover:bg-gray-50">
             <td class="py-4 px-4">{{ lote.codigo || lote.id }}</td>
             <td class="py-4 px-4">{{ lote.name }}</td>
-            <td class="py-4 px-4">{{ lote.quantity }}</td>
+            <td class="py-4 px-4">
+              <span class="text-gray-600">{{ lote.quantityOriginal || lote.quantity }}</span>
+            </td>
+            <td class="py-4 px-4">
+              <div class="flex items-center space-x-2">
+                <span [ngClass]="{
+                  'text-green-600 font-semibold': lote.quantity > 0,
+                  'text-red-600 font-semibold': lote.quantity === 0,
+                  'text-yellow-600 font-semibold': lote.quantity > 0 && lote.quantity < (lote.quantityOriginal || lote.quantity) * 0.8
+                }">{{ lote.quantity }}</span>
+                <span *ngIf="lote.quantityOriginal && lote.quantity < lote.quantityOriginal" 
+                      class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                  -{{ lote.quantityOriginal - lote.quantity }}
+                </span>
+              </div>
+            </td>
             <td class="py-4 px-4">{{ lote.birthdate | date:'dd/MM/yyyy' }}</td>
             <td class="py-4 px-4">{{ lote.cost | currency }}</td>
             <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
@@ -333,6 +355,80 @@
                 </button>
               </div>
             </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sección de Histórico por Fechas -->
+  <div *ngIf="activeTab === 'historico'" class="bg-indigo-50 p-6 rounded-lg border border-indigo-100 mt-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-indigo-700">Histórico por Fechas</h2>
+    </div>
+    
+    <!-- Filtros: Especie + Rango de fechas -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Especie</label>
+        <select class="w-full border rounded-md p-2" [ngModel]="selectedAnimalId" (ngModelChange)="changeAnimalResumen($event)">
+          <option [ngValue]="null">Todas</option>
+          <option *ngFor="let a of animalOptions" [ngValue]="a.id">{{ a.name }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+        <input type="date" class="w-full border rounded-md p-2" [(ngModel)]="fechaDesde">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+        <input type="date" class="w-full border rounded-md p-2" [(ngModel)]="fechaHasta">
+      </div>
+      <div class="flex items-end gap-2">
+        <button (click)="buscarHistorico()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg">Buscar</button>
+        <button (click)="historicoFechas = []; fechaDesde = null; fechaHasta = null" class="bg-white border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg">Limpiar</button>
+      </div>
+    </div>
+
+    <!-- Tarjetas de resumen (adquiridos y vivos) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <p class="text-sm text-gray-500">Animales Adquiridos</p>
+        <p class="text-2xl font-bold text-indigo-700">{{ resumen?.animalesAdquiridos || 0 }}</p>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <p class="text-sm text-gray-500">Animales Vivos</p>
+        <p class="text-2xl font-bold text-indigo-700">{{ resumen?.animalesActuales || 0 }}</p>
+      </div>
+    </div>
+
+    <!-- Tabla de histórico por fechas -->
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Cierre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr *ngIf="historicoFechas.length === 0 && !loadingHistorico">
+            <td colspan="6" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes en el rango seleccionado</td>
+          </tr>
+          <tr *ngIf="loadingHistorico">
+            <td colspan="6" class="py-4 px-4 text-center text-sm text-gray-500">Cargando...</td>
+          </tr>
+          <tr *ngFor="let lote of historicoFechas" class="hover:bg-gray-50">
+            <td class="py-4 px-4">{{ lote.codigo || lote.id }}</td>
+            <td class="py-4 px-4">{{ lote.name }}</td>
+            <td class="py-4 px-4">{{ lote.quantity }}</td>
+            <td class="py-4 px-4">{{ lote.fechaCierre | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
+            <td class="py-4 px-4">{{ lote.race.animal.name || 'No asignado' }}</td>
           </tr>
         </tbody>
       </table>

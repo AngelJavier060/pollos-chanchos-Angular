@@ -16,6 +16,8 @@ import com.wil.avicola_backend.model.Lote;
 import com.wil.avicola_backend.service.LoteService;
 
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/lote")
@@ -64,5 +66,33 @@ public class LoteController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Lote> deleteLote(@PathVariable String id) {
         return loteService.deleteLote(id);
+    }
+
+    // ================== NUEVOS ENDPOINTS RESUMEN Y LISTADOS ==================
+    @GetMapping("/resumen")
+    public ResponseEntity<java.util.Map<String, Object>> getResumen(
+            @RequestParam(name = "animalId", required = false) Long animalId) {
+        return loteService.getResumen(animalId);
+    }
+
+    @GetMapping("/activos")
+    public ResponseEntity<?> getActivos(
+            @RequestParam(name = "animalId", required = false) Long animalId) {
+        return loteService.findActivos(animalId);
+    }
+
+    @GetMapping("/historico")
+    public ResponseEntity<?> getHistorico(
+            @RequestParam(name = "animalId", required = false) Long animalId) {
+        return loteService.findHistorico(animalId);
+    }
+
+    // Histórico por rango de fechas de cierre (usa fechaCierre)
+    @GetMapping("/historico-fechas")
+    public ResponseEntity<?> getHistoricoPorFechas(
+            @RequestParam(name = "desde", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate desde,
+            @RequestParam(name = "hasta", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate hasta,
+            @RequestParam(name = "animalId", required = false) Long animalId) {
+        return loteService.findHistoricoByFechas(desde, hasta, animalId);
     }
 }

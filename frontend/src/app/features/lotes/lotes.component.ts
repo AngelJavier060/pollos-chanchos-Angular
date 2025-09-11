@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { LoteService } from './services/lote.service';
 import { RaceService } from '../configuracion/services/race.service';
 import { Lote } from './interfaces/lote.interface';
@@ -13,7 +13,7 @@ import { Race } from '../configuracion/interfaces/race.interface';
   templateUrl: './lotes.component.html',
   styleUrls: ['./lotes.component.scss'],
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, HttpClientModule]
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, HttpClientModule]
 })
 export class LotesComponent implements OnInit {
   lotes: Lote[] = [];
@@ -21,10 +21,13 @@ export class LotesComponent implements OnInit {
   races: Race[] = [];
   loteForm!: FormGroup;
   isEditing: boolean = false;
-  currentLoteId: number | null = null;
+  currentLoteId: string | null = null;
   loading: boolean = false;
   errorMessage: string = '';
   showForm: boolean = false;
+  
+  // Tabs
+  activeTab: 'activos' | 'historico' = 'activos';
   
   // Filtro por tipo de animal
   filtroAnimalActual: string = 'all';
@@ -40,12 +43,37 @@ export class LotesComponent implements OnInit {
     color: string;
   }> = new Map();
 
+  // Opciones de especies (para resumen e histórico)
+  animalOptions: { id: number; name: string }[] = [];
+  selectedAnimalId: number | null = null;
+
+  // Resumen por especie/general
+  resumen: { animalesAdquiridos: number; animalesActuales: number } | null = null;
+  loadingResumen = false;
+
+  // Histórico por fechas
+  fechaDesde: string | null = null; // formato yyyy-MM-dd
+  fechaHasta: string | null = null; // formato yyyy-MM-dd
+  historicoFechas: Lote[] = [];
+  loadingHistorico = false;
+
   constructor(
     private fb: FormBuilder,
     private loteService: LoteService,
     private raceService: RaceService
   ) {
     this.initForm();
+  }
+
+  // Construir lista de especies únicas a partir de races
+  private buildAnimalOptionsFromRaces(): void {
+    const map = new Map<number, string>();
+    this.races.forEach(r => {
+      if (r.animal?.id && r.animal.name) {
+        map.set(r.animal.id, r.animal.name);
+      }
+    });
+    this.animalOptions = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }
 
   private initForm(): void {
@@ -61,6 +89,8 @@ export class LotesComponent implements OnInit {
   ngOnInit(): void {
     this.loadLotes();
     this.loadAndValidateRaces();
+    // Cargar resumen inicial (general)
+    this.loadResumen();
   }
 
   toggleForm(): void {
@@ -112,6 +142,7 @@ export class LotesComponent implements OnInit {
       next: (data) => {
         this.races = data;
         this.validateRacesData();
+        this.buildAnimalOptionsFromRaces();
         this.loading = false;
       },
       error: (error) => {
@@ -212,7 +243,52 @@ export class LotesComponent implements OnInit {
     this.checkDuplicateNameAndSubmit();
   }
 
+  // ====== Resumen ======
+  changeAnimalResumen(id: string): void {
+    this.selectedAnimalId = id ? Number(id) : null;
+    this.loadResumen();
+  }
+
+  loadResumen(): void {
+    this.loadingResumen = true;
+    this.loteService.getResumen(this.selectedAnimalId ?? undefined).subscribe({
+      next: (res) => {
+        this.resumen = {
+          animalesAdquiridos: Number(res?.animalesAdquiridos ?? 0),
+          animalesActuales: Number(res?.animalesActuales ?? 0)
+        };
+        this.loadingResumen = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar resumen', err);
+        this.loadingResumen = false;
+      }
+    });
+  }
+
+  // ====== Histórico por fechas ======
+  buscarHistorico(): void {
+    this.loadingHistorico = true;
+    this.loteService.getHistoricoPorFechas({
+      desde: this.fechaDesde || undefined,
+      hasta: this.fechaHasta || undefined,
+      animalId: this.selectedAnimalId ?? undefined
+    }).subscribe({
+      next: (lotes) => {
+        this.historicoFechas = lotes;
+        this.loadingHistorico = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar histórico por fechas', err);
+        this.loadingHistorico = false;
+      }
+    });
+  }
+
   private createLote(raceId: number, lote: Lote): void {
+    // Al crear un lote nuevo, establecer quantityOriginal igual a quantity
+    lote.quantityOriginal = lote.quantity;
+    
     this.loteService.createLote(raceId, lote).subscribe({
       next: (newLote) => {
         console.log('Lote creado exitosamente:', newLote);
@@ -220,6 +296,7 @@ export class LotesComponent implements OnInit {
         this.resetForm();
         this.loading = false;
         this.showForm = false;
+        this.loadLotes(); // Recargar para actualizar la vista
       },
       error: (error) => {
         console.error('Error al crear el lote:', error);
@@ -230,39 +307,21 @@ export class LotesComponent implements OnInit {
   }
 
   private updateLote(lote: Lote): void {
+    this.loading = true;
+    
     this.loteService.updateLote(lote).subscribe({
-      next: (updatedLote) => {
-        const index = this.lotes.findIndex(l => l.id === updatedLote.id);
-        if (index !== -1) {
-          this.lotes[index] = updatedLote;
-        }
+      next: () => {
+        this.loadLotes();
         this.resetForm();
         this.loading = false;
         this.showForm = false;
       },
       error: (error) => {
-        console.error('Error al actualizar el lote:', error);
-        this.errorMessage = error.message;
+        console.error('Error updating lote:', error);
+        this.errorMessage = 'Error al actualizar el lote';
         this.loading = false;
       }
     });
-  }
-
-  deleteLote(id: number): void {
-    if (confirm('¿Está seguro que desea eliminar este lote?')) {
-      this.loading = true;
-      this.loteService.deleteLote(id).subscribe({
-        next: () => {
-          this.lotes = this.lotes.filter(lote => lote.id !== id);
-          this.loading = false;
-        },
-        error: (error) => {
-          console.error('Error al eliminar el lote:', error);
-          this.errorMessage = error.message;
-          this.loading = false;
-        }
-      });
-    }
   }
 
   editLote(lote: Lote): void {
@@ -383,5 +442,21 @@ export class LotesComponent implements OnInit {
         }
       }
     });
+  }
+
+  // Métodos auxiliares eliminados - ya están definidos arriba
+
+  deleteLote(id: string): void {
+    if (confirm('¿Está seguro de que desea eliminar este lote?')) {
+      this.loteService.deleteLote(id).subscribe({
+        next: () => {
+          this.loadLotes();
+        },
+        error: (error) => {
+          console.error('Error al eliminar lote:', error);
+          this.errorMessage = 'Error al eliminar el lote';
+        }
+      });
+    }
   }
 }

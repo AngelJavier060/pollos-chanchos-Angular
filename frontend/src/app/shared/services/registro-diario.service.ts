@@ -9,7 +9,7 @@ import { MortalidadBackendService, RegistroMortalidadRequest } from './mortalida
 import { MorbilidadBackendService, RegistroMorbilidadRequest } from './morbilidad-backend.service';
 
 export interface RegistroDiarioCompleto {
-  loteId: number;
+  loteId: string;
   fecha: Date;
   animalesMuertos: number;
   animalesEnfermos: number;
@@ -174,7 +174,7 @@ export class RegistroDiarioService {
   /**
    * ✅ ACTUALIZAR CANTIDAD DE ANIMALES EN LOTE
    */
-  private actualizarCantidadLote(loteId: number, cantidadAReducir: number): Observable<any> {
+  private actualizarCantidadLote(loteId: string, cantidadAReducir: number): Observable<any> {
     return this.loteService.getLotes().pipe(
       switchMap((lotes: any) => {
         let lotesArray = lotes;

@@ -1,6 +1,6 @@
 export interface RegistroMorbilidad {
   id?: number;
-  loteId: number;
+  loteId: string;
   loteName?: string;
   fechaRegistro: Date;
   cantidadEnfermos: number;

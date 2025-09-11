@@ -3,9 +3,13 @@ package com.wil.avicola_backend.service;
 import com.wil.avicola_backend.model.Enfermedad;
 import com.wil.avicola_backend.model.Medicamento;
 import com.wil.avicola_backend.model.RegistroMorbilidad;
+import com.wil.avicola_backend.model.RegistroMortalidad;
+import com.wil.avicola_backend.model.Lote;
+import com.wil.avicola_backend.dto.ConvertirMortalidadDTO;
 import com.wil.avicola_backend.repository.EnfermedadRepository;
 import com.wil.avicola_backend.repository.MedicamentoRepository;
 import com.wil.avicola_backend.repository.MorbilidadRepository;
+import com.wil.avicola_backend.repository.LoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +19,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Servicio para la gestión de la morbilidad
+ */
 @Service
 @Transactional
 public class MorbilidadService {
@@ -27,6 +34,12 @@ public class MorbilidadService {
     
     @Autowired
     private MedicamentoRepository medicamentoRepository;
+    
+    @Autowired
+    private MortalidadService mortalidadService;
+    
+    @Autowired
+    private LoteRepository loteRepository;
     
     // ========== OPERACIONES CRUD ==========
     
@@ -109,6 +122,69 @@ public class MorbilidadService {
             return morbilidadRepository.save(r);
         }
         throw new RuntimeException("Registro de morbilidad no encontrado con ID: " + id);
+    }
+    
+    // ========== NUEVOS FLUJOS: RECUPERAR Y CONVERTIR A MORTALIDAD ==========
+    public RegistroMorbilidad recuperar(Long id) {
+        Optional<RegistroMorbilidad> registroOpt = morbilidadRepository.findById(id);
+        if (registroOpt.isEmpty()) throw new RuntimeException("Registro de morbilidad no encontrado con ID: " + id);
+        RegistroMorbilidad r = registroOpt.get();
+        r.setEstadoTratamiento(RegistroMorbilidad.EstadoTratamiento.RECUPERADO);
+        r.setFechaFinTratamiento(LocalDate.now());
+        return morbilidadRepository.save(r);
+    }
+
+    public RegistroMortalidad convertirAMortalidad(Long id, ConvertirMortalidadDTO dto) {
+        Optional<RegistroMorbilidad> registroOpt = morbilidadRepository.findById(id);
+        if (registroOpt.isEmpty()) throw new RuntimeException("Registro de morbilidad no encontrado con ID: " + id);
+        RegistroMorbilidad morbilidad = registroOpt.get();
+
+        if (dto.getCausaId() == null) {
+            throw new RuntimeException("Se requiere causaId para convertir a mortalidad.");
+        }
+        if (dto.getCantidad() == null || dto.getCantidad() <= 0) {
+            throw new RuntimeException("La cantidad a convertir debe ser > 0.");
+        }
+
+        // Resolver lote (UUID o código)
+        Lote lote = resolveLote(dto.getLoteId(), dto.getLoteCodigo());
+        if (lote == null) {
+            throw new RuntimeException("No se pudo resolver el lote (UUID o código requerido).");
+        }
+
+        // Crear registro de mortalidad y delegar descuento en MortalidadService
+        RegistroMortalidad mortalidad = new RegistroMortalidad();
+        mortalidad.setLoteId(lote.getId());
+        mortalidad.setCantidadMuertos(dto.getCantidad());
+        mortalidad.setObservaciones(dto.getObservaciones());
+        mortalidad.setPeso(dto.getPeso());
+        mortalidad.setEdad(dto.getEdad());
+        mortalidad.setUbicacion(dto.getUbicacion());
+        mortalidad.setConfirmado(dto.getConfirmado() != null ? dto.getConfirmado() : Boolean.TRUE);
+        mortalidad.setUsuarioRegistro(dto.getUsuarioRegistro());
+
+        RegistroMortalidad creado = mortalidadService.crearRegistroConCausaId(mortalidad, dto.getCausaId());
+
+        // Actualizar estado de morbilidad
+        morbilidad.setEstadoTratamiento(RegistroMorbilidad.EstadoTratamiento.MOVIDO_A_MORTALIDAD);
+        morbilidad.setDerivadoAMortalidad(true);
+        morbilidad.setFechaFinTratamiento(LocalDate.now());
+        morbilidadRepository.save(morbilidad);
+
+        return creado;
+    }
+
+    private Lote resolveLote(String loteId, String loteCodigo) {
+        if (loteId != null && !loteId.isBlank()) {
+            try {
+                Optional<Lote> opt = loteRepository.findById(loteId);
+                if (opt.isPresent()) return opt.get();
+            } catch (Exception ignored) {}
+        }
+        if (loteCodigo != null && !loteCodigo.isBlank()) {
+            return loteRepository.findByCodigo(loteCodigo).orElse(null);
+        }
+        return null;
     }
     
     // ========== CONSULTAS ESPECÍFICAS ==========

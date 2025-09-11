@@ -73,7 +73,7 @@ export class AlimentacionService {
   /**
    * Registrar alimentación diaria
    */
-  registrarAlimentacion(request: RegistroAlimentacionRequest): Observable<RegistroAlimentacionResponse> {
+  registrarAlimentacion(request: RegistroAlimentacionRequest): Observable<string> {
     // ✅ USAR ENDPOINT DE DEBUG QUE SÍ GUARDA EN LA BASE DE DATOS
     const url = `${this.apiUrl}/debug/registrar-alimentacion`;
     
@@ -84,7 +84,8 @@ export class AlimentacionService {
     console.log('🍽️ Enviando registro de alimentación a endpoint de DEBUG (que SÍ guarda):', request);
     console.log('🔗 URL:', url);
     
-    return this.http.post<RegistroAlimentacionResponse>(url, request, { headers });
+    // Este endpoint devuelve texto (ResponseEntity<String>), por lo que configuramos responseType
+    return this.http.post<string>(url, request, { headers, responseType: 'text' as 'json' });
   }
 
   /**

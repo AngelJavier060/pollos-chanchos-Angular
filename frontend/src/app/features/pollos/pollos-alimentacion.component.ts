@@ -24,7 +24,7 @@ interface RegistroAlimentacionCompleto {
   observacionesVenta: string;
   observacionesSalud: string;
   observacionesGenerales: string;
-  loteId: number;
+  loteId: string;
   usuarioId: number;
   stockAnterior: number;
   stockPosterior: number;
@@ -83,7 +83,7 @@ export class PollosAlimentacionComponent implements OnInit {
   planActivoAdministrador: any = null;
 
   // Estadísticas de lotes - Cache para mortalidad
-  private estadisticasLotes: Map<number, {
+  private estadisticasLotes: Map<string, {
     pollosRegistrados: number;
     pollosVivos: number;
     mortalidadTotal: number;
@@ -173,7 +173,7 @@ export class PollosAlimentacionComponent implements OnInit {
     return this.lotesActivos.reduce((total, lote) => total + (lote.quantity || 0), 0);
   }
 
-  trackByLote(index: number, lote: Lote): number {
+  trackByLote(index: number, lote: Lote): any {
     return lote.id || index;
   }
 
@@ -338,7 +338,7 @@ export class PollosAlimentacionComponent implements OnInit {
   abrirModalAlimentacion(lote: Lote): void {
     this.loteSeleccionado = lote;
     this.registroCompleto = this.getRegistroVacio();
-    this.registroCompleto.loteId = lote.id || 0;
+    this.registroCompleto.loteId = String(lote.id || '');
     this.registroCompleto.animalesVivos = lote.quantity || 0;
     this.modalAbierto = true;
     
@@ -625,17 +625,42 @@ export class PollosAlimentacionComponent implements OnInit {
         return;
       }
 
-      if (this.registroCompleto.cantidadAplicada <= 0) {
-        alert('❌ La cantidad debe ser mayor a 0');
+      if ((this.registroCompleto.cantidadAplicada == null || this.registroCompleto.cantidadAplicada <= 0) &&
+          (this.registroCompleto.animalesMuertos == null || this.registroCompleto.animalesMuertos <= 0)) {
+        alert('❌ La cantidad debe ser mayor a 0 o debe registrar animales muertos');
         return;
       }
 
       // Confirmación
-      const confirmar = confirm(
-        `¿Confirmar registro de ${this.registroCompleto.cantidadAplicada} kg para el lote ${this.loteSeleccionado.codigo}?\n\n` +
-        `✅ Se deducirá automáticamente del inventario de alimentos.`
-      );
+      const mensajeConfirmacion = (this.registroCompleto.cantidadAplicada > 0)
+        ? `¿Confirmar registro de ${this.registroCompleto.cantidadAplicada} kg para el lote ${this.loteSeleccionado.codigo}?\n\n` +
+          `✅ Se deducirá automáticamente del inventario de alimentos.`
+        : `¿Confirmar registro sin consumo de alimento para el lote ${this.loteSeleccionado.codigo}?\n\n` +
+          `🐔 Se registrará únicamente la mortalidad indicada y se actualizará el lote.`;
+      const confirmar = confirm(mensajeConfirmacion);
       if (!confirmar) return;
+
+      // Si no hay consumo de alimento pero sí hay mortalidad, registrar solo mortalidad
+      if ((this.registroCompleto.cantidadAplicada == null || this.registroCompleto.cantidadAplicada <= 0) &&
+          (this.registroCompleto.animalesMuertos != null && this.registroCompleto.animalesMuertos > 0)) {
+        try {
+          this.loading = true;
+          if (this.registroCompleto.causaMortalidad) {
+            await this.registrarMortalidadAutomatica();
+          } else {
+            // Redirigir a la pantalla de mortalidad para completar causa si no se indicó
+            this.router.navigate(['/pollos/mortalidad'], { 
+              queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesMuertos }
+            });
+          }
+        } catch (e) {
+          console.error('❌ Error en flujo de solo mortalidad:', e);
+          alert('❌ Ocurrió un error al registrar la mortalidad. Intente nuevamente.');
+        } finally {
+          this.loading = false;
+        }
+        return;
+      }
 
       this.loading = true;
 
@@ -668,8 +693,7 @@ export class PollosAlimentacionComponent implements OnInit {
           cantidadAplicada: this.registroCompleto.cantidadAplicada,
           animalesVivos: this.registroCompleto.animalesVivos,
           animalesMuertos: this.registroCompleto.animalesMuertos,
-          observaciones: this.registroCompleto.observacionesGenerales || '',
-          usuarioId: this.user?.id || 0
+          observaciones: this.registroCompleto.observacionesGenerales || ''
         };
 
         const responseAlimentacion = await this.alimentacionService.registrarAlimentacion(datosRegistro).toPromise();
@@ -927,13 +951,13 @@ export class PollosAlimentacionComponent implements OnInit {
   }
 
   // Funciones adicionales requeridas por el template
-  obtenerEdadLote(loteId: number): number {
-    const lote = this.lotesActivos.find(l => l.id === loteId);
+  obtenerEdadLote(loteId: string): number {
+    const lote = this.lotesActivos.find(l => String(l.id) === loteId);
     return lote ? this.calcularDiasDeVida(lote.birthdate) : 0;
   }
 
-  obtenerEtapaActual(loteId: number): { nombre: string } | null {
-    const lote = this.lotesActivos.find(l => l.id === loteId);
+  obtenerEtapaActual(loteId: string): { nombre: string } | null {
+    const lote = this.lotesActivos.find(l => String(l.id) === loteId);
     if (!lote) return null;
     
     const diasVida = this.calcularDiasDeVida(lote.birthdate);
@@ -1031,7 +1055,7 @@ export class PollosAlimentacionComponent implements OnInit {
       observacionesVenta: '',
       observacionesSalud: '',
       observacionesGenerales: '',
-      loteId: 0,
+      loteId: '',
       usuarioId: this.user?.id || 0,
       stockAnterior: 0,
       stockPosterior: 0,
@@ -1041,7 +1065,7 @@ export class PollosAlimentacionComponent implements OnInit {
     };
   }
 
-  // 🔧 MÉTODO DE DIAGNÓSTICO ESPECÍFICO PARA ALIMENTACIÓN
+  // MÉTODO DE DIAGNÓSTICO ESPECÍFICO PARA ALIMENTACIÓN
   async diagnosticarCargaDeAlimentos(): Promise<void> {
     console.log('🔧 === DIAGNÓSTICO ESPECÍFICO DE ALIMENTACIÓN ===');
     

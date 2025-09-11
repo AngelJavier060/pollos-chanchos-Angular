@@ -50,7 +50,7 @@ export class PollosLotesComponent implements OnInit {
   /**
    * Método trackBy para optimizar el renderizado
    */
-  trackByLote(index: number, lote: Lote): number {
+  trackByLote(index: number, lote: Lote): any {
     return lote.id || index;
   }
 
