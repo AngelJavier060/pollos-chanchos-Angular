@@ -363,7 +363,7 @@ export class PollosAlimentacionComponent implements OnInit {
       console.log('📦 Lotes recibidos del servicio:', lotes?.length || 0);
       
       try {
-        const activos = await this.loteService.getActivos(1).toPromise();
+        const activos = await this.loteService.getActivos().toPromise();
         this.lotesActivos = (activos || []).filter(l => l.race?.animal?.name?.toLowerCase().includes('pollo') || l.race?.animal?.id === 1);
       } catch {
         this.lotesActivos = lotes?.filter(lote => 
