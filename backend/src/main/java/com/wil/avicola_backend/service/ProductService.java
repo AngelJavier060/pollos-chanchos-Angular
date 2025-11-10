@@ -38,6 +38,8 @@ public class ProductService {
     private CategoryRepository categoryRepository;
     @Autowired
     private CategoryService categoryService; // Añadido el servicio de categorías
+    @Autowired
+    private InventarioProductoService inventarioProductoService; // Sincronización de inventario por producto
 
     public ResponseEntity<?> findProducts() {
         return ResponseEntity.ok().body(productRepository.findByActiveTrue());
@@ -112,6 +114,17 @@ public class ProductService {
 
             Product product_new = productRepository.save(product);
             logger.info("Producto guardado exitosamente con ID: {}", product_new.getId());
+
+            // Sincronizar inventario automáticamente tras crear el producto
+            try {
+                inventarioProductoService.sincronizarDesdeProduct(
+                    product_new.getId(),
+                    "Admin UI",
+                    "Sincronización automática al crear producto"
+                );
+            } catch (Exception syncEx) {
+                logger.warn("No se pudo sincronizar inventario para producto {}: {}", product_new.getId(), syncEx.getMessage());
+            }
             return ResponseEntity.status(HttpStatus.OK).body(product_new);
         } catch (RequestException e) {
             logger.error("Error de validación al guardar producto: {}", e.getMessage());
@@ -140,8 +153,22 @@ public class ProductService {
                         null != product.getDate_compra() ? product.getDate_compra() : product_old.getDate_compra());
                 product_old.setLevel_min(0 != product.getLevel_min() ? product.getLevel_min() : product_old.getLevel_min());
                 product_old.setLevel_max(0 != product.getLevel_max() ? product.getLevel_max() : product_old.getLevel_max());
+                // Actualizar descripción si viene en el payload (permitiendo vaciarla con "")
+                product_old.setDescription(
+                        null != product.getDescription() ? product.getDescription() : product_old.getDescription());
 
                 productRepository.save(product_old);
+
+                // Sincronizar inventario automáticamente tras actualizar el producto
+                try {
+                    inventarioProductoService.sincronizarDesdeProduct(
+                        product_old.getId(),
+                        "Admin UI",
+                        "Sincronización automática al actualizar producto"
+                    );
+                } catch (Exception syncEx) {
+                    logger.warn("No se pudo sincronizar inventario para producto {}: {}", product_old.getId(), syncEx.getMessage());
+                }
                 return ResponseEntity.status(HttpStatus.OK).body(product_old);
             }
             throw new RequestException("No existe producto.");

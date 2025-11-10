@@ -1,21 +1,25 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
 import { ProductService } from '../../shared/services/product.service';
 import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/services/analisis-inventario.service';
 import { InventarioService, InventarioAlimento, MovimientoInventario } from '../pollos/services/inventario.service';
+import { InventarioProductoFrontService, InventarioProductoFront, MovimientoProductoRequest } from '../../shared/services/inventario-producto.service';
+import { InventarioEntradasService, InventarioEntrada, CrearEntradaRequest } from '../../shared/services/inventario-entradas.service';
 import { 
   Product, Provider, TypeFood, UnitMeasurement, Animal, Stage, NombreProducto 
 } from '../../shared/models/product.model';
+import { WebsocketService } from '../../shared/services/websocket.service';
 
 @Component({
   selector: 'app-inventario',
   templateUrl: './inventario.component.html',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, HttpClientModule]
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, HttpClientModule],
+  providers: [WebsocketService]
 })
 export class InventarioComponent implements OnInit {
   products: Product[] = [];
@@ -30,6 +34,8 @@ export class InventarioComponent implements OnInit {
 
   // Análisis de inventario
   analisisInventario: InventarioAnalisis | null = null;
+  analisisPollos: InventarioAnalisis | null = null;
+  analisisChanchos: InventarioAnalisis | null = null;
   cargandoAnalisis = false;
 
   // Inventario automático con disminución
@@ -37,11 +43,37 @@ export class InventarioComponent implements OnInit {
   inventariosStockBajo: InventarioAlimento[] = [];
   movimientosSeleccionados: MovimientoInventario[] = [];
 
-  // Vista actual
-  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' = 'productos';
+  // Inventario real por producto (mapa productId -> cantidadStock)
+  inventarioProductoMap: Map<number, number> = new Map();
+  // Vencimientos por producto (en unidad base)
+  stockVencidoMap: Map<number, number> = new Map();
+  stockPorVencerMap: Map<number, number> = new Map();
+  // Stock válido (no vencido) calculado desde entradas por producto
+  stockValidoMap: Map<number, number> = new Map();
+  // Disminución acumulada (consumos) por producto
+  disminucionAcumuladaMap: Map<number, number> = new Map();
+  invProductoSeleccionado: InventarioProductoFront | null = null;
+
+  // Vista actual (por defecto en Productos)
+  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' | 'entradas' | 'alertas' = 'productos';
+
+  // Resumen de cantidad real por Tipo de Alimento (para pestaña Productos -> Cantidad Real)
+  resumenCantidadReal: Array<{
+    typeFoodId: number;
+    typeFoodName: string;
+    cantidadOriginal: number;
+    cantidadActual: number;
+    consumido: number;
+    unidadMedida: string;
+  }> = [];
 
   productForm: FormGroup;
   searchForm: FormGroup;
+  entradaForm: FormGroup;
+  // Edición de entradas
+  editEntradaForm: FormGroup;
+  showEditEntradaModal: boolean = false;
+  editingEntradaId: number | null = null;
 
   selectedProduct: Product | null = null;
   isLoading = false;
@@ -51,22 +83,38 @@ export class InventarioComponent implements OnInit {
   // Referencia a Math para usarlo en el template
   Math = Math;
 
+  // Entradas por producto (UI Entradas)
+  selectedProductIdEntradas: number | null = null;
+  entradasProducto: InventarioEntrada[] = [];
+
+  // Alertas (UI Alertas)
+  alertasPorVencer: InventarioEntrada[] = [];
+  alertasVencidas: InventarioEntrada[] = [];
+  diasAlertaPorVencer: number = 15;
+  
+  animalIdAnalisis: number | null = 1;
+
   constructor(
     private productService: ProductService,
     private analisisService: AnalisisInventarioService,
     private inventarioService: InventarioService,
-    private fb: FormBuilder
+    private invProductoService: InventarioProductoFrontService,
+    private entradasService: InventarioEntradasService,
+    private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private websocketService: WebsocketService
   ) {
     this.productForm = this.fb.group({
       id: [null],
       name: ['', [Validators.required, Validators.maxLength(45)]],
+      description: [''],
       quantity: [0, [Validators.required, Validators.min(0)]],
       price_unit: [0, [Validators.required, Validators.min(0)]],
       number_facture: [0],
       date_compra: [null],
       level_min: [0],
       level_max: [0],
-      provider_id: [null, [Validators.required]],
+      provider_id: [null],
       typeFood_id: [null, [Validators.required]],
       unitMeasurement_id: [null, [Validators.required]],
       animal_id: [null, [Validators.required]],
@@ -76,32 +124,351 @@ export class InventarioComponent implements OnInit {
     this.searchForm = this.fb.group({
       name: [''],
       providerId: [null],
-      typeFoodId: [null],
       animalId: [null],
       stageId: [null]
+    });
+
+    // Formulario de creación de entradas
+    this.entradaForm = this.fb.group({
+      productId: [null, [Validators.required]],
+      unidadControl: ['saco'],
+      contenidoPorUnidadBase: [null, [Validators.required, Validators.min(0.001)]],
+      cantidadUnidades: [1, [Validators.required, Validators.min(0.001)]],
+      codigoLote: [''],
+      fechaIngreso: [null],
+      fechaVencimiento: [null],
+      observaciones: [''],
+      providerId: [null, [Validators.required]],
+      costoUnitarioBase: [null, [Validators.required, Validators.min(0)]],
+      costoPorUnidadControl: [null, [Validators.min(0)]]
+    });
+    // Formulario de edición de entradas (solo metadata)
+    this.editEntradaForm = this.fb.group({
+      codigoLote: [''],
+      unidadControl: [''],
+      fechaIngreso: [null],
+      fechaVencimiento: [null],
+      contenidoPorUnidadBase: [null],
+      cantidadUnidades: [null],
+      observaciones: [''],
+      providerId: [null],
+      costoUnitarioBase: [null],
+      costoPorUnidadControl: [null]
+    });
+    this.recalcularResumenCantidadReal();
+  }
+  
+  getStockMinimoProductoSeleccionado(): number {
+    const invMin = Number(this.invProductoSeleccionado?.stockMinimo ?? 0);
+    if (invMin && !isNaN(invMin) && invMin > 0) return invMin;
+    const pid = this.selectedProductIdEntradas;
+    if (!pid) return 0;
+    const p = this.products.find(x => x.id === pid);
+    const min = Number((p as any)?.level_min ?? 0);
+    return isNaN(min) ? 0 : min;
+  }
+
+  getTotalBaseCalculado(): number {
+    const c = Number(this.entradaForm?.get('contenidoPorUnidadBase')?.value ?? 0);
+    const u = Number(this.entradaForm?.get('cantidadUnidades')?.value ?? 0);
+    const total = (isNaN(c) ? 0 : c) * (isNaN(u) ? 0 : u);
+    return Math.round((total + Number.EPSILON) * 1000) / 1000;
+  }
+
+  // Nombres de productos asociados a un tipo de alimento (máx 2 y resumen)
+  getNombresProductosPorTipo(inventario: InventarioAlimento, max: number = 2): string {
+    const typeId = inventario?.tipoAlimento?.id;
+    if (!typeId) return inventario?.tipoAlimento?.name || 'Producto';
+    const nombres = Array.from(new Set(
+      (this.products || [])
+        .filter(p => (p?.typeFood?.id ?? p?.typeFood_id) === typeId)
+        .map(p => p?.name)
+        .filter(Boolean)
+    ));
+    if (nombres.length === 0) return inventario?.tipoAlimento?.name || 'Producto';
+    if (nombres.length <= max) return nombres.join(', ');
+    const visibles = nombres.slice(0, max).join(', ');
+    const restantes = nombres.length - max;
+    return `${visibles} (+${restantes} más)`;
+  }
+
+  // Umbral mínimo consolidado: usa el valor del backend si existe; caso contrario suma de mínimos por producto del tipo
+  getStockMinimoPorTipo(inventario: InventarioAlimento): number {
+    const backendMin = Number(inventario?.stockMinimo ?? 0);
+    if (backendMin && !isNaN(backendMin) && backendMin > 0) return backendMin;
+    if (!inventario?.tipoAlimento?.id) return backendMin || 0;
+    const typeId = inventario.tipoAlimento.id;
+    let sumaMin = 0;
+    for (const p of this.products || []) {
+      const pid = p?.typeFood?.id ?? p?.typeFood_id;
+      if (pid === typeId) {
+        const min = Number((p as any)?.level_min ?? 0);
+        if (!isNaN(min)) sumaMin += min;
+      }
+    }
+    return sumaMin || backendMin || 0;
+  }
+
+  // Utilidad: convertir distintas formas de fecha del backend a Date válido
+  toDate(value: any): Date | null {
+    if (!value) return null;
+    // Si viene como array [yyyy,MM,dd,HH,mm,ss,nanos]
+    if (Array.isArray(value)) {
+      const [y, mo, d, h, mi, s, nanos] = value;
+      return new Date(y, (mo || 1) - 1, d || 1, h || 0, mi || 0, s || 0, Math.floor((nanos || 0) / 1e6));
+    }
+    if (typeof value === 'string') {
+      const v = value.trim();
+      if (v.includes(',')) {
+        const parts = v.split(',').map(p => parseInt(p.trim(), 10));
+        const [y, mo, d, h, mi, s, nanos] = parts;
+        return new Date(y, (mo || 1) - 1, d || 1, h || 0, mi || 0, s || 0, Math.floor((nanos || 0) / 1e6));
+      }
+      const dIso = new Date(v);
+      return isNaN(dIso.getTime()) ? null : dIso;
+    }
+    if (typeof value === 'number') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Objeto con propiedades year/month/day (por si acaso)
+    if (typeof value === 'object') {
+      const y = (value as any).year;
+      const mo = (value as any).month || (value as any).monthValue;
+      const d = (value as any).day || (value as any).dayOfMonth;
+      const h = (value as any).hour;
+      const mi = (value as any).minute;
+      const s = (value as any).second;
+      const nanos = (value as any).nano || (value as any).nanos;
+      if (y && mo && d) return new Date(y, mo - 1, d, h || 0, mi || 0, s || 0, Math.floor((nanos || 0) / 1e6));
+    }
+    return null;
+  }
+
+  // Convertir a 'yyyy-MM-dd' para inputs date
+  dateToInput(value: any): string {
+    const d = this.toDate(value);
+    return d ? d.toISOString().split('T')[0] : '';
+  }
+
+  /**
+   * Cargar inventario por producto desde backend (tabla inventario_producto)
+{{ ... }}
+   */
+  private cargarInventarioPorProducto(): void {
+    this.invProductoService.listar().subscribe({
+      next: (lista: InventarioProductoFront[]) => {
+        const map = new Map<number, number>();
+        for (const inv of lista) {
+          if (inv?.product?.id != null) {
+            map.set(inv.product.id, Number(inv.cantidadStock || 0));
+          }
+        }
+        this.inventarioProductoMap = map;
+        console.log('📦 Inventario por producto cargado:', this.inventarioProductoMap);
+      },
+      error: (err) => {
+        console.error('❌ Error cargando inventario por producto:', err);
+        this.inventarioProductoMap = new Map();
+      }
+    });
+  }
+
+  // ==========================
+  // Edición / Eliminación de entradas
+  // ==========================
+  openEditEntrada(e: InventarioEntrada): void {
+    this.editingEntradaId = e.id;
+    this.showEditEntradaModal = true;
+    let contenidoBase: number | null = (e as any)?.contenidoPorUnidad != null ? Number((e as any).contenidoPorUnidad) : null;
+    let cantUnidades: number | null = (e as any)?.cantidadUnidades != null ? Number((e as any).cantidadUnidades) : null;
+    const sbr = (e as any)?.stockBaseRestante != null ? Number((e as any).stockBaseRestante) : null;
+    const sur = (e as any)?.stockUnidadesRestantes != null ? Number((e as any).stockUnidadesRestantes) : null;
+    if (contenidoBase == null || isNaN(contenidoBase)) {
+      if (sbr != null && sur != null && sur > 0) {
+        contenidoBase = sbr / sur;
+      } else if (sbr != null) {
+        contenidoBase = sbr;
+      }
+    }
+    if (cantUnidades == null || isNaN(cantUnidades)) {
+      if (sur != null && sur > 0) {
+        cantUnidades = sur;
+      } else {
+        cantUnidades = 1;
+      }
+    }
+    this.editEntradaForm.reset({
+      codigoLote: e.codigoLote || '',
+      unidadControl: e.unidadControl || '',
+      fechaIngreso: e.fechaIngreso ? this.dateToInput(e.fechaIngreso) : null,
+      fechaVencimiento: e.fechaVencimiento ? this.dateToInput(e.fechaVencimiento) : null,
+      contenidoPorUnidadBase: contenidoBase,
+      cantidadUnidades: cantUnidades,
+      observaciones: e.observaciones || '',
+      providerId: (e as any)?.provider?.id || null,
+      costoUnitarioBase: e.costoUnitarioBase ?? null,
+      costoPorUnidadControl: e.costoPorUnidadControl ?? null
+    });
+  }
+
+  closeEditEntrada(): void {
+    this.showEditEntradaModal = false;
+    this.editingEntradaId = null;
+    this.editEntradaForm.reset();
+  }
+
+  saveEditEntrada(): void {
+    if (!this.editingEntradaId) return;
+    const v = this.editEntradaForm.value;
+    const req: any = {
+      codigoLote: v.codigoLote || undefined,
+      unidadControl: v.unidadControl || undefined,
+      fechaIngreso: v.fechaIngreso || undefined,       // yyyy-MM-dd
+      fechaVencimiento: v.fechaVencimiento || undefined,
+      contenidoPorUnidadBase: v.contenidoPorUnidadBase != null ? Number(v.contenidoPorUnidadBase) : undefined,
+      cantidadUnidades: v.cantidadUnidades != null ? Number(v.cantidadUnidades) : undefined,
+      observaciones: v.observaciones || undefined,
+      providerId: v.providerId != null ? Number(v.providerId) : undefined,
+      costoUnitarioBase: v.costoUnitarioBase != null ? Number(v.costoUnitarioBase) : undefined,
+      costoPorUnidadControl: v.costoPorUnidadControl != null ? Number(v.costoPorUnidadControl) : undefined
+    };
+    this.entradasService.actualizarEntrada(this.editingEntradaId, req).subscribe({
+      next: () => {
+        alert('Entrada actualizada');
+        this.closeEditEntrada();
+        if (this.selectedProductIdEntradas) this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
+        this.cargarInventarioPorProducto();
+        this.cargarValidosParaProductos();
+        this.cargarDisminuciones();
+      },
+      error: (err) => {
+        console.error('Error al actualizar entrada', err);
+        alert('No se pudo actualizar la entrada');
+      }
+    });
+  }
+
+  eliminarEntrada(e: InventarioEntrada): void {
+    if (!e?.id) return;
+    const ok = confirm('¿Eliminar esta entrada? Esta acción es reversible reactivándola manualmente en BD. No ajustará el stock consolidado.');
+    if (!ok) return;
+    this.entradasService.eliminarEntrada(e.id, 'Eliminada desde UI').subscribe({
+      next: () => {
+        alert('Entrada eliminada (soft delete)');
+        if (this.selectedProductIdEntradas) this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
+        this.cargarInventarioPorProducto();
+        this.cargarValidosParaProductos();
+        this.cargarDisminuciones();
+      },
+      error: (err) => {
+        console.error('Error al eliminar entrada', err);
+        alert('No se pudo eliminar la entrada');
+      }
+    });
+  }
+
+  // ==============================================
+  // UI: Alertas de Entradas (por vencer / vencidas)
+  // ==============================================
+  cargarAlertasEntradas(dias: number = 15): void {
+    this.diasAlertaPorVencer = dias;
+    this.entradasService.porVencer(undefined, dias).subscribe({
+      next: (lista) => this.alertasPorVencer = lista || [],
+      error: () => this.alertasPorVencer = []
+    });
+    this.entradasService.vencidas().subscribe({
+      next: (lista) => this.alertasVencidas = lista || [],
+      error: () => this.alertasVencidas = []
+    });
+  }
+
+  // Cargar disminución (consumo acumulado) por producto sumando SALIDA y CONSUMO_LOTE
+  private cargarDisminuciones(): void {
+    // Optimizado: una sola llamada al backend que retorna mapa productId -> disminución
+    this.invProductoService.disminucionAgrupada().subscribe({
+      next: (mapa) => {
+        const m = new Map<number, number>();
+        if (mapa) {
+          Object.keys(mapa).forEach(k => {
+            const id = Number(k);
+            const v = Number((mapa as any)[k] ?? 0);
+            if (!isNaN(id)) m.set(id, isNaN(v) ? 0 : v);
+          });
+        }
+        this.disminucionAcumuladaMap = m;
+      },
+      error: () => this.disminucionAcumuladaMap = new Map<number, number>()
+    });
+  }
+
+  private cargarValidosParaProductos(): void {
+    // Optimizado: una sola llamada al backend que retorna mapa productId -> stock válido
+    this.entradasService.stockValidoAgrupado().subscribe({
+      next: (mapa) => {
+        const m = new Map<number, number>();
+        if (mapa) {
+          Object.keys(mapa).forEach(k => {
+            const id = Number(k);
+            const v = Number((mapa as any)[k] ?? 0);
+            if (!isNaN(id)) m.set(id, isNaN(v) ? 0 : v);
+          });
+        }
+        this.stockValidoMap = m;
+      },
+      error: () => this.stockValidoMap = new Map<number, number>()
     });
   }
 
   ngOnInit(): void {
     this.loadRelatedEntities();
     this.loadProducts();
-    this.cargarAnalisisInventario();
     this.cargarInventarioAutomatico();
+    this.cargarInventarioPorProducto();
+    this.cargarVencimientos();
+    this.cargarValidosParaProductos();
+    this.cargarDisminuciones();
 
     // ✅ NUEVA FUNCIONALIDAD: Actualizar inventario automáticamente cada 30 segundos
     // cuando se está viendo la vista de inventario automático
     this.setupAutoRefresh();
+
+    // ✅ Suscripción WebSocket: refrescar inventario en tiempo real ante cambios
+    this.websocketService.connect().subscribe({
+      next: () => {
+        console.log('🔔 WS /topic/inventory-update recibido -> refrescando inventario');
+        this.cargarInventarioAutomatico();
+        this.cargarInventarioPorProducto();
+        this.cargarVencimientos();
+        this.cargarValidosParaProductos();
+        this.cargarDisminuciones();
+      }
+    });
+
+    // ✅ Leer la pestaña desde query params (?tab=productos|inventario-automatico|entradas|alertas)
+    this.route.queryParamMap.subscribe(params => {
+      const tabParam = (params.get('tab') || '').trim();
+      const validTabs = ['productos', 'inventario-automatico', 'entradas', 'alertas'];
+      const target = validTabs.includes(tabParam) ? tabParam : 'productos';
+      if (this.vistaActual !== (target as any)) {
+        this.cambiarVista(target as any);
+      }
+    });
   }
 
   /**
    * Configurar actualización automática del inventario
    */
   private setupAutoRefresh(): void {
-    // Actualizar cada 30 segundos si estamos en la vista de inventario automático
+    // Actualizar cada 30 segundos en vistas relevantes
     setInterval(() => {
-      if (this.vistaActual === 'inventario-automatico') {
+      if (this.vistaActual === 'inventario-automatico' || this.vistaActual === 'productos') {
         console.log('🔄 Auto-refresh: Actualizando inventario automáticamente...');
         this.cargarInventarioAutomatico();
+        this.cargarInventarioPorProducto();
+        this.cargarVencimientos();
+        this.cargarValidosParaProductos();
+        this.cargarDisminuciones();
       }
     }, 30000); // 30 segundos
   }
@@ -114,6 +481,8 @@ export class InventarioComponent implements OnInit {
         this.products = data;
         this.filteredProducts = data;
         this.isLoading = false;
+        this.recalcularResumenCantidadReal();
+        this.cargarInventarioPorProducto();
       },
       error: (error) => {
         console.error('Error al cargar productos:', error);
@@ -192,7 +561,8 @@ export class InventarioComponent implements OnInit {
    */
   cargarAnalisisInventario(): void {
     this.cargandoAnalisis = true;
-    this.analisisService.getAnalisisInventario().subscribe({
+    const animalId = this.animalIdAnalisis ?? 1;
+    this.analisisService.getAnalisisInventario(animalId).subscribe({
       next: (analisis) => {
         this.analisisInventario = analisis;
         this.cargandoAnalisis = false;
@@ -204,17 +574,57 @@ export class InventarioComponent implements OnInit {
       }
     });
   }
+
+  private cargarAnalisisComparativo(): void {
+    // Cargar análisis para Pollos (1) y Chanchos (2) en paralelo
+    this.analisisService.getAnalisisInventario(1).subscribe({
+      next: (a) => this.analisisPollos = a,
+      error: () => this.analisisPollos = null
+    });
+    this.analisisService.getAnalisisInventario(2).subscribe({
+      next: (a) => this.analisisChanchos = a,
+      error: () => this.analisisChanchos = null
+    });
+  }
+
+  onAnimalAnalisisChange(): void {
+    this.cargarAnalisisInventario();
+  }
   
   /**
    * Cambiar entre vistas
    */
-  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico'): void {
+  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico' | 'entradas' | 'alertas'): void {
     this.vistaActual = vista;
-    if (vista === 'analisis' && !this.analisisInventario) {
-      this.cargarAnalisisInventario();
-    }
+    // La vista de análisis fue trasladada a 'Análisis Financiero'
     if (vista === 'inventario-automatico') {
       this.cargarInventarioAutomatico();
+      this.cargarInventarioPorProducto();
+      this.cargarVencimientos();
+    }
+    if (vista === 'productos') {
+      // Al entrar a Productos, refrescar productos e inventario real inmediatamente
+      this.loadProducts();
+      this.cargarInventarioPorProducto();
+      this.cargarVencimientos();
+      this.cargarValidosParaProductos();
+      this.cargarDisminuciones();
+    }
+    if (vista === 'entradas') {
+      // Preparar listas de productos si aún no
+      if (!this.products || this.products.length === 0) this.loadProducts();
+      // Si ya hay un producto seleccionado, refrescar sus entradas
+      if (this.selectedProductIdEntradas) {
+        this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
+      }
+    }
+    if (vista === 'alertas') {
+      this.cargarAlertasEntradas(this.diasAlertaPorVencer);
+      // Cargar inventarios con stock bajo para panel de Alertas
+      this.inventarioService.obtenerInventariosStockBajo().subscribe({
+        next: (stockBajo) => this.inventariosStockBajo = stockBajo,
+        error: () => this.inventariosStockBajo = []
+      });
     }
   }
   
@@ -237,6 +647,23 @@ export class InventarioComponent implements OnInit {
    */
   formatearNumero(numero: number): string {
     return numero.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+  }
+
+  getTotalesCostosCategorias(): { alimentacion: number; sanidad: number; variables: number; manoObra: number; logistica: number; fijos: number; total: number } {
+    const base = { alimentacion: 0, sanidad: 0, variables: 0, manoObra: 0, logistica: 0, fijos: 0, total: 0 };
+    const lista = this.analisisInventario?.analisisPorLote || [];
+    for (const item of lista) {
+      const c = (item as any)?.costos || {};
+      base.alimentacion += Number(c.alimentacion || 0);
+      base.sanidad += Number(c.sanidad || 0);
+      base.variables += Number(c.variables || 0);
+      base.manoObra += Number(c.manoObra || 0);
+      base.logistica += Number(c.logistica || 0);
+      base.fijos += Number(c.fijos || 0);
+    }
+    base.total = base.alimentacion + base.sanidad + base.variables + base.manoObra + base.logistica + base.fijos;
+    const r = (n: number) => Math.round(n * 100) / 100;
+    return { alimentacion: r(base.alimentacion), sanidad: r(base.sanidad), variables: r(base.variables), manoObra: r(base.manoObra), logistica: r(base.logistica), fijos: r(base.fijos), total: r(base.total) };
   }
   
   /**
@@ -268,6 +695,57 @@ export class InventarioComponent implements OnInit {
   // MÉTODOS PARA INVENTARIO AUTOMÁTICO CON DISMINUCIÓN
   // ============================================================================
   
+  getStockOriginalPorTipo(inventario: InventarioAlimento): number {
+    if (!inventario?.tipoAlimento?.id) return Number(inventario?.cantidadOriginal ?? 0);
+    const typeId = inventario.tipoAlimento.id;
+    let suma = 0;
+    for (const p of this.products || []) {
+      const pid = p?.typeFood?.id ?? p?.typeFood_id;
+      if (pid === typeId) {
+        suma += Number(p?.quantity ?? 0);
+      }
+    }
+    return suma > 0 ? suma : Number(inventario?.cantidadOriginal ?? 0);
+  }
+
+  getStockActualPorTipo(inventario: InventarioAlimento): number {
+    if (!inventario?.tipoAlimento?.id) return Number(inventario?.cantidadStock ?? 0);
+    const typeId = inventario.tipoAlimento.id;
+    let suma = 0;
+    for (const p of this.products || []) {
+      const pid = p?.typeFood?.id ?? p?.typeFood_id;
+      if (pid === typeId && p?.id != null) {
+        const val = this.stockValidoMap.get(p.id);
+        suma += Number(val ?? 0);
+      }
+    }
+    return suma > 0 ? suma : Number(inventario?.cantidadStock ?? 0);
+  }
+
+  getConsumido(inventario: InventarioAlimento): number {
+    const original = this.getStockOriginalPorTipo(inventario);
+    const actual = this.getStockActualPorTipo(inventario);
+    const diff = Number(original) - Number(actual);
+    return diff > 0 ? diff : 0;
+  }
+
+  // Total consumido por tipo (sumando movimientos de SALIDA/CONSUMO_LOTE por producto)
+  getConsumidoPorTipo(inventario: InventarioAlimento): number {
+    if (!inventario?.tipoAlimento?.id) return this.getConsumido(inventario);
+    const typeId = inventario.tipoAlimento.id;
+    let suma = 0;
+    for (const p of this.products || []) {
+      const pidType = p?.typeFood?.id ?? p?.typeFood_id;
+      if (pidType === typeId && p?.id != null) {
+        const val = Number(this.disminucionAcumuladaMap.get(p.id) ?? 0);
+        if (!isNaN(val)) suma += val;
+      }
+    }
+    // Fallback a diferencia si no hay movimientos cargados
+    if (suma === 0) return this.getConsumido(inventario);
+    return suma;
+  }
+  
   /**
    * Cargar inventario automático con control de stock
    */
@@ -279,6 +757,7 @@ export class InventarioComponent implements OnInit {
       next: (inventarios) => {
         console.log('✅ Inventarios cargados:', inventarios);
         this.inventarioAlimentos = inventarios;
+        this.recalcularResumenCantidadReal();
         
         // Si no hay inventarios, mostrar mensaje de ayuda
         if (inventarios.length === 0) {
@@ -355,10 +834,11 @@ export class InventarioComponent implements OnInit {
    * Obtener color del indicador de stock
    */
   getColorStock(inventario: InventarioAlimento): string {
-    const porcentaje = (inventario.cantidadStock / inventario.stockMinimo) * 100;
-    
-    if (porcentaje <= 100) return 'bg-red-500'; // Stock crítico
-    if (porcentaje <= 150) return 'bg-yellow-500'; // Stock bajo
+    const actual = this.getStockActualPorTipo(inventario);
+    const minimo = this.getStockMinimoPorTipo(inventario) || 1;
+    const porcentajeVsMin = (actual / minimo) * 100;
+    if (porcentajeVsMin <= 100) return 'bg-red-500'; // Stock crítico
+    if (porcentajeVsMin <= 150) return 'bg-yellow-500'; // Stock bajo
     return 'bg-green-500'; // Stock normal
   }
   
@@ -366,9 +846,11 @@ export class InventarioComponent implements OnInit {
    * Obtener estado del stock
    */
   getEstadoStock(inventario: InventarioAlimento): string {
-    if (inventario.cantidadStock <= inventario.stockMinimo) {
+    const actual = this.getStockActualPorTipo(inventario);
+    const minimo = this.getStockMinimoPorTipo(inventario);
+    if (actual <= minimo) {
       return 'CRÍTICO';
-    } else if (inventario.cantidadStock <= inventario.stockMinimo * 1.5) {
+    } else if (actual <= minimo * 1.5) {
       return 'BAJO';
     }
     return 'NORMAL';
@@ -421,6 +903,7 @@ export class InventarioComponent implements OnInit {
       this.productForm.patchValue({
         id: product.id,
         name: product.name,
+        description: (product as any)?.description || '',
         quantity: product.quantity,
         price_unit: product.price_unit,
         number_facture: product.number_facture,
@@ -567,6 +1050,14 @@ export class InventarioComponent implements OnInit {
     return unit ? unit.name : 'No disponible';
   }
   
+  // Unidad base del producto seleccionado para guiar el ingreso de contenido por unidad
+  getUnidadBaseProducto(productId: number | null): string {
+    if (!productId) return 'unidad';
+    const p = this.products.find(x => x.id === productId);
+    const nombre = p?.unitMeasurement?.name || (p?.unitMeasurement_id ? this.getUnitMeasurementName(p.unitMeasurement_id) : null);
+    return nombre || 'unidad';
+  }
+  
   getAnimalName(id: number | undefined): string {
     if (!id) return 'No disponible';
     const animal = this.animals.find(a => a.id === id);
@@ -582,13 +1073,17 @@ export class InventarioComponent implements OnInit {
   resetFilters(): void {
     this.searchForm.reset();
     this.filteredProducts = this.products;
+    this.recalcularResumenCantidadReal();
   }
 
   /**
    * Calcular porcentaje de stock disponible
    */
   calcularPorcentajeStock(inventario: InventarioAlimento): number {
-    const porcentaje = (inventario.cantidadStock / (inventario.cantidadOriginal || inventario.cantidadStock || 1)) * 100;
+    const original = this.getStockOriginalPorTipo(inventario);
+    const actual = this.getStockActualPorTipo(inventario);
+    const base = original || actual || 1;
+    const porcentaje = (actual / base) * 100;
     return Math.min(100, Math.round(porcentaje));
   }
 
@@ -598,4 +1093,254 @@ export class InventarioComponent implements OnInit {
   contarInventariosPorEstado(estado: string): number {
     return this.inventarioAlimentos.filter(inv => this.getEstadoStock(inv) === estado).length;
   }
+
+  // ======================================================
+  // Cálculo de Cantidad Real por Tipo de Alimento
+  // ======================================================
+  private recalcularResumenCantidadReal(): void {
+    const mapaOriginalPorTipo = new Map<number, { nombre: string; total: number }>();
+
+    // Acumular cantidades originales por TypeFood a partir de los productos filtrados
+    for (const p of this.filteredProducts) {
+      const typeId = p.typeFood?.id ?? p.typeFood_id;
+      if (!typeId) continue;
+      const nombre = p.typeFood?.name || this.getTypeFoodName(typeId);
+      const actual = mapaOriginalPorTipo.get(typeId) || { nombre, total: 0 };
+      actual.total += Number(p.quantity || 0);
+      mapaOriginalPorTipo.set(typeId, actual);
+    }
+
+    // Construir resumen cruzando con inventarioAlimentos (stock real)
+    const resultado: Array<{
+      typeFoodId: number;
+      typeFoodName: string;
+      cantidadOriginal: number;
+      cantidadActual: number;
+      consumido: number;
+      unidadMedida: string;
+    }> = [];
+
+    for (const [typeFoodId, info] of mapaOriginalPorTipo.entries()) {
+      const inv = this.inventarioAlimentos.find(i => i.tipoAlimento?.id === typeFoodId);
+      const cantidadActual = Number(inv?.cantidadStock ?? 0);
+      const unidad = inv?.unidadMedida || 'kg';
+      const original = Number(info.total || 0);
+      const consumido = Math.max(original - cantidadActual, 0);
+      resultado.push({
+        typeFoodId,
+        typeFoodName: info.nombre,
+        cantidadOriginal: original,
+        cantidadActual,
+        consumido,
+        unidadMedida: unidad
+      });
+    }
+
+    // Ordenar por nombre para visual ordenada
+    resultado.sort((a, b) => a.typeFoodName.localeCompare(b.typeFoodName));
+    this.resumenCantidadReal = resultado;
+  }
+
+  // ======================================================
+  // Cantidad Real y Disminución para la tabla de Productos
+  // ======================================================
+  getCantidadRealProducto(product: Product): number {
+    // Mostrar DISPONIBLE (no vencido) calculado desde entradas válidas (no vencidas)
+    if (!product?.id) return 0;
+    const val = this.stockValidoMap.get(product.id);
+    return Number(val ?? 0);
+  }
+
+  getDisminucionProducto(product: Product): number {
+    if (!product?.id) return 0;
+    return Number(this.disminucionAcumuladaMap.get(product.id) ?? 0);
+  }
+
+  getVencidoProducto(product: Product): number {
+    if (!product?.id) return 0;
+    return Number(this.stockVencidoMap.get(product.id) ?? 0);
+  }
+
+  getPorVencerProducto(product: Product): number {
+    if (!product?.id) return 0;
+    return Number(this.stockPorVencerMap.get(product.id) ?? 0);
+  }
+
+  getStockTotalProducto(product: Product): number {
+    if (!product?.id) return 0;
+    return Number(this.inventarioProductoMap.get(product.id) ?? 0);
+  }
+
+  private cargarVencimientos(): void {
+    // Cargar vencidas global y agrupar por producto
+    this.entradasService.vencidas().subscribe({
+      next: (lista) => {
+        const map = new Map<number, number>();
+        for (const e of (lista || [])) {
+          const pid = (e as any)?.product?.id;
+          if (pid != null) {
+            const suma = Number(e?.stockBaseRestante ?? 0);
+            map.set(pid, Number(map.get(pid) ?? 0) + suma);
+          }
+        }
+        this.stockVencidoMap = map;
+      },
+      error: () => {
+        this.stockVencidoMap = new Map();
+      }
+    });
+    // Cargar por vencer (15 días por defecto)
+    this.entradasService.porVencer(undefined, this.diasAlertaPorVencer).subscribe({
+      next: (lista) => {
+        const map = new Map<number, number>();
+        for (const e of (lista || [])) {
+          const pid = (e as any)?.product?.id;
+          if (pid != null) {
+            const suma = Number(e?.stockBaseRestante ?? 0);
+            map.set(pid, Number(map.get(pid) ?? 0) + suma);
+          }
+        }
+        this.stockPorVencerMap = map;
+      },
+      error: () => {
+        this.stockPorVencerMap = new Map();
+      }
+    });
+  }
+
+  // Abrir formulario para reponer el producto cuando la cantidad real llegue a 0
+  reponerProducto(product: Product): void {
+    // Llevar al usuario a Entradas con el producto preseleccionado para crear una entrada VIGENTE (FEFO)
+    if (!product?.id) return;
+    this.vistaActual = 'entradas';
+    this.selectedProductIdEntradas = product.id;
+    this.entradaForm.patchValue({ productId: product.id });
+    const provId = (product as any)?.provider?.id ?? (product as any)?.provider_id ?? null;
+    if (provId) this.entradaForm.patchValue({ providerId: provId });
+    this.cargarInventarioProductoSeleccionado(product.id);
+    this.cargarEntradasPorProducto(product.id);
+  }
+
+  // Acción rápida para la vista Productos: refrescar listado y cantidad real
+  actualizarProductosYStock(): void {
+    this.loadProducts();
+    this.cargarInventarioPorProducto();
+    this.cargarDisminuciones();
+  }
+
+  // Sincronizar inventarios: crear faltantes y registrar entradas iniciales
+  sincronizarInventario(): void {
+    if (this.isLoading) return;
+    this.isLoading = true;
+    this.invProductoService.sincronizar(true).subscribe({
+      next: (res) => {
+        console.log('✅ Sincronización de inventario completada:', res);
+        alert(`Sincronización completada\n\n` +
+              `Productos considerados: ${res?.totalProductosConsiderados ?? '-'}\n` +
+              `Inventarios creados: ${res?.inventariosCreados ?? '-'}\n` +
+              `Entradas registradas: ${res?.entradasRegistradas ?? '-'}\n` +
+              `Omitidos: ${res?.omitidos ?? '-'}`);
+        // Refrescar datos visibles
+        this.loadProducts();
+        this.cargarInventarioPorProducto();
+        this.cargarDisminuciones();
+      },
+      error: (err) => {
+        console.error('❌ Error al sincronizar inventario:', err);
+        const msg = err?.status === 401 ? 'No autorizado (¿sesión expirada?). Inicie sesión nuevamente.' : 'No se pudo sincronizar inventario.';
+        alert(msg);
+      },
+      complete: () => {
+        this.isLoading = false;
+      }
+    });
+  }
+  // ==============================================
+  // UI: Entradas por Producto
+  // ==============================================
+  onProductoEntradasChange(productIdStr: string): void {
+    const pid = Number(productIdStr);
+    this.selectedProductIdEntradas = isNaN(pid) ? null : pid;
+    if (this.selectedProductIdEntradas) {
+      this.entradaForm.patchValue({ productId: this.selectedProductIdEntradas });
+      // Prefijar proveedor según el producto seleccionado (si existe)
+      const prod = this.products.find(p => p.id === this.selectedProductIdEntradas);
+      if (prod) {
+        const provId = (prod as any)?.provider?.id ?? (prod as any)?.provider_id ?? null;
+        if (provId) this.entradaForm.patchValue({ providerId: provId });
+      }
+      // Cargar resumen de inventario del producto seleccionado
+      this.cargarInventarioProductoSeleccionado(this.selectedProductIdEntradas);
+      this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
+    } else {
+      this.entradasProducto = [];
+      this.invProductoSeleccionado = null;
+    }
+  }
+
+  cargarEntradasPorProducto(productId: number): void {
+    this.entradasService.listarPorProducto(productId).subscribe({
+      next: (lista) => this.entradasProducto = lista || [],
+      error: (err) => {
+        console.error('Error listando entradas por producto', err);
+        this.entradasProducto = [];
+      }
+    });
+  }
+
+  private cargarInventarioProductoSeleccionado(productId: number): void {
+    this.invProductoService.porProducto(productId).subscribe({
+      next: (inv) => this.invProductoSeleccionado = inv || null,
+      error: () => this.invProductoSeleccionado = null
+    });
+  }
+  
+  // Crear entrada (pestaña Entradas)
+  crearEntrada(): void {
+    if (this.entradaForm.invalid) {
+      this.entradaForm.markAllAsTouched();
+      return;
+    }
+    const v = this.entradaForm.value;
+    const req: CrearEntradaRequest = {
+      productId: v.productId,
+      codigoLote: v.codigoLote || undefined,
+      fechaIngreso: v.fechaIngreso || undefined,
+      fechaVencimiento: v.fechaVencimiento || undefined,
+      unidadControl: v.unidadControl || undefined,
+      contenidoPorUnidadBase: Number(v.contenidoPorUnidadBase),
+      cantidadUnidades: v.cantidadUnidades != null ? Number(v.cantidadUnidades) : 1,
+      observaciones: v.observaciones || undefined,
+      providerId: v.providerId != null ? Number(v.providerId) : undefined,
+      costoUnitarioBase: v.costoUnitarioBase != null ? Number(v.costoUnitarioBase) : undefined,
+      costoPorUnidadControl: v.costoPorUnidadControl != null ? Number(v.costoPorUnidadControl) : undefined
+    };
+    this.isLoading = true;
+    this.entradasService.crearEntrada(req).subscribe({
+      next: () => {
+        alert('Entrada creada y stock actualizado');
+        if (this.selectedProductIdEntradas) this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
+        this.cargarInventarioPorProducto();
+        if (this.selectedProductIdEntradas) this.cargarInventarioProductoSeleccionado(this.selectedProductIdEntradas);
+        this.cargarValidosParaProductos();
+        this.cargarDisminuciones();
+        this.entradaForm.patchValue({
+          codigoLote: '',
+          contenidoPorUnidadBase: null,
+          cantidadUnidades: 1,
+          fechaIngreso: null,
+          fechaVencimiento: null,
+          observaciones: '',
+          costoUnitarioBase: null,
+          costoPorUnidadControl: null
+        });
+      },
+      error: (err) => {
+        console.error('Error creando entrada', err);
+        alert('No se pudo crear la entrada');
+      },
+      complete: () => this.isLoading = false
+    });
+  }
+  
 }

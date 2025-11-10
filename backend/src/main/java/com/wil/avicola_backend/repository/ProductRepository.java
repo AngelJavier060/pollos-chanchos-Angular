@@ -5,6 +5,8 @@ import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
 import com.wil.avicola_backend.model.Product;
+import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends CrudRepository<Product, Long> {
@@ -40,4 +42,10 @@ public interface ProductRepository extends CrudRepository<Product, Long> {
 
     // Listado solo de productos activos
     Iterable<Product> findByActiveTrue();
+
+    // Listar productos por tipo de alimento
+    List<Product> findByTypeFood_Id(long typeFoodId);
+
+    // Buscar primer producto por nombre (case-insensitive)
+    Optional<Product> findFirstByNameIgnoreCase(String name);
 }

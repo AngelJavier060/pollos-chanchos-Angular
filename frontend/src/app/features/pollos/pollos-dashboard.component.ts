@@ -1,4 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
+import { filter } from 'rxjs/operators';
+
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
@@ -14,6 +17,7 @@ export class PollosDashboardComponent implements OnInit, OnDestroy {
   user: User | null = null;
   isUserMenuOpen = false;
   isSidebarCollapsed = false;
+  pageTitle: string = '';
 
   // Estadísticas en tiempo real
   sidebarStats = {
@@ -34,14 +38,23 @@ export class PollosDashboardComponent implements OnInit, OnDestroy {
   constructor(
     private authService: AuthDirectService,
     private loteService: LoteService,
-    private planService: PlanAlimentacionService
+    private planService: PlanAlimentacionService,
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.user = this.authService.currentUserValue;
     this.cargarEstadisticasIniciales();
     this.iniciarActualizacionEnTiempoReal();
-    
+    this.resolvePageTitle();
+    // Actualizar título cuando cambia la navegación
+    this.subscriptions.add(
+      this.router.events
+        .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+        .subscribe(() => this.resolvePageTitle())
+    );
+
     // Listener para cerrar el menú al hacer clic fuera
     document.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
@@ -314,5 +327,35 @@ export class PollosDashboardComponent implements OnInit, OnDestroy {
    */
   getMorbilidadActiva(): number {
     return this._morbilidadActiva;
+  }
+
+  // =========================
+  // Roles y Título de Página
+  // =========================
+  isAdmin(): boolean {
+    const roles = this.user?.roles || [];
+    return roles.includes('ROLE_ADMIN') || roles.includes('ADMIN');
+  }
+
+  private resolvePageTitle(): void {
+    let child = this.route.firstChild;
+    while (child && child.firstChild) {
+      child = child.firstChild;
+    }
+    const path = child?.routeConfig?.path || 'dashboard';
+    this.pageTitle = this.mapPathToTitle(path);
+  }
+
+  private mapPathToTitle(path: string): string {
+    switch (path) {
+      case 'dashboard': return 'Dashboard';
+      case 'alimentacion': return 'Alimentación';
+      case 'lotes': return 'Lotes';
+      case 'historico': return 'Histórico';
+      case 'mortalidad': return 'Mortalidad';
+      case 'morbilidad': return 'Morbilidad';
+      case 'inventario': return 'Inventario';
+      default: return 'Dashboard';
+    }
   }
 }

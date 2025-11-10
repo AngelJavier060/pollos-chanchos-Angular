@@ -32,12 +32,48 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
         </svg>
         Registro de Lotes
-      </button>      <button (click)="navegarA('inventario')" routerLinkActive="bg-blue-700" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
-        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-        </svg>
-        Inventario
       </button>
+      <!-- Inventario con submenús -->
+      <div>
+        <button (click)="toggleInventario()" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+          </svg>
+          <span class="flex-1">Inventario</span>
+          <svg class="w-4 h-4 ml-2 transition-transform" [class.rotate-180]="inventarioOpen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div *ngIf="inventarioOpen" class="ml-6 mt-1 mb-2 space-y-1">
+          <button (click)="navegarAInventario('productos')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Producto
+          </button>
+          <button (click)="navegarAInventario('inventario-automatico')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Inventario Automático
+          </button>
+          <button (click)="navegarAInventario('entradas')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Entradas
+          </button>
+          <button (click)="navegarAInventario('alertas')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Alertas
+          </button>
+          <button (click)="navegarA('inventario/sanidad')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Sanidad y Cuidado Animal
+          </button>
+          <button (click)="navegarA('inventario/operacion')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Gastos de Operación
+          </button>
+          <button (click)="navegarA('inventario/mano-obra')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Mano de Obra
+          </button>
+          <button (click)="navegarA('inventario/logistica')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Movilización y Logística
+          </button>
+          <button (click)="navegarA('inventario/fijos')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
+            Costos Fijos
+          </button>
+        </div>
+      </div>
 
       <!-- Plan Nutricional en la navegación principal -->
       <button (click)="navegarA('plan-nutricional')" routerLinkActive="bg-blue-700" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
@@ -45,6 +81,14 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
         </svg>
         Plan Nutricional
+      </button>
+
+      <!-- Análisis Financiero (nuevo) -->
+      <button (click)="navegarA('analisis-financiero')" routerLinkActive="bg-blue-700" class="w-full text-left block px-4 py-3 text-white hover:bg-blue-700 flex items-center cursor-pointer">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 11V3a1 1 0 112 0v8h3a1 1 0 010 2h-3v8a1 1 0 11-2 0v-8H8a1 1 0 010-2h3z" />
+        </svg>
+        Análisis Financiero
       </button>
 
       <!-- Ventas - Nuevas opciones en el menú lateral -->

@@ -85,7 +85,6 @@ public class LoteService {
             }
 
             lote_old.setBirthdate(lote.getBirthdate());
-            lote_old.setQuantity(lote.getQuantity());
             lote_old.setCost(lote.getCost());
             lote_old.setName(lote.getName());
             

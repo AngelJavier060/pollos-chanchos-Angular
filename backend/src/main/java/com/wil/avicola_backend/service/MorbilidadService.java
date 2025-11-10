@@ -11,12 +11,15 @@ import com.wil.avicola_backend.repository.MedicamentoRepository;
 import com.wil.avicola_backend.repository.MorbilidadRepository;
 import com.wil.avicola_backend.repository.LoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -41,6 +44,43 @@ public class MorbilidadService {
     @Autowired
     private LoteRepository loteRepository;
     
+    @PostConstruct
+    public void seedEnfermedadesPorDefecto() {
+        if (enfermedadRepository.count() == 0) {
+            Enfermedad e1 = new Enfermedad();
+            e1.setNombre("Newcastle");
+            e1.setDescripcion("Enfermedad viral respiratoria");
+            e1.setContagiosa(true);
+            e1.setActivo(true);
+
+            Enfermedad e2 = new Enfermedad();
+            e2.setNombre("Coccidiosis");
+            e2.setDescripcion("Infección parasitaria intestinal");
+            e2.setContagiosa(true);
+            e2.setActivo(true);
+
+            Enfermedad e3 = new Enfermedad();
+            e3.setNombre("Salmonelosis");
+            e3.setDescripcion("Infección bacteriana digestiva");
+            e3.setContagiosa(true);
+            e3.setActivo(true);
+
+            Enfermedad e4 = new Enfermedad();
+            e4.setNombre("Bronquitis Infecciosa");
+            e4.setDescripcion("Infección viral respiratoria");
+            e4.setContagiosa(true);
+            e4.setActivo(true);
+
+            Enfermedad e5 = new Enfermedad();
+            e5.setNombre("Estrés Térmico");
+            e5.setDescripcion("Problemas por temperaturas extremas");
+            e5.setContagiosa(false);
+            e5.setActivo(true);
+
+            enfermedadRepository.saveAll(Arrays.asList(e1, e2, e3, e4, e5));
+        }
+    }
+
     // ========== OPERACIONES CRUD ==========
     
     /**
@@ -125,12 +165,23 @@ public class MorbilidadService {
     }
     
     // ========== NUEVOS FLUJOS: RECUPERAR Y CONVERTIR A MORTALIDAD ==========
-    public RegistroMorbilidad recuperar(Long id) {
+    public RegistroMorbilidad recuperar(Long id, Double costo) {
         Optional<RegistroMorbilidad> registroOpt = morbilidadRepository.findById(id);
         if (registroOpt.isEmpty()) throw new RuntimeException("Registro de morbilidad no encontrado con ID: " + id);
         RegistroMorbilidad r = registroOpt.get();
         r.setEstadoTratamiento(RegistroMorbilidad.EstadoTratamiento.RECUPERADO);
         r.setFechaFinTratamiento(LocalDate.now());
+        if (costo != null) {
+            r.setCosto(BigDecimal.valueOf(costo));
+        }
+        return morbilidadRepository.save(r);
+    }
+
+    public RegistroMorbilidad actualizarCosto(Long id, Double costo) {
+        Optional<RegistroMorbilidad> registroOpt = morbilidadRepository.findById(id);
+        if (registroOpt.isEmpty()) throw new RuntimeException("Registro de morbilidad no encontrado con ID: " + id);
+        RegistroMorbilidad r = registroOpt.get();
+        r.setCosto(costo != null ? BigDecimal.valueOf(costo) : null);
         return morbilidadRepository.save(r);
     }
 
@@ -146,15 +197,21 @@ public class MorbilidadService {
             throw new RuntimeException("La cantidad a convertir debe ser > 0.");
         }
 
-        // Resolver lote (UUID o código)
+        // Resolver lote (UUID o código); si no se puede, usar fallback sin abortar
         Lote lote = resolveLote(dto.getLoteId(), dto.getLoteCodigo());
-        if (lote == null) {
-            throw new RuntimeException("No se pudo resolver el lote (UUID o código requerido).");
-        }
 
         // Crear registro de mortalidad y delegar descuento en MortalidadService
         RegistroMortalidad mortalidad = new RegistroMortalidad();
-        mortalidad.setLoteId(lote.getId());
+        if (lote != null) {
+            mortalidad.setLoteId(lote.getId());
+        } else {
+            String idOrCodigo = (dto.getLoteId() != null && !dto.getLoteId().isBlank())
+                ? dto.getLoteId()
+                : (dto.getLoteCodigo() != null && !dto.getLoteCodigo().isBlank())
+                    ? dto.getLoteCodigo()
+                    : String.valueOf(morbilidad.getLoteId());
+            mortalidad.setLoteId(idOrCodigo);
+        }
         mortalidad.setCantidadMuertos(dto.getCantidad());
         mortalidad.setObservaciones(dto.getObservaciones());
         mortalidad.setPeso(dto.getPeso());

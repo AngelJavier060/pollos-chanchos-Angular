@@ -255,7 +255,7 @@
               <div class="text-sm text-gray-500">{{ registro.fechaRegistro | date:'HH:mm' }}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <div class="text-sm text-gray-900">{{ registro.enfermedad.nombre }}</div>
+              <div class="text-sm text-gray-900">{{ registro.enfermedad?.nombre || 'Sin especificar' }}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="text-sm text-gray-900">{{ registro.cantidadEnfermos }}</div>
@@ -273,9 +273,9 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    [style.background-color]="registro.estado.color + '20'" 
-                    [style.color]="registro.estado.color">
-                {{ registro.estado.nombre }}
+                    [style.background-color]="(registro.estado?.color || '#6B7280') + '20'" 
+                    [style.color]="registro.estado?.color || '#6B7280'">
+                {{ registro.estado?.nombre || 'En Observación' }}
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -294,7 +294,7 @@
               
               <!-- ✅ BOTONES ESPECÍFICOS SEGÚN ESTADO -->
               <button 
-                *ngIf="!registro.estado.esTerminal && registro.estado.nombre !== 'Recuperado'"
+                *ngIf="!registro.estado?.esTerminal && registro.estado?.nombre !== 'Recuperado'"
                 (click)="marcarComoRecuperado(registro)"
                 class="text-green-600 hover:text-green-900 mr-2"
                 title="Marcar como recuperado">
@@ -302,7 +302,7 @@
               </button>
               
               <button 
-                *ngIf="!registro.estado.esTerminal && registro.estado.nombre !== 'Recuperado'"
+                *ngIf="!registro.estado?.esTerminal && registro.estado?.nombre !== 'Recuperado'"
                 (click)="moverAMortalidad(registro)"
                 class="text-red-600 hover:text-red-900 mr-2"
                 title="Mover a mortalidad">
@@ -339,18 +339,18 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Lote:</label>
-            <select [(ngModel)]="nuevoRegistro.loteId" name="loteId" required 
+            <select [(ngModel)]="nuevoRegistro.loteId" name="loteId" required disabled
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Seleccionar lote</option>
               <option *ngFor="let lote of lotesPollos" [value]="lote.id">
-                Lote {{ lote.id }} - {{ lote.race?.name }}
+                {{ lote.codigo || lote.name || ('Lote ' + (lote.id | slice:0:8)) }}
               </option>
             </select>
           </div>
           
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad de enfermos:</label>
-            <input type="number" [(ngModel)]="nuevoRegistro.cantidadEnfermos" name="cantidadEnfermos" min="1" required
+            <input type="number" [(ngModel)]="nuevoRegistro.cantidadEnfermos" name="cantidadEnfermos" min="1" required disabled
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           </div>
         </div>
@@ -358,16 +358,17 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Enfermedad:</label>
-            <select [(ngModel)]="nuevoRegistro.enfermedad" name="enfermedad" required
+            <select [(ngModel)]="nuevoRegistro.enfermedad" name="enfermedad" required [compareWith]="compareEnfermedades"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Seleccionar enfermedad</option>
-              <option *ngFor="let enfermedad of enfermedadesComunes" [value]="enfermedad">{{ enfermedad }}</option>
+              <option *ngFor="let enfermedad of enfermedades" [ngValue]="enfermedad">{{ enfermedad.nombre }}</option>
+              <option *ngIf="!enfermedades || enfermedades.length === 0" disabled>(Sin enfermedades activas en el sistema)</option>
             </select>
           </div>
           
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Gravedad:</label>
-            <select [(ngModel)]="nuevoRegistro.gravedad" name="gravedad" required
+            <select [(ngModel)]="nuevoRegistro.severidad" name="severidad" required
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="leve">Leve</option>
               <option value="moderada">Moderada</option>
@@ -379,13 +380,13 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones del veterinario:</label>
-          <textarea [(ngModel)]="nuevoRegistro.observacionesVeterinario" name="observaciones" rows="3"
+          <textarea [(ngModel)]="nuevoRegistro.observaciones" name="observaciones" rows="3"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
         </div>
 
         <div class="flex items-center space-x-4">
           <label class="flex items-center">
-            <input type="checkbox" [(ngModel)]="nuevoRegistro.requiereAislamiento" name="aislamiento" class="mr-2">
+            <input type="checkbox" [(ngModel)]="nuevoRegistro.aislado" name="aislado" class="mr-2">
             <span class="text-sm text-gray-700">Requiere aislamiento</span>
           </label>
           <label class="flex items-center">

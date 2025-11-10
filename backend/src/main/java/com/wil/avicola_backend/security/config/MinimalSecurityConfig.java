@@ -74,6 +74,8 @@ public class MinimalSecurityConfig {
                     .requestMatchers(HttpMethod.PUT, "/api/mortalidad/**").permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/mortalidad/**").permitAll()
                     .requestMatchers(HttpMethod.PATCH, "/api/mortalidad/**").permitAll()
+                    // Habilitar handshake SockJS/STOMP sin autenticación
+                    .requestMatchers("/ws/**").permitAll()
                     // Permitir todas las peticiones OPTIONS para CORS
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     // Endpoints públicos - NO requieren autenticación
@@ -152,7 +154,7 @@ public class MinimalSecurityConfig {
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"));
-        configuration.setAllowCredentials(false); // 🔧 CRÍTICO: Desactivar credentials para endpoints públicos
+        configuration.setAllowCredentials(true); // 🔧 Necesario para SockJS con withCredentials
         configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

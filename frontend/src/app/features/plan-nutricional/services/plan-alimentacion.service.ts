@@ -368,4 +368,11 @@ export class PlanAlimentacionService {
   getProductosParaHoy(asignacionId: number): Observable<PlanDetalle[]> {
     return this.http.get<PlanDetalle[]>(`${this.apiUrl}/asignacion/${asignacionId}/productos-hoy`);
   }
+
+  /**
+   * Obtener historial de movimientos de inventario por lote
+   */
+  getMovimientosPorLote(loteId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/movimientos/lote/${loteId}`);
+  }
 }

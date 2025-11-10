@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.wil.avicola_backend.model.PlanEjecucion;
 import com.wil.avicola_backend.repository.PlanEjecucionRepository;
 import com.wil.avicola_backend.service.PlanEjecucionService;
+import com.wil.avicola_backend.dto.AlertaRapidaDto;
 // Nuevos imports para el sistema de corrección
 import com.wil.avicola_backend.service.CorreccionService;
 import com.wil.avicola_backend.dto.CorreccionRequest;
@@ -198,6 +199,30 @@ public class PlanEjecucionController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> getEstadisticasEjecucion(@PathVariable Long asignacionId) {
         return planEjecucionService.getEstadisticasEjecucion(asignacionId);
+    }
+
+    /**
+     * Obtener alertas rápidas para el usuario autenticado (temporal userId=1)
+     */
+    @GetMapping("/alertas")
+    public ResponseEntity<List<AlertaRapidaDto>> getAlertas(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaBase,
+            @RequestParam(required = false) Integer dias,
+            Principal principal) {
+        Long userId = 1L; // getUserIdFromPrincipal(principal)
+        return planEjecucionService.getAlertasRapidas(userId, fechaBase, dias);
+    }
+
+    /**
+     * Obtener alertas rápidas para un usuario específico (solo administradores)
+     */
+    @GetMapping("/alertas/usuario/{userId}")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<List<AlertaRapidaDto>> getAlertasUsuario(
+            @PathVariable Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaBase,
+            @RequestParam(required = false) Integer dias) {
+        return planEjecucionService.getAlertasRapidas(userId, fechaBase, dias);
     }
     
     /**

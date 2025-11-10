@@ -3,7 +3,6 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { LoteService } from '../../features/lotes/services/lote.service';
 import { ProductService } from './product.service';
 import { MortalidadBackendService, RegistroMortalidadRequest } from './mortalidad-backend.service';
 import { MorbilidadBackendService, RegistroMorbilidadRequest } from './morbilidad-backend.service';
@@ -39,7 +38,6 @@ export class RegistroDiarioService {
 
   constructor(
     private http: HttpClient,
-    private loteService: LoteService,
     private productService: ProductService,
     private mortalidadService: MortalidadBackendService,
     private morbilidadService: MorbilidadBackendService
@@ -62,12 +60,7 @@ export class RegistroDiarioService {
     // Crear array de observables para ejecutar en paralelo
     const operaciones: Observable<any>[] = [];
 
-    // 1. ACTUALIZAR CANTIDAD DE ANIMALES EN LOTE
-    if (registro.animalesMuertos > 0 || registro.animalesEnfermos > 0) {
-      operaciones.push(this.actualizarCantidadLote(registro.loteId, registro.animalesMuertos + registro.animalesEnfermos));
-    }
-
-    // 2. REGISTRAR MORTALIDAD
+    // 1. REGISTRAR MORTALIDAD (descuenta stock en backend)
     if (registro.animalesMuertos > 0) {
       const registroMortalidad: RegistroMortalidadRequest = {
         loteId: registro.loteId,
@@ -80,7 +73,7 @@ export class RegistroDiarioService {
       operaciones.push(this.mortalidadService.registrarMortalidad(registroMortalidad));
     }
 
-    // 3. REGISTRAR MORBILIDAD
+    // 2. REGISTRAR MORBILIDAD (no altera stock)
     if (registro.animalesEnfermos > 0) {
       const registroMorbilidad: RegistroMorbilidadRequest = {
         loteId: registro.loteId,
@@ -100,7 +93,7 @@ export class RegistroDiarioService {
       operaciones.push(this.morbilidadService.registrarMorbilidad(registroMorbilidad));
     }
 
-    // 4. DESCONTAR INVENTARIO
+    // 3. DESCONTAR INVENTARIO
     if (registro.cantidadAlimento && registro.cantidadAlimento > 0 && registro.tipoAlimento) {
       operaciones.push(this.descontarInventario(registro.tipoAlimento, registro.cantidadAlimento, registro.usuario));
     }
@@ -121,15 +114,6 @@ export class RegistroDiarioService {
         
         // Procesar resultados
         let indice = 0;
-        
-        // Resultado actualización lote
-        if (registro.animalesMuertos > 0 || registro.animalesEnfermos > 0) {
-          resultados.resultados.loteActualizado = respuestas[indice]?.success || false;
-          if (!resultados.resultados.loteActualizado) {
-            resultados.errores?.push('Error al actualizar cantidad del lote');
-          }
-          indice++;
-        }
 
         // Resultado mortalidad
         if (registro.animalesMuertos > 0) {
@@ -171,38 +155,7 @@ export class RegistroDiarioService {
     );
   }
 
-  /**
-   * ✅ ACTUALIZAR CANTIDAD DE ANIMALES EN LOTE
-   */
-  private actualizarCantidadLote(loteId: string, cantidadAReducir: number): Observable<any> {
-    return this.loteService.getLotes().pipe(
-      switchMap((lotes: any) => {
-        let lotesArray = lotes;
-        
-        // Si viene envuelto en un objeto response
-        if (lotes.status === 200 && lotes.object) {
-          lotesArray = lotes.object;
-        }
-        
-        const lote = lotesArray.find((l: any) => l.id === loteId);
-        
-        if (!lote) {
-          throw new Error(`Lote con ID ${loteId} no encontrado`);
-        }
-
-        const nuevaCantidad = Math.max(0, lote.quantity - cantidadAReducir);
-        
-        console.log(`🔄 Actualizando lote ${loteId}: ${lote.quantity} → ${nuevaCantidad} (-${cantidadAReducir})`);
-        
-        const loteActualizado = { ...lote, quantity: nuevaCantidad };
-        return this.loteService.updateLote(loteActualizado);
-      }),
-      map((response: any) => ({
-        success: response?.status === 200 || response?.id,
-        message: (response?.status === 200 || response?.id) ? 'Lote actualizado exitosamente' : 'Error al actualizar lote'
-      }))
-    );
-  }
+  // Eliminado: la actualización de stock se delega al backend vía Mortalidad.
 
   /**
    * ✅ DESCONTAR DEL INVENTARIO

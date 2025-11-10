@@ -42,6 +42,21 @@ public class DataInitializer implements CommandLineRunner {
             // Siempre asegurar que el usuario admin exista
             ensureAdminUserExists();
 
+            // Asegurar usuarios solicitados por negocio
+            ensureSpecificUserExists(
+                "Javier",
+                "javier@avicola.com",
+                "Alexandra1",
+                ERole.ROLE_ADMIN
+            );
+
+            ensureSpecificUserExists(
+                "elvia",
+                "elvia@avicola.com",
+                "123456",
+                ERole.ROLE_USER
+            );
+
             logger.info("Verificación de datos iniciales completada.");
 
         } catch (Exception e) {
@@ -116,6 +131,49 @@ public class DataInitializer implements CommandLineRunner {
             } else {
                 logger.info("El usuario 'admin' ya existe y está configurado correctamente.");
             }
+        }
+    }
+
+    private void ensureSpecificUserExists(String username, String email, String rawPassword, ERole roleEnum) {
+        try {
+            Optional<Usuario> opt = usuarioRepository.findByUsername(username);
+            Role role = roleRepository.findByName(roleEnum)
+                    .orElseThrow(() -> new RuntimeException("Error: Rol no encontrado: " + roleEnum));
+
+            if (!opt.isPresent()) {
+                logger.info("Creando usuario requerido por negocio: {}", username);
+                Usuario u = new Usuario();
+                u.setUsername(username);
+                u.setEmail(email);
+                u.setPassword(passwordEncoder.encode(rawPassword));
+                u.setActive(true);
+                u.setRoles(Collections.singleton(role));
+                usuarioRepository.save(u);
+                return;
+            }
+
+            // Actualizar usuario existente para garantizar acceso
+            Usuario u = opt.get();
+            boolean changed = false;
+            if (!u.isActive()) { u.setActive(true); changed = true; }
+            if (email != null && (u.getEmail() == null || !u.getEmail().equalsIgnoreCase(email))) { u.setEmail(email); changed = true; }
+            // Asegurar rol requerido
+            if (u.getRoles() == null || u.getRoles().stream().noneMatch(r -> r.getName() == roleEnum)) {
+                Set<Role> roles = new HashSet<>(u.getRoles() != null ? u.getRoles() : Collections.emptySet());
+                roles.add(role);
+                u.setRoles(roles);
+                changed = true;
+            }
+            // Alinear contraseña con la proporcionada para pruebas
+            u.setPassword(passwordEncoder.encode(rawPassword));
+            changed = true;
+            if (changed) {
+                usuarioRepository.save(u);
+                logger.info("Usuario '{}' actualizado/asegurado.", username);
+            }
+        } catch (Exception e) {
+            logger.error("No se pudo asegurar el usuario '{}': {}", username, e.getMessage(), e);
+            throw e;
         }
     }
 }

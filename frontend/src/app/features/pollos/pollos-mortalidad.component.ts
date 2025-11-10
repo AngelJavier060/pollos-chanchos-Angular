@@ -173,12 +173,20 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       this.mortalidadService.registrarMortalidadConCausa(registroConCausa).subscribe({
         next: (nuevoRegistro) => {
           console.log('✅ Respuesta del backend:', nuevoRegistro);
+          const lotePrevio = this.lotes.find(l => String(l.id) === String(this.nuevoRegistro.loteId));
+          const vivosPrevios = lotePrevio?.quantity || 0;
+          const muertos = Number(this.nuevoRegistro.cantidadMuertos) || 0;
+          const restantes = Math.max(0, vivosPrevios - muertos);
           this.registrosMortalidad.unshift(nuevoRegistro);
           this.cargarEstadisticasDesdeBackend();
           this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
           this.cerrarModalRegistro();
           console.log('✅ Mortalidad registrada exitosamente con causa, lote actualizado');
-          alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+          if (restantes <= 0) {
+            alert(`✅ Mortalidad registrada: ${muertos} animales. El lote ha llegado a 0 y fue movido al Histórico. Ciclo finalizado.`);
+          } else {
+            alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+          }
         },
         error: (error) => {
           console.error('❌ Error al registrar mortalidad con causa:', error);
@@ -201,12 +209,20 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
       this.mortalidadService.registrarMortalidad(registroSimple).subscribe({
         next: (nuevoRegistro) => {
           console.log('✅ Respuesta del backend:', nuevoRegistro);
+          const lotePrevio = this.lotes.find(l => String(l.id) === String(this.nuevoRegistro.loteId));
+          const vivosPrevios = lotePrevio?.quantity || 0;
+          const muertos = Number(this.nuevoRegistro.cantidadMuertos) || 0;
+          const restantes = Math.max(0, vivosPrevios - muertos);
           this.registrosMortalidad.unshift(nuevoRegistro);
           this.cargarEstadisticasDesdeBackend();
           this.recargarLotesActualizados(this.nuevoRegistro.loteId!);
           this.cerrarModalRegistro();
           console.log('✅ Mortalidad registrada exitosamente sin causa, lote actualizado');
-          alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+          if (restantes <= 0) {
+            alert(`✅ Mortalidad registrada: ${muertos} animales. El lote ha llegado a 0 y fue movido al Histórico. Ciclo finalizado.`);
+          } else {
+            alert(`Mortalidad registrada exitosamente. La cantidad del lote ha sido actualizada automáticamente.`);
+          }
         },
         error: (error) => {
           console.error('❌ Error al registrar mortalidad sin causa:', error);

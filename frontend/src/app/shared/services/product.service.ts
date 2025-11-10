@@ -61,6 +61,7 @@ export class ProductService {
     // Crear un objeto simple con solo los datos básicos del producto
     const productData = {
       name: product.name,
+      description: (product as any)?.description || '',
       quantity: product.quantity,
       price_unit: product.price_unit,
       number_facture: product.number_facture,

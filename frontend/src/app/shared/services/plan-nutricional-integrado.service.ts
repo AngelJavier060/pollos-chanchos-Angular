@@ -23,6 +23,9 @@ export interface EtapaCrecimiento {
   descripcion: string;
   esActual?: boolean;
   completada?: boolean;
+  // ✅ Metadatos del plan de origen (principal)
+  planId?: number;
+  planNombre?: string;
 }
 
 export interface PlanIntegrado {
@@ -88,6 +91,31 @@ export class PlanNutricionalIntegradoService {
     }
   ];
 
+  // ✅ NUEVO: Determinar si un plan pertenece al tipo de animal solicitado (singulares/plurales/sinónimos)
+  private esPlanDelTipo(plan: any, tipoAnimal: 'pollos' | 'chanchos'): boolean {
+    const nombreAnimal = plan.animalName?.toLowerCase() || '';
+    const objetoAnimal = plan.animal?.name?.toLowerCase() || '';
+    const nombrePlan = plan.name?.toLowerCase() || '';
+    const descripcion = plan.description?.toLowerCase() || '';
+
+    const idAnimalRaw = plan.animal?.id ?? plan.animalId ?? null;
+    const idAnimalNum = idAnimalRaw != null ? Number(idAnimalRaw) : null;
+    if (idAnimalNum != null && !Number.isNaN(idAnimalNum)) {
+      if (tipoAnimal === 'pollos' && idAnimalNum === 1) return true;
+      if (tipoAnimal === 'chanchos' && idAnimalNum === 2) return true;
+    }
+
+    const terminosPollos = ['pollo', 'pollos', 'ave', 'aves', 'gallina', 'gallinas'];
+    const terminosChanchos = ['chancho', 'chanchos', 'cerdo', 'cerdos', 'porcino', 'porcinos'];
+    const terminos = tipoAnimal === 'pollos' ? terminosPollos : terminosChanchos;
+
+    const fuente = `${nombreAnimal} ${objetoAnimal} ${nombrePlan} ${descripcion}`;
+    const fuenteNorm = fuente.toLowerCase();
+
+    const coincide = terminos.some(t => fuenteNorm.includes(t));
+    return coincide;
+  }
+
   constructor(
     private planAlimentacionService: PlanAlimentacionService,
     private productService: ProductService
@@ -131,41 +159,14 @@ export class PlanNutricionalIntegradoService {
         });
         
         // Filtrar planes por tipo de animal - SOLO DATOS REALES
-        // ✅ BUSCAR PLANES QUE CORRESPONDAN AL TIPO DE ANIMAL
-        const planesDelTipo = planes.filter(plan => {
-          // Verificar si el plan tiene detalles que correspondan al tipo de animal
-          const esDelTipoAnimal = plan.animalName?.toLowerCase().includes(tipoAnimal) ||
-                                 plan.animal?.name?.toLowerCase().includes(tipoAnimal) ||
-                                 plan.name?.toLowerCase().includes(tipoAnimal);
-          
-          console.log(`🔍 Evaluando plan "${plan.name}":`, {
-            animalName: plan.animalName,
-            animalObj: plan.animal?.name,
-            planName: plan.name,
-            esDelTipo: esDelTipoAnimal
-          });
-          
-          return esDelTipoAnimal;
-        });
+        // ✅ BUSCAR PLANES QUE CORRESPONDAN AL TIPO DE ANIMAL (singular/plural y sinónimos)
+        const planesDelTipo = planes.filter(plan => this.esPlanDelTipo(plan, tipoAnimal));
 
         console.log(`🎯 Planes encontrados para ${tipoAnimal}:`, planesDelTipo);
         console.log(`🚨 FILTRADO DETALLADO para ${tipoAnimal}:`);
         planes.forEach((plan, index) => {
-          const nombreAnimal = plan.animalName?.toLowerCase() || '';
-          const objetoAnimal = plan.animal?.name?.toLowerCase() || '';
-          const nombrePlan = plan.name?.toLowerCase() || '';
-          const descripcionPlan = plan.description?.toLowerCase() || '';
-          
-          const coincideExacto = nombreAnimal === tipoAnimal || objetoAnimal === tipoAnimal;
-          const coincideIncluye = nombreAnimal.includes(tipoAnimal) || objetoAnimal.includes(tipoAnimal) || 
-                                 nombrePlan.includes(tipoAnimal) || descripcionPlan.includes(tipoAnimal);
-          
-          console.log(`  Plan ${index + 1}: "${plan.name}"`);
-          console.log(`    - animalName: "${plan.animalName}" → exacto: ${nombreAnimal === tipoAnimal ? '✅' : '❌'}, incluye: ${nombreAnimal.includes(tipoAnimal) ? '✅' : '❌'}`);
-          console.log(`    - animal.name: "${plan.animal?.name}" → exacto: ${objetoAnimal === tipoAnimal ? '✅' : '❌'}, incluye: ${objetoAnimal.includes(tipoAnimal) ? '✅' : '❌'}`);
-          console.log(`    - plan.name: "${plan.name}" → incluye: ${nombrePlan.includes(tipoAnimal) ? '✅' : '❌'}`);
-          console.log(`    - description: "${plan.description}" → incluye: ${descripcionPlan.includes(tipoAnimal) ? '✅' : '❌'}`);
-          console.log(`    - ¿Incluido?: ${coincideExacto || coincideIncluye ? '✅ SÍ' : '❌ NO'}`);
+          const incluido = this.esPlanDelTipo(plan, tipoAnimal);
+          console.log(`  Plan ${index + 1}: "${plan.name}" → ¿Incluido?: ${incluido ? '✅ SÍ' : '❌ NO'}`);
         });
 
         if (planesDelTipo.length === 0) {
@@ -195,37 +196,43 @@ export class PlanNutricionalIntegradoService {
         return forkJoin(observablesDetalles).pipe(
           map(todosLosDetalles => {
             console.log('📊 Detalles obtenidos de todos los planes:', todosLosDetalles);
-            
-            // Combinar todos los detalles de todos los planes
-            const detallesCombinados = todosLosDetalles.flat();
-            console.log('🔗 Detalles combinados de todos los planes:', detallesCombinados);
-            
-            // Crear un plan integrado con todos los detalles combinados
-            const planCombinado: PlanAlimentacion = {
-              ...planesDelTipo[0], // Usar el primer plan como base
+
+            // ✅ Construir etapas preservando el plan de origen de cada detalle
+            const etapas: EtapaCrecimiento[] = [];
+            todosLosDetalles.forEach((detalles, idx) => {
+              const planOrigen = planesDelTipo[idx];
+              (detalles || []).forEach((detalle: PlanDetalle) => {
+                const etapa = this.convertirDetalleAEtapa(detalle, productos, tipoAnimal, planOrigen);
+                etapas.push(etapa);
+              });
+            });
+
+            // Crear un plan integrado virtual con todas las etapas preservando el plan de origen
+            const planIntegrado: PlanIntegrado = {
+              id: 0,
               name: `Plan Integrado ${tipoAnimal.charAt(0).toUpperCase() + tipoAnimal.slice(1)}`,
               description: `Plan combinado de ${planesDelTipo.length} planes para ${tipoAnimal}`,
-              detalles: detallesCombinados
+              tipoAnimal,
+              etapas,
+              activo: true
             };
-            
-            const planIntegrado = this.convertirAPlanIntegrado(planCombinado, productos, tipoAnimal);
-            
-            console.log('✅ Plan integrado final con TODAS las etapas:', planIntegrado);
-            console.log('🚨 ETAPAS FINALES CREADAS:');
+
+            console.log('✅ Plan integrado final con TODAS las etapas (con plan de origen):', planIntegrado);
             planIntegrado.etapas.forEach((etapa, index) => {
               console.log(`  Etapa ${index + 1}:`, {
                 nombre: etapa.nombre,
                 diasEdad: etapa.diasEdad,
                 tipoAlimento: etapa.tipoAlimento,
-                producto: etapa.producto?.name
+                producto: etapa.producto?.name,
+                planOrigen: etapa.planNombre
               });
             });
-            
+
             // ✅ GUARDAR EN CACHE
             this.planesCache.set(cacheKey, planIntegrado);
             this.cacheExpiration.set(cacheKey, Date.now() + this.CACHE_DURATION);
             console.log(`💾 Plan combinado guardado en cache para ${tipoAnimal}`);
-            
+
             return planIntegrado;
           })
         );
@@ -353,46 +360,6 @@ export class PlanNutricionalIntegradoService {
       activo: plan.active || false
     };
   }
-
-  /**
-   * Convertir detalle del plan a etapa - SOLO DATOS REALES DEL ADMINISTRADOR
-   */
-  private convertirDetalleAEtapa(detalle: PlanDetalle, productos: Product[], tipoAnimal: 'pollos' | 'chanchos'): EtapaCrecimiento {
-    const producto = productos.find(p => p.id === detalle.product.id);
-    
-    console.log('🔄 Procesando detalle REAL del administrador:', detalle);
-    console.log('📅 Rango de días REAL:', `${detalle.dayStart} - ${detalle.dayEnd} días`);
-    console.log('🍽️ Producto REAL:', detalle.product.name);
-
-    // ✅ USAR ÚNICAMENTE DATOS REALES DEL ADMINISTRADOR
-    const etapaReal: EtapaCrecimiento = {
-      id: detalle.id,
-      nombre: `Etapa ${detalle.dayStart}-${detalle.dayEnd}`,
-      diasEdad: { 
-        min: detalle.dayStart, 
-        max: detalle.dayEnd 
-      }, // ✅ RANGOS REALES DEL ADMINISTRADOR
-      tipoAlimento: detalle.product.name, // ✅ ALIMENTO REAL DEL ADMINISTRADOR
-      consumoDiario: { 
-        min: Math.round(detalle.quantityPerAnimal * 1000 * 0.8), // 80% del valor como mínimo
-        max: Math.round(detalle.quantityPerAnimal * 1000 * 1.2)  // 120% del valor como máximo
-      },
-      producto: {
-        id: detalle.product.id,
-        name: detalle.product.name,
-        stock: producto?.quantity || detalle.product.stock || 0
-      },
-      quantityPerAnimal: detalle.quantityPerAnimal, // ✅ CANTIDAD REAL DEL ADMINISTRADOR
-      frequency: detalle.frequency || 'DIARIA',
-      instructions: detalle.instructions,
-      descripcion: `Etapa de ${detalle.dayStart} a ${detalle.dayEnd} días con ${detalle.product.name}`
-    };
-
-    console.log('✅ Etapa REAL creada:', etapaReal);
-    
-    return etapaReal;
-  }
-
   // ❌ MÉTODO ELIMINADO - Ya no se crean etapas estándar
   // El sistema debe usar únicamente datos reales del administrador
   
@@ -401,6 +368,54 @@ export class PlanNutricionalIntegradoService {
     // Este método ya no se usa - solo datos reales del administrador
   }
   */
+
+  /**
+   * Convertir detalle del plan a etapa - SOLO DATOS REALES DEL ADMINISTRADOR
+   */
+  private convertirDetalleAEtapa(
+    detalle: PlanDetalle,
+    productos: Product[],
+    tipoAnimal: 'pollos' | 'chanchos',
+    planOrigen?: PlanAlimentacion
+  ): EtapaCrecimiento {
+    const producto = productos.find(p => p.id === detalle.product.id);
+
+    console.log('🔄 Procesando detalle REAL del administrador:', detalle);
+    console.log('📅 Rango de días REAL:', `${detalle.dayStart} - ${detalle.dayEnd} días`);
+    console.log('🍽️ Producto REAL:', detalle.product.name);
+
+    const dayStartNum = Number(detalle.dayStart);
+    const dayEndNum = Number(detalle.dayEnd);
+    const qtyPerAnimalNum = Number(detalle.quantityPerAnimal);
+
+    const etapaReal: EtapaCrecimiento = {
+      id: detalle.id,
+      nombre: `Etapa ${dayStartNum}-${dayEndNum}`,
+      diasEdad: {
+        min: dayStartNum,
+        max: dayEndNum
+      },
+      tipoAlimento: detalle.product.name,
+      consumoDiario: {
+        min: Math.round(qtyPerAnimalNum * 1000 * 0.8),
+        max: Math.round(qtyPerAnimalNum * 1000 * 1.2)
+      },
+      producto: {
+        id: detalle.product.id,
+        name: detalle.product.name,
+        stock: producto?.quantity || detalle.product.stock || 0
+      },
+      quantityPerAnimal: qtyPerAnimalNum,
+      frequency: detalle.frequency || 'DIARIA',
+      instructions: detalle.instructions,
+      descripcion: `Etapa de ${dayStartNum} a ${dayEndNum} días con ${detalle.product.name}`,
+      planId: planOrigen?.id,
+      planNombre: planOrigen?.name
+    };
+
+    console.log('✅ Etapa REAL creada:', etapaReal);
+    return etapaReal;
+  }
 
   // ❌ MÉTODO ELIMINADO - Ya no se crean planes por defecto
   // El sistema debe forzar el uso de datos reales del administrador

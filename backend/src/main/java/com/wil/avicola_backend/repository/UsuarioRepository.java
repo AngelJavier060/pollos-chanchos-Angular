@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByUsername(String username);
     
+    Optional<Usuario> findByUsernameIgnoreCase(String username);
+    
     Optional<Usuario> findByEmail(String email);
     
     Boolean existsByUsername(String username);
@@ -26,4 +28,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     
     @Query("SELECT COUNT(u) FROM Usuario u JOIN u.roles r WHERE r.name = ?1")
     long countByRoles_Name(ERole role);
+
+    Optional<Usuario> findFirstByActiveTrueOrderByIdAsc();
 }

@@ -152,17 +152,36 @@ public class MorbilidadController {
      * Recuperar morbilidad (no altera stock)
      */
     @PatchMapping("/{id}/recuperar")
-    public ResponseEntity<Map<String, Object>> recuperar(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> recuperar(@PathVariable Long id, @RequestParam(required = false) Double costo) {
         Map<String, Object> response = new HashMap<>();
         try {
-            RegistroMorbilidad actualizado = morbilidadService.recuperar(id);
+            RegistroMorbilidad actualizado = morbilidadService.recuperar(id, costo);
             response.put("success", true);
-            response.put("message", "Registro marcado como RECUPERADO");
+            response.put("message", "Registro marcado como RECUPERADO" + (costo != null ? " con costo registrado" : ""));
             response.put("data", actualizado);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Error al recuperar: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Actualizar costo de un registro de morbilidad
+     */
+    @PatchMapping("/{id}/costo")
+    public ResponseEntity<Map<String, Object>> actualizarCosto(@PathVariable Long id, @RequestParam Double costo) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            RegistroMorbilidad actualizado = morbilidadService.actualizarCosto(id, costo);
+            response.put("success", true);
+            response.put("message", "Costo actualizado exitosamente");
+            response.put("data", actualizado);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al actualizar costo: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

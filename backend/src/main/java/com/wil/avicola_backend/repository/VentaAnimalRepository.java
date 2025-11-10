@@ -22,4 +22,11 @@ public interface VentaAnimalRepository extends JpaRepository<VentaAnimal, Long> 
 
     @Query("SELECT COALESCE(SUM(v.cantidad), 0) FROM VentaAnimal v WHERE v.estado = 'EMITIDA' AND v.animalId = :animalId")
     BigDecimal sumCantidadEmitidaByAnimalId(@Param("animalId") Long animalId);
+
+    // Ventas por lote
+    List<VentaAnimal> findByLoteId(String loteId);
+
+    // Ventas por lote y estado
+    @Query("SELECT v FROM VentaAnimal v WHERE v.loteId = :loteId AND v.estado = :estado")
+    List<VentaAnimal> findByLoteIdAndEstado(@Param("loteId") String loteId, @Param("estado") VentaAnimal.Estado estado);
 }

@@ -18,6 +18,7 @@ export class AdminComponent implements OnInit {
   isUserMenuOpen: boolean = false;
   currentUser: User | null = null;
   avatarUrl: string = 'assets/img/default-avatar.png';
+  inventarioOpen: boolean = false;
 
   constructor(
     private authService: AuthService,
@@ -66,6 +67,13 @@ export class AdminComponent implements OnInit {
   navegarA(path: string): void {
     this.router.navigate([`/admin/${path}`]);
     this.closeUserMenu();
+    this.inventarioOpen = false;
+  }
+
+  navegarAInventario(tab: 'productos' | 'inventario-automatico' | 'entradas' | 'alertas'): void {
+    this.router.navigate(['/admin/inventario'], { queryParams: { tab } });
+    this.closeUserMenu();
+    this.inventarioOpen = false;
   }
 
   navegarAPerfil(): void {
@@ -81,5 +89,9 @@ export class AdminComponent implements OnInit {
   cerrarSesion(): void {
     this.authService.logout();
     this.router.navigate(['/auth/login']);
+  }
+
+  toggleInventario(): void {
+    this.inventarioOpen = !this.inventarioOpen;
   }
 }

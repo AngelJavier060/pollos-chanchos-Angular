@@ -41,7 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/plan-ejecucion/test",
             "/api/plan-ejecucion/registrar-alimentacion",  // Permitir registro de alimentación
             "/animal/**",
-            "/api/ventas/**"
+            "/api/ventas/**",
+            "/ws/**"  // Handshake SockJS/STOMP
     );
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils, UserDetailsServiceImpl userDetailsService) {

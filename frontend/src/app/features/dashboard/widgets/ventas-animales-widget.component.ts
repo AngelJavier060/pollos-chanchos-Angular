@@ -560,8 +560,16 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     this.ventasService.crearVentaAnimal(body).subscribe({
       next: (res) => {
         const id = res?.id ?? '—';
-        alert(`Venta de animales guardada (id=${id})`);
+        const qtyPrev = Number(lote?.quantity ?? 0);
+        const qtyVend = cantidadNum;
+        const restantes = Math.max(0, qtyPrev - qtyVend);
+        if (restantes <= 0) {
+          alert(`Venta guardada (id=${id}). El lote ${lote?.codigo || ''} llegó a 0 y fue movido al Histórico. Ciclo finalizado.`);
+        } else {
+          alert(`Venta de animales guardada (id=${id})`);
+        }
         this.cargarVentasAnimalesHoy();
+        this.cargarLotes();
         // Reset rápido manteniendo lote seleccionado
         const keepLote = this.venta.loteId;
         this.venta = {
@@ -651,9 +659,18 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     this.ventasService.crearVentaAnimal(body).subscribe({
       next: () => {
         this.eliminarLinea(index);
-        alert('Venta de animales guardada correctamente');
-        // Refrescar listado de ventas guardadas
+        const lote = this.lotes.find(l => String(l.id) === loteIdStr);
+        const qtyPrev = Number(lote?.quantity ?? 0);
+        const qtyVend = Number(it.cantidad ?? 0);
+        const restantes = Math.max(0, qtyPrev - qtyVend);
+        if (restantes <= 0) {
+          alert(`Venta de animales guardada correctamente. El lote ${lote?.codigo || ''} llegó a 0 y fue movido al Histórico. Ciclo finalizado.`);
+        } else {
+          alert('Venta de animales guardada correctamente');
+        }
+        // Refrescar listado de ventas guardadas y lotes
         this.cargarVentasAnimalesHoy();
+        this.cargarLotes();
       },
       error: (err) => {
         console.error('Error al guardar venta de animales', err);

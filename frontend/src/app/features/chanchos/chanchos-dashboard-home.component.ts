@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
+import { PlanEjecucionServiceFront, AlertaRapida } from '../../shared/services/plan-ejecucion.service';
 
 @Component({
   selector: 'app-chanchos-dashboard-home',
@@ -40,13 +41,17 @@ export class ChanchosDashboardHomeComponent implements OnInit {
   // Resumen ejecutivo
   resumenEjecutivo = {
     tendenciaProduccion: 'Positiva',
-    alertasActivas: 2,
+    alertasActivas: 0,
     eficienciaGeneral: 88
   };
 
+  // Alertas rápidas próximas
+  alertas: AlertaRapida[] = [];
+
   constructor(
     private authService: AuthDirectService,
-    private loteService: LoteService
+    private loteService: LoteService,
+    private planEjecucionServiceFront: PlanEjecucionServiceFront
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -62,10 +67,34 @@ export class ChanchosDashboardHomeComponent implements OnInit {
     this.loading = true;
     try {
       await this.cargarMetricas();
+      await this.cargarAlertas();
     } catch (error) {
       console.error('❌ Error al cargar datos del dashboard:', error);
     } finally {
       this.loading = false;
+    }
+  }
+
+  /**
+   * Cargar alertas próximas (por defecto 7 días)
+   */
+  async cargarAlertas(): Promise<void> {
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      this.planEjecucionServiceFront.getAlertas(7, hoy).subscribe({
+        next: (res) => {
+          this.alertas = res || [];
+          this.resumenEjecutivo.alertasActivas = this.alertas.length;
+          console.log('🔔 Alertas próximas:', this.alertas);
+        },
+        error: (err) => {
+          console.error('❌ Error cargando alertas:', err);
+          this.alertas = [];
+          this.resumenEjecutivo.alertasActivas = 0;
+        }
+      });
+    } catch (e) {
+      console.error('❌ Error inesperado cargando alertas:', e);
     }
   }
 

@@ -41,6 +41,9 @@ public class Product {
     private double level_max;
     private double level_min;
 
+    // Nueva descripción del producto
+    private String description;
+
     @Column(nullable = false)
     private Boolean active;
 

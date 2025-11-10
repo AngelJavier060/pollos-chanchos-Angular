@@ -3,6 +3,8 @@ package com.wil.avicola_backend.service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,18 +55,19 @@ public class PlanDetalleService {
             Product product = productRepository.findById(detalleRequest.getProduct().getId())
                 .orElseThrow(() -> new RequestException("No existe el producto especificado"));
             
-            // Validar rangos de días
-            if (detalleRequest.getDayStart() <= 0 || detalleRequest.getDayEnd() < detalleRequest.getDayStart()) {
-                throw new RequestException("Los rangos de días no son válidos");
-            }
-            
             // Validar cantidad
             if (detalleRequest.getQuantityPerAnimal() <= 0) {
                 throw new RequestException("La cantidad por animal debe ser mayor a 0");
             }
+
+            // Validación básica de rangos
+            if (detalleRequest.getDayStart() == null || detalleRequest.getDayEnd() == null
+                || detalleRequest.getDayStart() <= 0 || detalleRequest.getDayEnd() < detalleRequest.getDayStart()) {
+                throw new RequestException("Los rangos de días no son válidos");
+            }
             
-            // Verificar solapamiento de días con otros detalles del mismo plan
-            verificarSolapamientoDias(plan, detalleRequest, null);
+            // Validar que el sub-rango esté dentro del rango principal del plan
+            validarDentroDelRangoPrincipal(plan, detalleRequest.getDayStart(), detalleRequest.getDayEnd());
             
             // Crear el detalle
             PlanDetalle nuevoDetalle = PlanDetalle.builder()
@@ -86,7 +89,7 @@ public class PlanDetalleService {
             
             planAlimentacionRepository.save(plan);
             
-            logger.info("Detalle agregado al plan: {} - Días {}-{}", plan.getName(), 
+            logger.info("Detalle agregado al plan: {} - Días {}-{} (sub-etapa permitida)", plan.getName(), 
                        nuevoDetalle.getDayStart(), nuevoDetalle.getDayEnd());
             
             // Convertir a DTO antes de devolver
@@ -126,8 +129,8 @@ public class PlanDetalleService {
                 throw new RequestException("Los rangos de días no son válidos");
             }
             
-            // Verificar solapamiento (excluyendo el detalle actual)
-            verificarSolapamientoDias(plan, detalleRequest, detalleId);
+            // Validar que el sub-rango esté dentro del rango principal del plan
+            validarDentroDelRangoPrincipal(plan, detalleRequest.getDayStart(), detalleRequest.getDayEnd());
             
             // Actualizar campos
             detalleExistente.setDayStart(detalleRequest.getDayStart());
@@ -138,7 +141,7 @@ public class PlanDetalleService {
             
             planAlimentacionRepository.save(plan);
             
-            logger.info("Detalle actualizado en plan: {}", plan.getName());
+            logger.info("Detalle actualizado en plan: {} (sub-etapa permitida)", plan.getName());
             return ResponseEntity.ok(detalleExistente);
             
         } catch (RequestException e) {
@@ -260,14 +263,12 @@ public class PlanDetalleService {
                     throw new RequestException("Los rangos de días no son válidos");
                 }
                 
-                // Verificar solapamiento excluyendo el detalle actual
-                if (planDetalleRepository.existsOverlappingRanges(
-                        detalleExistente.getPlanAlimentacion().getId(),
-                        detalleRequest.getDayStart(),
-                        detalleRequest.getDayEnd(),
-                        detalleId)) {
-                    throw new RequestException("El rango de días se solapa con otro detalle existente");
-                }
+                // Validar que el sub-rango esté dentro del rango principal del plan
+                validarDentroDelRangoPrincipal(
+                    detalleExistente.getPlanAlimentacion(),
+                    detalleRequest.getDayStart(),
+                    detalleRequest.getDayEnd()
+                );
                 
                 detalleExistente.setDayStart(detalleRequest.getDayStart());
                 detalleExistente.setDayEnd(detalleRequest.getDayEnd());
@@ -365,45 +366,47 @@ public class PlanDetalleService {
      * MEJORADO: Permite múltiples etapas para diferentes animales en el mismo rango
      */
     private void verificarSolapamientoDias(PlanAlimentacion plan, PlanDetalle nuevoDetalle, Long excludeDetalleId) {
-        if (plan.getDetalles() == null) return;
-        
-        for (PlanDetalle detalle : plan.getDetalles()) {
-            // Excluir el detalle actual si estamos actualizando
-            if (excludeDetalleId != null && detalle.getId().equals(excludeDetalleId)) {
-                continue;
-            }
-            
-            // ✅ NUEVO: Permitir mismo rango si es para DIFERENTE animal
-            boolean esDiferenteAnimal = nuevoDetalle.getAnimal() != null && detalle.getAnimal() != null &&
-                nuevoDetalle.getAnimal().getId() != detalle.getAnimal().getId();
-            
-            // ✅ NUEVO: Permitir mismo rango si es para DIFERENTE producto
-            boolean esDiferenteProducto = nuevoDetalle.getProduct() != null && detalle.getProduct() != null &&
-                nuevoDetalle.getProduct().getId() != detalle.getProduct().getId();
-            
-            // Verificar solapamiento
-            boolean haysolapamiento = !(nuevoDetalle.getDayEnd() < detalle.getDayStart() || 
-                                       nuevoDetalle.getDayStart() > detalle.getDayEnd());
-            
-            if (haysolapamiento) {
-                // ✅ MEJORADO: Solo lanzar error si es EXACTAMENTE el mismo animal Y producto
-                if (!esDiferenteAnimal && !esDiferenteProducto) {
-                    throw new RequestException(String.format(
-                        "El rango de días %d-%d se solapa con el rango existente %d-%d para el mismo animal y producto. " +
-                        "Considera usar rangos diferentes como %d-%d o %d-%d", 
-                        nuevoDetalle.getDayStart(), nuevoDetalle.getDayEnd(),
-                        detalle.getDayStart(), detalle.getDayEnd(),
-                        detalle.getDayEnd() + 1, nuevoDetalle.getDayEnd(),
-                        nuevoDetalle.getDayStart(), detalle.getDayStart() - 1));
-                } else {
-                    // ✅ Solo advertencia en log para diferentes animales/productos
-                    logger.info("⚠️ Rango sobrepuesto permitido: días {}-{} para {} (producto: {})", 
-                               nuevoDetalle.getDayStart(), nuevoDetalle.getDayEnd(),
-                               nuevoDetalle.getAnimal() != null ? nuevoDetalle.getAnimal().getName() : "N/A",
-                               nuevoDetalle.getProduct() != null ? nuevoDetalle.getProduct().getName() : "N/A");
-                }
-            }
+        // ⚠️ REGLA NUEVA: Se permiten sub-etapas solapadas dentro del rango principal del plan.
+        // Mantener este método para compatibilidad, pero ahora solo valida rango principal.
+        validarDentroDelRangoPrincipal(plan, nuevoDetalle.getDayStart(), nuevoDetalle.getDayEnd());
+    }
+
+    /**
+     * Valida que el sub-rango (dayStart-dayEnd) esté dentro del rango principal del plan.
+     * El rango principal se detecta del nombre del plan si contiene "min-max".
+     * Ej.: "31-60", "1 - 30 días".
+     * Si no se puede detectar, no se aplica restricción adicional (solo reglas básicas >0 y fin>=inicio).
+     */
+    private void validarDentroDelRangoPrincipal(PlanAlimentacion plan, Integer dayStart, Integer dayEnd) {
+        if (plan == null || plan.getName() == null) return;
+        int[] rango = extraerRangoDesdeNombre(plan.getName());
+        if (rango == null) {
+            logger.info("ℹ️ No se detectó rango principal en el nombre del plan '{}'. Se omite validación de contención.", plan.getName());
+            return;
         }
+        int min = rango[0];
+        int max = rango[1];
+        if (dayStart < min || dayEnd > max) {
+            throw new RequestException(String.format(
+                "Fuera de rango principal (%d-%d): los días deben estar dentro del rango del plan.", min, max));
+        }
+    }
+
+    /**
+     * Extrae el rango "min-max" de un nombre de plan. Retorna {min, max} o null si no se encuentra.
+     */
+    private int[] extraerRangoDesdeNombre(String nombrePlan) {
+        if (nombrePlan == null) return null;
+        Pattern p = Pattern.compile("(\\d+)\\s*-\\s*(\\d+)");
+        Matcher m = p.matcher(nombrePlan);
+        if (m.find()) {
+            try {
+                int min = Integer.parseInt(m.group(1));
+                int max = Integer.parseInt(m.group(2));
+                if (min > 0 && max >= min) return new int[]{min, max};
+            } catch (NumberFormatException ignored) {}
+        }
+        return null;
     }
 
     /**

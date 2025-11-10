@@ -121,7 +121,7 @@ export class PlanNutricionalComponent implements OnInit {
       quantityPerAnimal: ['', [Validators.required, Validators.min(0.001)]],
       frequency: ['DIARIA', Validators.required],
       instructions: ['']
-    });
+    }, { validators: [this.detalleFormValidator.bind(this)] });
     
     console.log('✅ FORMULARIOS INICIALIZADOS');
     console.log('Validaciones del detalleForm configuradas correctamente');
@@ -260,6 +260,28 @@ export class PlanNutricionalComponent implements OnInit {
         }
       };
       
+      // ✅ Validación anti-solapamiento a nivel de PLAN por animal (frontend)
+      try {
+        const nuevoRango = this.extractRangeFromName(planData.name || '');
+        if (nuevoRango && formData.animalId) {
+          const overlap = (this.planes || [])
+            .filter(p => (p.animalId || p.animal?.id) === formData.animalId)
+            .filter(p => !this.editingPlan || p.id !== this.editingPlan.id)
+            .some(p => {
+              const r = this.extractRangeFromName(p.name || '');
+              return r ? this.rangosSeSolapan(nuevoRango.min, nuevoRango.max, r.min, r.max) : false;
+            });
+          if (overlap) {
+            this.loading = false;
+            alert(`❌ Rango solapado\n\nEl rango ${nuevoRango.min}-${nuevoRango.max} se cruza con otro plan existente para este animal.\n` +
+                  `Por favor, defina un rango que no se cruce.`);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ No se pudo validar solapamiento en frontend:', e);
+      }
+
       console.log('Datos del plan a enviar:', planData);
       
       const request = this.editingPlan
@@ -291,6 +313,9 @@ export class PlanNutricionalComponent implements OnInit {
             this.authService.logout();
           } else if (error.status === 403) {
             alert('No tienes permisos para realizar esta acción.');
+          } else if (error.status === 400) {
+            const serverMsg = (error?.error && typeof error.error === 'object') ? (error.error.error || error.error.message) : null;
+            alert(serverMsg ? `Error de validación: ${serverMsg}` : 'Error de validación (400). Verifique los datos e intente nuevamente.');
           } else {
             alert('Error al guardar el plan. Verifique los datos e intente nuevamente.');
           }
@@ -393,6 +418,35 @@ export class PlanNutricionalComponent implements OnInit {
       this.loadVistaGeneralEtapas();
     }
   }
+
+  /**
+   * Cuando el usuario cambia el plan seleccionado en el combo,
+   * si el formulario de etapa está abierto, precargamos automáticamente
+   * Día inicio y Día fin con el rango principal del plan (si existe)
+   * y bloqueamos el animal si el plan ya lo define.
+   */
+  onSelectedPlanChange(plan: PlanAlimentacion | null): void {
+    this.selectedPlan = plan;
+    if (!this.showEtapaForm || !plan) return;
+
+    const animalDelPlan = this.getAnimalFromPlan(plan);
+    const animalId = animalDelPlan?.id || null;
+    const rango = this.getAllowedRangeFromPlanName();
+    const start = rango ? rango.min : this.calcularSiguienteRangoDisponible();
+    const end = rango ? rango.max : start + 6;
+
+    this.detalleForm.patchValue({
+      dayStart: start,
+      dayEnd: end,
+      animalId: animalId
+    });
+
+    if (animalDelPlan && animalId) {
+      this.detalleForm.get('animalId')?.disable();
+    } else {
+      this.detalleForm.get('animalId')?.enable();
+    }
+  }
   
   // Método de carga de asignaciones eliminado - ya no se usa
 
@@ -426,6 +480,115 @@ export class PlanNutricionalComponent implements OnInit {
         // Mostrar un mensaje de error al usuario
         alert(`Error al cargar la lista de animales: ${error.message || 'Error desconocido'}`);
       }
+    });
+  }
+
+  /**
+   * Validador cross-field para el formulario de etapa.
+   * - dayEnd >= dayStart
+   * - Si el nombre del plan contiene un rango "x-y", validar que ambos días estén dentro de ese rango.
+   */
+  private detalleFormValidator(group: FormGroup): any | null {
+    const ds = Number(group.get('dayStart')?.value);
+    const de = Number(group.get('dayEnd')?.value);
+    if (!ds || !de) return null;
+
+    // Regla 1: fin >= inicio
+    if (de < ds) {
+      return { rangoInvalido: 'El Día fin no puede ser menor que el Día inicio.' };
+    }
+
+    // Regla 2: dentro del rango permitido (si existe)
+    const rango = this.getAllowedRangeFromPlanName();
+    if (rango) {
+      if (ds < rango.min || de > rango.max) {
+        return { fueraDeRango: `Los días deben estar entre ${rango.min} y ${rango.max}.` };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Intenta detectar un rango permitido (min-max) a partir del nombre del plan seleccionado.
+   * Ej: "Plan Pollos 1-45 días" -> {min:1, max:45}
+   */
+  private getAllowedRangeFromPlanName(): { min: number, max: number } | null {
+    const name = this.selectedPlan?.name || '';
+    const match = name.match(/(\d+)\s*-\s*(\d+)/);
+    if (!match) return null;
+    const min = Number(match[1]);
+    const max = Number(match[2]);
+    if (!isNaN(min) && !isNaN(max) && min > 0 && max >= min) {
+      return { min, max };
+    }
+    return null;
+  }
+
+  // ✅ Helpers de rango (independientes de selectedPlan)
+  private extractRangeFromName(name: string): { min: number, max: number } | null {
+    if (!name) return null;
+    const match = name.match(/(\d+)\s*-\s*(\d+)/);
+    if (!match) return null;
+    const min = Number(match[1]);
+    const max = Number(match[2]);
+    if (!isNaN(min) && !isNaN(max) && min > 0 && max >= min) {
+      return { min, max };
+    }
+    return null;
+  }
+
+  private rangosSeSolapan(aMin: number, aMax: number, bMin: number, bMax: number): boolean {
+    return !(aMax < bMin || bMax < aMin);
+  }
+
+  // Getters públicos para usar en la plantilla (min/max válidos del rango principal)
+  getPlanRangeMin(): number | null {
+    const r = this.getAllowedRangeFromPlanName();
+    return r ? r.min : null;
+  }
+  getPlanRangeMax(): number | null {
+    const r = this.getAllowedRangeFromPlanName();
+    return r ? r.max : null;
+  }
+
+  // Indicadores en tiempo real para el formulario de Plan
+  get rangoDetectadoForm(): { min: number, max: number } | null {
+    const nombre = this.planForm?.get('name')?.value || '';
+    return this.extractRangeFromName(nombre);
+  }
+
+  get planSolapadoNombre(): string | null {
+    const rango = this.rangoDetectadoForm;
+    const animalId = this.planForm?.get('animalId')?.value;
+    if (!rango || !animalId) return null;
+    const existente = (this.planes || [])
+      .filter(p => (p.animalId || p.animal?.id) === animalId)
+      .filter(p => !this.editingPlan || p.id !== this.editingPlan.id)
+      .find(p => {
+        const r = this.extractRangeFromName(p.name || '');
+        return r ? this.rangosSeSolapan(rango.min, rango.max, r.min, r.max) : false;
+      });
+    return existente ? (existente.name || `Plan ${existente.id}`) : null;
+  }
+  /**
+   * Refresca únicamente los detalles del plan seleccionado desde backend,
+   * para que se vea inmediatamente la etapa creada/actualizada.
+   */
+  private refreshSelectedPlanDetalles(): void {
+    if (!this.selectedPlan?.id) return;
+    const planId = this.selectedPlan.id;
+    this.planService.getDetallesByPlan(planId).subscribe({
+      next: (detalles) => {
+        // Actualizar en selectedPlan
+        this.selectedPlan!.detalles = detalles;
+        // Actualizar también referencia en this.planes
+        const idx = this.planes.findIndex(p => p.id === planId);
+        if (idx >= 0) {
+          this.planes[idx] = { ...this.planes[idx], detalles };
+        }
+        console.log('🔄 Detalles del plan actualizados tras crear/editar etapa:', detalles);
+      },
+      error: (e) => console.error('❌ Error al refrescar detalles del plan seleccionado:', e)
     });
   }
 
@@ -676,10 +839,40 @@ export class PlanNutricionalComponent implements OnInit {
   showCreateDetalleForm(plan: PlanAlimentacion): void {
     this.selectedPlan = plan;
     this.showEtapaForm = true;
-    this.detalleForm.reset();
+    // Prefijar días según rango principal del plan si existe; si no, sugerir siguiente semana
+    const animalDelPlan = this.getAnimalFromPlan(plan);
+    const animalId = animalDelPlan?.id || null;
+    const rango = this.getAllowedRangeFromPlanName();
+    const start = rango ? rango.min : this.calcularSiguienteRangoDisponible();
+    const end = rango ? rango.max : start + 6; // 7 días por defecto
+
+    this.detalleForm.reset({
+      animalId: animalId,
+      productId: null,
+      dayStart: start,
+      dayEnd: end,
+      quantityPerAnimal: 0.05,
+      frequency: 'DIARIA',
+      instructions: ''
+    });
+
+    if (animalDelPlan && animalId) {
+      this.detalleForm.get('animalId')?.disable();
+    } else {
+      this.detalleForm.get('animalId')?.enable();
+    }
   }
 
   saveDetalle(): void {
+    if (!this.detalleForm.valid) {
+      const errs: any = this.detalleForm.errors || {};
+      if (errs?.rangoInvalido) {
+        alert(`❌ Rango inválido\n\n${errs.rangoInvalido}`);
+      } else if (errs?.fueraDeRango) {
+        alert(`❌ Fuera de rango permitido\n\n${errs.fueraDeRango}`);
+      }
+      return;
+    }
     if (this.detalleForm.valid && this.selectedPlan) {
       this.loading = true;
       const formData = this.detalleForm.value;
@@ -819,9 +1012,8 @@ export class PlanNutricionalComponent implements OnInit {
           
           this.closeDetalleForm();
           this.loading = false;
-          
-          // ✅ Recargar los detalles para mostrar la nueva etapa
-          this.loadDetallesPlanes();
+          // ✅ Refrescar SOLO el plan seleccionado para visualizar inmediatamente la nueva etapa
+          this.refreshSelectedPlanDetalles();
           
           // 🔄 Si estamos en Vista General, recargarla también
           if (this.activeTab === 'vista-general') {
@@ -973,22 +1165,23 @@ export class PlanNutricionalComponent implements OnInit {
     const animalId = animalDelPlan?.id || null;
     const animalName = this.getAnimalNameFromPlan(this.selectedPlan);
     
-    // Calcular rango sugerido
-    const siguienteDiaInicio = this.calcularSiguienteRangoDisponible();
-    const siguienteDiaFin = siguienteDiaInicio + 6; // 7 días por defecto
+    // Calcular rango por defecto: rango principal del plan si existe; de lo contrario, siguiente semana sugerida
+    const rango = this.getAllowedRangeFromPlanName();
+    const defaultStart = rango ? rango.min : this.calcularSiguienteRangoDisponible();
+    const defaultEnd = rango ? rango.max : defaultStart + 6; // 7 días por defecto
     
     console.log('🎯 PRECARGAR ANIMAL EN NUEVA ETAPA');
     console.log('Plan seleccionado:', this.selectedPlan.name);
     console.log('Animal del plan:', animalDelPlan);
     console.log('Animal ID a precargar:', animalId);
     console.log('Nombre del animal:', animalName);
-    console.log('Rango sugerido:', siguienteDiaInicio, '-', siguienteDiaFin);
+    console.log('Rango sugerido:', defaultStart, '-', defaultEnd);
     
     this.detalleForm.reset({
       animalId: animalId,
       productId: null,
-      dayStart: siguienteDiaInicio,
-      dayEnd: siguienteDiaFin,
+      dayStart: defaultStart,
+      dayEnd: defaultEnd,
       quantityPerAnimal: 0.05,
       frequency: 'DIARIA',
       instructions: ''

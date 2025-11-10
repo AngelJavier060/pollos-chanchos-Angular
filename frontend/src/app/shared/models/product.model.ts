@@ -8,6 +8,7 @@ export interface Product {
   date_compra: Date;
   level_min: number; // Cambiado a number
   level_max: number; // Cambiado a number
+  description?: string;
   provider_id?: number;
   typeFood_id?: number;
   unitMeasurement_id?: number;

@@ -1,0 +1,558 @@
+<div class="p-6">
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-blue-800">Análisis Financiero</h1>
+      <p class="text-gray-600">Resumen financiero y rentabilidad por especie y por lote</p>
+    </div>
+    <div class="flex items-center space-x-3">
+      <input type="text" placeholder="Buscar por código (e.g. 003)" [(ngModel)]="filtroCodigo"
+             class="p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+      <div class="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded-md">
+        <label class="text-sm text-gray-700">Mortalidad estimada %</label>
+        <input type="number" min="0" max="100" step="0.1" [(ngModel)]="mortalidadEstimadaPct"
+               class="w-24 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+      </div>
+      <div class="bg-gray-100 rounded-lg p-1">
+        <button (click)="onEspecieChange(1)" [class]="especieSeleccionada === 1 ? 'bg-blue-600 text-white' : 'text-gray-700'" class="px-4 py-2 rounded-md">Pollos</button>
+        <button (click)="onEspecieChange(2)" [class]="especieSeleccionada === 2 ? 'bg-blue-600 text-white' : 'text-gray-700'" class="px-4 py-2 rounded-md">Chanchos</button>
+      </div>
+      <button (click)="refrescar()" class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+        <i class="fas fa-sync-alt mr-1"></i>Refrescar
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="cargando" class="flex justify-center items-center py-16">
+    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
+    <span class="ml-4 text-gray-600">Cargando análisis financiero...</span>
+  </div>
+
+  <ng-container *ngIf="!cargando">
+    <!-- KPIs especie actual -->
+    <div *ngIf="analisisActual" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div class="p-4 rounded-lg bg-emerald-50 text-center">
+        <div class="text-xs text-emerald-700">Ingresos Totales</div>
+        <div class="text-2xl font-bold text-emerald-800">${{ formatearNumero(analisisActual.ingresosTotales || 0) }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-sky-50 text-center">
+        <div class="text-xs text-sky-700">Animales Vendidos</div>
+        <div class="text-2xl font-bold text-sky-800">{{ formatearNumero(analisisActual.vendidosTotales || 0) }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-rose-50 text-center">
+        <div class="text-xs text-rose-700">Mortalidad Total</div>
+        <div class="text-2xl font-bold text-rose-800">{{ formatearNumero(analisisActual.mortalidadTotal || 0) }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-indigo-50 text-center">
+        <div class="text-xs text-indigo-700">Costo Unitario Vendido (Prom)</div>
+        <div class="text-2xl font-bold text-indigo-800">${{ formatearNumero(analisisActual.costoUnitarioVendidoPromedio || 0) }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-amber-50 text-center">
+        <div class="text-xs text-amber-700">Beneficio Total</div>
+        <div class="text-2xl font-bold text-amber-800">${{ formatearNumero(analisisActual.beneficioTotal || 0) }}</div>
+      </div>
+    </div>
+
+    <!-- Comparativa por especie -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-balance-scale text-purple-500 mr-2"></i>Comparativa por Especie
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Pollos -->
+        <div class="p-4 rounded-lg border border-gray-200">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-gray-600">Pollos</div>
+            <div class="text-xs text-gray-400">Actualizado</div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="text-xs text-gray-500">Ingresos</div>
+              <div class="text-lg font-bold text-emerald-700">${{ formatearNumero(analisisPollos?.ingresosTotales || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Vendidos</div>
+              <div class="text-lg font-bold text-sky-700">{{ formatearNumero(analisisPollos?.vendidosTotales || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Costo Unit Prom</div>
+              <div class="text-lg font-bold text-indigo-700">${{ formatearNumero(analisisPollos?.costoUnitarioVendidoPromedio || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Beneficio</div>
+              <div class="text-lg font-bold text-amber-700">${{ formatearNumero(analisisPollos?.beneficioTotal || 0) }}</div>
+            </div>
+          </div>
+        </div>
+        <!-- Chanchos -->
+        <div class="p-4 rounded-lg border border-gray-200">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-gray-600">Chanchos</div>
+            <div class="text-xs text-gray-400">Actualizado</div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="text-xs text-gray-500">Ingresos</div>
+              <div class="text-lg font-bold text-emerald-700">${{ formatearNumero(analisisChanchos?.ingresosTotales || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Vendidos</div>
+              <div class="text-lg font-bold text-sky-700">{{ formatearNumero(analisisChanchos?.vendidosTotales || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Costo Unit Prom</div>
+              <div class="text-lg font-bold text-indigo-700">${{ formatearNumero(analisisChanchos?.costoUnitarioVendidoPromedio || 0) }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Beneficio</div>
+              <div class="text-lg font-bold text-amber-700">${{ formatearNumero(analisisChanchos?.beneficioTotal || 0) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detalle por lote -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-clipboard-list text-purple-500 mr-2"></i>Detalle por Lote</h3>
+        <div class="text-sm text-gray-500">
+          <span *ngIf="analisisActual">Total de lotes: {{ analisisActual.analisisPorLote?.length || 0 }}</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('lote')">Lote</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('pollosVivos')">Vivos</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('pollosMuertos')">Muertos</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('vendidos')">Vendidos</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('ingresosTotal')">Ingresos</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('costoTotalLote')">Costo Total</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('costoPorPollo')">Costo/Animal</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('rendimiento')">Rendimiento</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" (click)="ordenarPor('rentabilidad')">Rentabilidad</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200" *ngIf="analisisActual">
+            <tr *ngFor="let lote of getPorLoteOrdenado()" class="hover:bg-gray-50">
+              <td class="px-6 py-3 text-sm font-medium text-gray-800">{{ lote.lote?.codigo || ('Lote ' + (lote.lote?.id || 'N/A')) }}</td>
+              <td class="px-6 py-3 text-sm">{{ formatearNumero(lote.pollosVivos) }}</td>
+              <td class="px-6 py-3 text-sm text-red-600">{{ formatearNumero(lote.pollosMuertos) }}</td>
+              <td class="px-6 py-3 text-sm">{{ formatearNumero(lote.vendidos || 0) }}</td>
+              <td class="px-6 py-3 text-sm text-green-700 font-semibold">${{ formatearNumero(lote.ingresosTotal || 0) }}</td>
+              <td class="px-6 py-3 text-sm">${{ formatearNumero(lote.costoTotalLote) }}</td>
+              <td class="px-6 py-3 text-sm">${{ formatearNumero(lote.costoPorPollo) }}</td>
+              <td class="px-6 py-3 text-sm" [ngClass]="{ 'text-green-600': (lote.rendimiento||0) >= 80, 'text-yellow-600': (lote.rendimiento||0) >= 60 && (lote.rendimiento||0) < 80, 'text-red-600': (lote.rendimiento||0) < 60 }">{{ formatearNumero(lote.rendimiento) }}%</td>
+              <td class="px-6 py-3 text-sm" [ngClass]="{ 'text-green-600': (lote.rentabilidad||0) >= 20, 'text-yellow-600': (lote.rentabilidad||0) >= 10 && (lote.rentabilidad||0) < 20, 'text-red-600': (lote.rentabilidad||0) < 10 }">{{ formatearNumero(lote.rentabilidad) }}%</td>
+              <td class="px-6 py-3 text-sm">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" [ngClass]="{ 'text-green-700': lote.estadoLote==='activo', 'text-red-700': lote.estadoLote!=='activo' }">{{ lote.estadoLote }}</span>
+              </td>
+            </tr>
+            <tr *ngIf="(analisisActual?.analisisPorLote?.length || 0) === 0">
+              <td colspan="10" class="px-6 py-6 text-center text-sm text-gray-500">Sin lotes para mostrar</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Costo Inicial del Animal -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-calculator text-emerald-500 mr-2"></i>Costo Inicial del Animal
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio unit.</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales base</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo compra total</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mortalidad est. ({{ mortalidadEstimadaPct }}%)</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales viables</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo real x vivo</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dif. vs precio</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ver</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200" *ngIf="analisisActual">
+            <tr *ngFor="let row of getPorLoteOrdenado()" class="hover:bg-gray-50">
+              <td class="px-6 py-3 text-sm font-medium text-gray-800">{{ row.lote?.codigo || ('Lote ' + (row.lote?.id || 'N/A')) }}</td>
+              <td class="px-6 py-3 text-sm">${{ formatearNumero(getPrecioUnitarioCompra(row)) }}</td>
+              <td class="px-6 py-3 text-sm">{{ formatearNumero(row.lote?.quantityOriginal || (row.pollosVivos + (row.vendidos||0) + (row.pollosMuertos||0))) }}</td>
+              <td class="px-6 py-3 text-sm text-indigo-700 font-semibold">${{ formatearNumero(getCostoTotalCompra(row)) }}</td>
+              <td class="px-6 py-3 text-sm text-rose-700">{{ formatearNumero(getMortalidadEstimadaCantidad(row)) }}</td>
+              <td class="px-6 py-3 text-sm text-green-700 font-semibold">{{ formatearNumero(getAnimalesViables(row)) }}</td>
+              <td class="px-6 py-3 text-sm text-emerald-700 font-semibold">${{ formatearNumero(getCostoRealUnitarioVivo(row)) }}</td>
+              <td class="px-6 py-3 text-sm" [ngClass]="{ 'text-red-600': getDiferenciaUnitario(row) > 0, 'text-green-600': getDiferenciaUnitario(row) <= 0 }">${{ formatearNumero(getDiferenciaUnitario(row)) }}</td>
+              <td class="px-6 py-3 text-sm">
+                <button (click)="abrirDetalleCostoInicial(row)" class="px-2 py-1 text-blue-600 hover:text-blue-800" title="Ver detalle">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="getPorLoteOrdenado().length === 0">
+              <td colspan="9" class="px-6 py-6 text-center text-sm text-gray-500">Sin lotes para mostrar</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal detalle Costo Inicial -->
+    <div *ngIf="costoInicialDetalleAbierto" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black bg-opacity-40" (click)="cerrarDetalleCostoInicial()"></div>
+      <div class="relative bg-white w-full max-w-4xl mx-4 rounded-lg shadow-lg overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+          <h4 class="text-lg font-semibold text-gray-800">
+            <i class="fas fa-calculator text-emerald-500 mr-2"></i>Costo Inicial — {{ loteCostoInicialDetalle?.lote?.codigo || ('Lote ' + (loteCostoInicialDetalle?.lote?.id || '')) }} ({{ getTipoAnimalDeRow(loteCostoInicialDetalle) }})
+          </h4>
+          <button (click)="cerrarDetalleCostoInicial()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="px-4 py-4 max-h-[70vh] overflow-auto">
+          <div class="mb-3 text-sm text-gray-600">
+            Esta vista muestra de dónde provienen los valores de la tabla principal para el lote seleccionado.
+          </div>
+          <div class="overflow-x-auto mb-4">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Precio del animal</td>
+                  <td class="px-4 py-2 text-sm">Costo unitario de compra</td>
+                  <td class="px-4 py-2 text-sm">${{ formatearNumero(getPrecioUnitarioCompra(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Animales base</td>
+                  <td class="px-4 py-2 text-sm">Cantidad inicial considerada</td>
+                  <td class="px-4 py-2 text-sm">{{ formatearNumero(getAnimalesIniciales(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Costo compra total</td>
+                  <td class="px-4 py-2 text-sm">Precio unitario × animales base</td>
+                  <td class="px-4 py-2 text-sm text-indigo-700 font-semibold">${{ formatearNumero(getCostoTotalCompra(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Mortalidad estimada</td>
+                  <td class="px-4 py-2 text-sm">{{ mortalidadEstimadaPct }}% aplicado a animales base</td>
+                  <td class="px-4 py-2 text-sm text-rose-700">{{ formatearNumero(getMortalidadEstimadaCantidad(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Animales viables</td>
+                  <td class="px-4 py-2 text-sm">Animales vivos considerados para costo</td>
+                  <td class="px-4 py-2 text-sm text-green-700 font-semibold">{{ formatearNumero(getAnimalesViables(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Costo real por animal vivo</td>
+                  <td class="px-4 py-2 text-sm">Costo total / animales viables</td>
+                  <td class="px-4 py-2 text-sm text-emerald-700 font-semibold">${{ formatearNumero(getCostoRealUnitarioVivo(loteCostoInicialDetalle)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">Diferencia vs precio unitario</td>
+                  <td class="px-4 py-2 text-sm">Costo real por vivo - precio unitario</td>
+                  <td class="px-4 py-2 text-sm" [ngClass]="{ 'text-red-600': getDiferenciaUnitario(loteCostoInicialDetalle) > 0, 'text-green-600': getDiferenciaUnitario(loteCostoInicialDetalle) <= 0 }">${{ formatearNumero(getDiferenciaUnitario(loteCostoInicialDetalle)) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h5 class="text-sm font-semibold text-gray-700 mb-2">Resultado final para el lote</h5>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de animal</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad comprada</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mortalidad (%)</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Viables</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo total</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo por animal</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td class="px-4 py-2 text-sm">{{ loteCostoInicialDetalle?.lote?.codigo || ('Lote ' + (loteCostoInicialDetalle?.lote?.id || '')) }}</td>
+                  <td class="px-4 py-2 text-sm">{{ getTipoAnimalDeRow(loteCostoInicialDetalle) }}</td>
+                  <td class="px-4 py-2 text-sm">{{ formatearNumero(getAnimalesIniciales(loteCostoInicialDetalle)) }}</td>
+                  <td class="px-4 py-2 text-sm">{{ mortalidadEstimadaPct }}%</td>
+                  <td class="px-4 py-2 text-sm text-green-700 font-semibold">{{ formatearNumero(getAnimalesViables(loteCostoInicialDetalle)) }}</td>
+                  <td class="px-4 py-2 text-sm text-indigo-700 font-semibold">${{ formatearNumero(getCostoTotalCompra(loteCostoInicialDetalle)) }}</td>
+                  <td class="px-4 py-2 text-sm text-emerald-700 font-semibold">${{ formatearNumero(getCostoRealUnitarioVivo(loteCostoInicialDetalle)) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla Matriz: Análisis de Alimentación por Lote -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-6" *ngIf="analisisActual">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">
+          <i class="fas fa-seedling text-green-500 mr-2"></i>Tabla de Alimento – Consumo y Costos por Lote
+        </h3>
+        <div class="bg-gray-100 rounded-lg p-1 text-sm">
+          <button class="px-3 py-1 rounded-md" [class.bg-blue-600]="modoTablaAlimentos==='horizontal'" [class.text-white]="modoTablaAlimentos==='horizontal'" (click)="modoTablaAlimentos='horizontal'">Horizontal</button>
+          <button class="px-3 py-1 rounded-md" [class.bg-blue-600]="modoTablaAlimentos==='vertical'" [class.text-white]="modoTablaAlimentos==='vertical'" (click)="modoTablaAlimentos='vertical'">Vertical</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto" *ngIf="modoTablaAlimentos==='horizontal'">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Tipo de alimento</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Unidad</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Precio unitario</th>
+              <ng-container *ngFor="let lote of getLotesOrdenados()">
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" colspan="2">{{ codigoLote(lote) }}</th>
+              </ng-container>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Total general ($)</th>
+            </tr>
+            <tr>
+              <ng-container *ngFor="let lote of getLotesOrdenados()">
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consumo (kg)</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo {{ codigoLote(lote) }}</th>
+              </ng-container>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let tipo of getTiposAlimento()" class="hover:bg-gray-50">
+              <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ tipo }}</td>
+              <td class="px-4 py-2 text-sm">{{ getUnidadPorTipo(tipo) }}</td>
+              <td class="px-4 py-2 text-sm">${{ formatearNumero(getPrecioUnitarioPromedioPorTipo(tipo)) }}</td>
+              <ng-container *ngFor="let lote of getLotesOrdenados()">
+                <td class="px-4 py-2 text-sm">{{ formatearNumero(getConsumoPorTipo(lote, tipo)) }}</td>
+                <td class="px-4 py-2 text-sm">${{ formatearNumero(getCostoParcialPorTipo(lote, tipo)) }}</td>
+              </ng-container>
+              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getTotalGeneralPorTipoCosto(tipo)) }}</td>
+            </tr>
+            <tr class="bg-gray-50">
+              <td class="px-4 py-2 text-sm font-semibold" colspan="3">Totales por lote</td>
+              <ng-container *ngFor="let lote of getLotesOrdenados()">
+                <td class="px-4 py-2 text-sm">{{ formatearNumero(getConsumoTotalAlimentacionKgPorLote(lote)) }}</td>
+                <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getCostoTotalAlimentacionPorLote(lote)) }}</td>
+              </ng-container>
+              <td class="px-4 py-2 text-sm"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Vista Vertical por Lote -->
+      <div *ngIf="modoTablaAlimentos==='vertical'" class="space-y-4">
+        <div *ngFor="let lote of getLotesOrdenados()" class="border border-gray-200 rounded-md">
+          <div class="flex items-center justify-between bg-gray-50 px-4 py-2">
+            <div class="font-semibold text-gray-800">{{ codigoLote(lote) }}</div>
+            <button class="text-blue-600 hover:underline text-sm" (click)="toggleDetalle(lote)">
+              {{ expanded[String(lote?.lote?.id || codigoLote(lote))] ? 'Ocultar' : 'Mostrar' }} detalle
+            </button>
+          </div>
+          <div *ngIf="expanded[String(lote?.lote?.id || codigoLote(lote))]" class="p-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de alimento</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consumo (kg)</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio unitario</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo parcial</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr *ngFor="let d of (lote.detalleAlimentos || [])" class="hover:bg-gray-50">
+                  <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ d.typeFood }}</td>
+                  <td class="px-4 py-2 text-sm">{{ d.unidad }}</td>
+                  <td class="px-4 py-2 text-sm">{{ formatearNumero(d.consumoKg) }}</td>
+                  <td class="px-4 py-2 text-sm">${{ formatearNumero(d.precioUnitario) }}</td>
+                  <td class="px-4 py-2 text-sm">${{ formatearNumero(d.costoParcial) }}</td>
+                </tr>
+                <tr class="bg-gray-50">
+                  <td class="px-4 py-2 text-sm font-semibold" colspan="2">Totales lote</td>
+                  <td class="px-4 py-2 text-sm">{{ formatearNumero(getConsumoTotalAlimentacionKgPorLote(lote)) }}</td>
+                  <td class="px-4 py-2 text-sm"></td>
+                  <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getCostoTotalAlimentacionPorLote(lote)) }}</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 text-sm font-semibold" colspan="4">Costo por animal</td>
+                  <td class="px-4 py-2 text-sm font-semibold text-emerald-700">${{ formatearNumero(getCostoPorAnimal(lote)) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Sanidad y Cuidado Animal: Tabla principal -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-1">
+        <i class="fas fa-syringe text-rose-500 mr-2"></i>3. Sanidad y Cuidado Animal
+      </h3>
+      <p class="text-sm text-gray-500 mb-4">Incluye todo lo que mantenga saludable al animal.</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ver</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let r of sanidadResumen" class="hover:bg-gray-50">
+              <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ r.concepto }}</td>
+              <td class="px-4 py-2 text-sm">{{ r.detalle }}</td>
+              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(r.costo) }}</td>
+              <td class="px-4 py-2 text-sm">
+                <button (click)="abrirDetalle(r.concepto)" class="px-2 py-1 text-blue-600 hover:text-blue-800" title="Ver detalle">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+            <tr class="bg-gray-50">
+              <td class="px-4 py-2 text-sm font-semibold" colspan="2">Total sanidad</td>
+              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getTotalSanidad()) }}</td>
+              <td class="px-4 py-2 text-sm"></td>
+            </tr>
+            <tr *ngIf="sanidadResumen.length === 0">
+              <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">Sin registros de sanidad para la especie seleccionada</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal detalle Sanidad -->
+    <div *ngIf="sanidadDetalleAbierto" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black bg-opacity-40" (click)="cerrarDetalle()"></div>
+      <div class="relative bg-white w-full max-w-5xl mx-4 rounded-lg shadow-lg overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+          <h4 class="text-lg font-semibold text-gray-800">
+            <i class="fas fa-syringe text-rose-500 mr-2"></i>Sanidad y Cuidado Animal — {{ conceptoDetalle }}
+          </h4>
+          <button (click)="cerrarDetalle()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="px-4 pt-3">
+          <div class="bg-gray-100 inline-flex rounded-md mb-3">
+            <button class="px-3 py-1 rounded-l-md" [class.bg-blue-600]="sanidadTab==='registros'" [class.text-white]="sanidadTab==='registros'" (click)="sanidadTab='registros'">Registros</button>
+            <button class="px-3 py-1 rounded-r-md" [class.bg-blue-600]="sanidadTab==='lotes'" [class.text-white]="sanidadTab==='lotes'" (click)="sanidadTab='lotes'">Por lote</button>
+          </div>
+        </div>
+        <div class="px-4 pb-4 max-h-[70vh] overflow-auto">
+          <!-- Tab Registros -->
+          <div *ngIf="sanidadTab==='registros'">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de animal</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del gasto</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle / Descripción</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo unitario</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total gasto</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let r of getRegistrosSanidadPorConcepto()" class="hover:bg-gray-50">
+                    <td class="px-4 py-2 text-sm">{{ r?.lote?.codigo || (r?.loteId ? ('Lote ' + r.loteId) : '-') }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.lote?.race?.animal?.name || '-' }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.nombreGasto }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.detalle }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.cantidad }}</td>
+                    <td class="px-4 py-2 text-sm">${{ formatearNumero(r?.costoUnitario) }}</td>
+                    <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(r?.total ?? (r?.cantidad * r?.costoUnitario)) }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.fecha }}</td>
+                    <td class="px-4 py-2 text-sm">{{ r?.observaciones }}</td>
+                  </tr>
+                  <tr *ngIf="getRegistrosSanidadPorConcepto().length === 0">
+                    <td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">Sin registros para mostrar</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab Por lote -->
+          <div *ngIf="sanidadTab==='lotes'">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total {{ conceptoDetalle }}</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo por animal</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let l of getSanidadPorLotePorConcepto()" class="hover:bg-gray-50">
+                    <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ l.loteCodigo }}</td>
+                    <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(l.total) }}</td>
+                    <td class="px-4 py-2 text-sm font-semibold text-emerald-700">${{ formatearNumero(l.costoPorAnimal) }}</td>
+                  </tr>
+                  <tr *ngIf="getSanidadPorLotePorConcepto().length === 0">
+                    <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500">Sin datos para mostrar</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla: Cálculo por animal (viables) -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-6" *ngIf="analisisActual">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-drumstick-bite text-orange-500 mr-2"></i>Cálculo por animal (en base a animales viables)
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales iniciales</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mortalidad</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales viables</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo total alimentación</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo por animal</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let lote of getLotesActuales()" class="hover:bg-gray-50">
+              <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ lote.lote?.codigo || ('Lote ' + (lote.lote?.id || '')) }}</td>
+              <td class="px-4 py-2 text-sm">{{ formatearNumero(getAnimalesIniciales(lote)) }}</td>
+              <td class="px-4 py-2 text-sm text-rose-700">{{ formatearNumero(getMortalidadEstimadaCantidad(lote)) }}</td>
+              <td class="px-4 py-2 text-sm text-green-700 font-semibold">{{ formatearNumero(getAnimalesViables(lote)) }}</td>
+              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getCostoTotalAlimentacionPorLote(lote)) }}</td>
+              <td class="px-4 py-2 text-sm font-semibold text-emerald-700">${{ formatearNumero(getCostoPorAnimal(lote)) }}</td>
+            </tr>
+            <tr class="bg-gray-50">
+              <td class="px-4 py-2 text-sm font-semibold" colspan="4">Total general</td>
+              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">${{ formatearNumero(getCostoTotalAlimentacionGeneral()) }}</td>
+              <td class="px-4 py-2 text-sm font-semibold text-emerald-700">Promedio ${{ formatearNumero(getPromedioCostoPorAnimal()) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>

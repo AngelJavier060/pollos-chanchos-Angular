@@ -56,11 +56,11 @@ public interface LoteRepository extends CrudRepository<Lote, String> {
     Long sumQuantityOriginalByAnimalId(@Param("animalId") Long animalId);
 
     // ========== Histórico por rango de fechas de cierre ==========
-    @Query("SELECT l FROM Lote l WHERE l.quantity = 0 AND l.fechaCierre BETWEEN :desde AND :hasta ORDER BY l.fechaCierre DESC")
+    @Query("SELECT l FROM Lote l WHERE l.quantity = 0 AND (l.fechaCierre BETWEEN :desde AND :hasta OR l.fechaCierre IS NULL) ORDER BY l.fechaCierre DESC")
     List<Lote> findHistoricoByFechaCierreBetween(@Param("desde") java.time.LocalDateTime desde,
                                                  @Param("hasta") java.time.LocalDateTime hasta);
 
-    @Query("SELECT l FROM Lote l WHERE l.quantity = 0 AND l.race.animal.id = :animalId AND l.fechaCierre BETWEEN :desde AND :hasta ORDER BY l.fechaCierre DESC")
+    @Query("SELECT l FROM Lote l WHERE l.quantity = 0 AND l.race.animal.id = :animalId AND (l.fechaCierre BETWEEN :desde AND :hasta OR l.fechaCierre IS NULL) ORDER BY l.fechaCierre DESC")
     List<Lote> findHistoricoByAnimalAndFechaCierreBetween(@Param("animalId") long animalId,
                                                           @Param("desde") java.time.LocalDateTime desde,
                                                           @Param("hasta") java.time.LocalDateTime hasta);

@@ -19,7 +19,11 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.security.Key;
+import java.nio.charset.StandardCharsets;
 
+/**
+ * Utility class for handling JWT tokens.
+ */
 @Component
 public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
@@ -30,7 +34,13 @@ public class JwtUtils {
     private long refreshTokenDurationMs;
 
     private Key key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+        try {
+            return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+        } catch (IllegalArgumentException e) {
+            logger.warn("JWT secret no está en Base64. Usando bytes UTF-8 del valor configurado.");
+            byte[] raw = jwtSecret.getBytes(StandardCharsets.UTF_8);
+            return Keys.hmacShaKeyFor(raw);
+        }
     }
 
     public String generateJwtToken(Authentication authentication) {

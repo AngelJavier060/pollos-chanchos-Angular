@@ -5,9 +5,12 @@ import { AlimentacionService } from './services/alimentacion.service';
 import { PlanNutricionalIntegradoService } from '../../shared/services/plan-nutricional-integrado.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
 import { environment } from '../../../environments/environment';
-import { CausaMortalidad, CAUSAS_MORTALIDAD } from './models/mortalidad.model';
+import { CausaMortalidad } from './models/mortalidad.model';
 import { MortalidadService } from './services/mortalidad.service';
 import { InventarioService, RegistroConsumoRequest } from './services/inventario.service';
+import { ProductService } from '../../shared/services/product.service';
+import { WebsocketService } from '../../shared/services/websocket.service'; // Import WebSocket service
+import { MorbilidadBackendService } from '../../shared/services/morbilidad-backend.service';
 
 interface RegistroAlimentacionCompleto {
   fecha: string;
@@ -46,6 +49,11 @@ interface EtapaAlimento {
   unidad: string;
   seleccionado: boolean;
   productosDetalle: ProductoDetalle[];
+  // ✅ Nuevos campos para visualizar el sub-rango del plan
+  dayStart: number;
+  dayEnd: number;
+  // ✅ NUEVO: ID real del producto para descontar inventario por producto
+  productoId?: number;
 }
 
 interface EtapaActual {
@@ -81,6 +89,13 @@ export class PollosAlimentacionComponent implements OnInit {
   alimentosSeleccionados: EtapaAlimento[] = [];
   etapaActualLote: EtapaActual | null = null;
   planActivoAdministrador: any = null;
+  // 🧭 Plan principal detectado para el día actual
+  planPrincipalNombre: string | null = null;
+  planPrincipalRango: { min: number | null, max: number | null } = { min: null, max: null };
+
+  // ✅ Parámetros Fase 1 (modo rápido): consumo por animal y animales alimentados
+  consumoPorAnimalManual: number | null = null; // kg por animal (puede sobreescribir sugerido)
+  animalesAlimentadosManual: number | null = null; // cantidad de animales a alimentar (por defecto los vivos del lote)
 
   // Estadísticas de lotes - Cache para mortalidad
   private estadisticasLotes: Map<string, {
@@ -92,12 +107,15 @@ export class PollosAlimentacionComponent implements OnInit {
   }> = new Map();
 
   // Propiedades para dropdown de causas de mortalidad
-  causasMortalidad: CausaMortalidad[] = CAUSAS_MORTALIDAD;
+  causasMortalidad: CausaMortalidad[] = [];
   causasMortalidadFiltradas: CausaMortalidad[] = [];
   mostrarDropdownCausas = false;
 
   // Mapa de mortalidad por lote (para calcular valores reales)
   mortalidadPorLote = new Map<string, number>();
+
+  // Mapa de morbilidad (enfermos activos) por lote
+  morbilidadPorLote = new Map<string, number>();
 
   // Estados de UI
   diagnosticoVisible = false;
@@ -110,6 +128,10 @@ export class PollosAlimentacionComponent implements OnInit {
     problemasDetectados: 0
   };
 
+  // Feedback de UI (éxito/error) para el registro con inventario
+  uiMessageSuccess: string | null = null;
+  uiMessageError: string | null = null;
+
   constructor(
     private loteService: LoteService,
     private alimentacionService: AlimentacionService,
@@ -117,7 +139,10 @@ export class PollosAlimentacionComponent implements OnInit {
     private cdr: ChangeDetectorRef,
     private router: Router,
     private mortalidadService: MortalidadService,
-    private inventarioService: InventarioService
+    private inventarioService: InventarioService,
+    private productService: ProductService,
+    private websocketService: WebsocketService, // Inject WebSocket service
+    private morbilidadBackend: MorbilidadBackendService
   ) {}
 
   ngOnInit(): void {
@@ -126,6 +151,91 @@ export class PollosAlimentacionComponent implements OnInit {
     this.causasMortalidadFiltradas = [...this.causasMortalidad]; // Inicializar causas filtradas
     this.cargarDatosIniciales();
     this.cargarMortalidadTodosLotes(); // Cargar mortalidad real
+    this.cargarCausasMortalidad();
+  }
+
+  /**
+   * Cargar morbilidad (enfermos activos) de todos los lotes desde el backend
+   */
+  private async cargarMorbilidadTodosLotes(): Promise<void> {
+    try {
+      const tareas = this.lotesActivos.map(async (lote) => {
+        // El endpoint de morbilidad espera un ID numérico (Long). Usamos dígitos del código del lote.
+        const codigo = String(lote.codigo || '');
+        const digits = (codigo.match(/\d+/g) || []).join('');
+        const loteNum = Number(digits);
+        if (!Number.isFinite(loteNum) || loteNum <= 0) {
+          this.morbilidadPorLote.set(String(lote.id || ''), 0);
+          return;
+        }
+        try {
+          const datos = await this.morbilidadBackend.contarEnfermosPorLote(loteNum).toPromise();
+          const activos = Number(datos?.enfermosActivos || 0);
+          this.morbilidadPorLote.set(String(lote.id || ''), activos);
+        } catch (e) {
+          console.warn('No se pudo obtener morbilidad para lote', lote.codigo, e);
+          this.morbilidadPorLote.set(String(lote.id || ''), 0);
+        }
+      });
+      await Promise.all(tareas);
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('❌ Error al cargar morbilidad:', error);
+      this.morbilidadPorLote = new Map();
+    }
+  }
+
+  /**
+   * Obtener morbilidad (enfermos activos) real desde cache cargado
+   */
+  calcularMorbilidadActual(lote: Lote): number {
+    return this.morbilidadPorLote.get(lote.id?.toString() || '') || 0;
+  }
+
+  private cargarCausasMortalidad(): void {
+    this.mortalidadService.getCausas().subscribe({
+      next: (causas) => {
+        this.causasMortalidad = causas || [];
+        this.causasMortalidadFiltradas = [...this.causasMortalidad];
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Error al cargar causas de mortalidad:', error);
+      }
+    });
+  }
+
+  // ================= UTILIDADES DE PLAN PRINCIPAL =================
+  private determinarPlanPrincipal(etapas: any[], diasVida: number): { nombre: string, rango?: { min: number, max: number } } | null {
+    if (!etapas || etapas.length === 0) return null;
+    // 1) Preferir un plan cuyo nombre contenga un rango x-y que incluya diasVida
+    for (const e of etapas) {
+      const parsed = this.extraerRangoDesdeNombre(e.planNombre);
+      if (parsed && diasVida >= parsed.min && diasVida <= parsed.max) {
+        return { nombre: e.planNombre, rango: parsed };
+      }
+    }
+    // 2) Si ninguno tiene rango en el nombre, agrupar por planNombre y usar el primero
+    const nombre = etapas[0]?.planNombre || null;
+    if (nombre) {
+      const parsed = this.extraerRangoDesdeNombre(nombre);
+      return { nombre, rango: parsed || undefined } as any;
+    }
+    return null;
+  }
+
+  private extraerRangoDesdeNombre(nombrePlan?: string): { min: number, max: number } | null {
+    if (!nombrePlan) return null;
+    const fuente = String(nombrePlan).toLowerCase();
+    // Soportar: "31-60", "31 – 60", "31 — 60", "31 a 60", "31 al 60"
+    const regex = /(\d+)\s*(?:-|–|—|al|a)\s*(\d+)/i;
+    const match = fuente.match(regex);
+    if (match) {
+      const min = Number(match[1]);
+      const max = Number(match[2]);
+      if (!isNaN(min) && !isNaN(max) && min > 0 && max >= min) return { min, max };
+    }
+    return null;
   }
 
   // Métodos básicos requeridos por el template
@@ -252,16 +362,23 @@ export class PollosAlimentacionComponent implements OnInit {
       const lotes = await this.loteService.getLotes().toPromise();
       console.log('📦 Lotes recibidos del servicio:', lotes?.length || 0);
       
-      this.lotesActivos = lotes?.filter(lote => 
-        lote.race?.animal?.name?.toLowerCase().includes('pollo') ||
-        lote.race?.animal?.id === 1
-      ) || [];
+      try {
+        const activos = await this.loteService.getActivos(1).toPromise();
+        this.lotesActivos = (activos || []).filter(l => l.race?.animal?.name?.toLowerCase().includes('pollo') || l.race?.animal?.id === 1);
+      } catch {
+        this.lotesActivos = lotes?.filter(lote => 
+          (lote.quantity || 0) > 0 && (lote.race?.animal?.name?.toLowerCase().includes('pollo') ||
+          lote.race?.animal?.id === 1)
+        ) || [];
+      }
       
       this.estadoSistema.lotesCargados = this.lotesActivos.length;
       console.log('✅ Datos cargados:', this.lotesActivos.length, 'lotes de pollos');
       
       // ✅ CARGAR ESTADÍSTICAS DE MORTALIDAD PARA CADA LOTE
       await this.cargarEstadisticasLotes();
+      // ✅ CARGAR MORBILIDAD (ENFERMOS ACTIVOS) PARA CADA LOTE
+      await this.cargarMorbilidadTodosLotes();
       
       console.log('🐔 Lotes activos con estadísticas:', this.lotesActivos);
       
@@ -358,6 +475,8 @@ export class PollosAlimentacionComponent implements OnInit {
     try {
       // ✅ CARGAR PLAN NUTRICIONAL REAL DESDE EL BACKEND
       console.log('🌐 Consultando plan nutricional real desde backend...');
+      // Forzar recarga del plan para evitar cache desactualizado
+      this.planNutricionalService.forzarRecargaCompleta();
       
       // Hacer la llamada al servicio real para obtener plan nutricional de pollos
       this.planNutricionalService.obtenerPlanActivo('pollos').subscribe({
@@ -380,10 +499,12 @@ export class PollosAlimentacionComponent implements OnInit {
               console.log(`     - Producto: ${etapa.producto?.name || etapa.tipoAlimento}`);
             });
             
-            // ✅ Buscar TODAS las etapas que correspondan a los días de vida del lote
-            const etapasCorrespondientes = planPollos.etapas.filter((etapa: any) => 
-              diasVida >= etapa.diasEdad.min && diasVida <= etapa.diasEdad.max
-            );
+            // ✅ Buscar todas las etapas que corresponden al día actual (para diagnóstico)
+            const etapasCorrespondientes = planPollos.etapas.filter((etapa: any) => {
+              const min = Number(etapa?.diasEdad?.min);
+              const max = Number(etapa?.diasEdad?.max);
+              return Number.isFinite(min) && Number.isFinite(max) && diasVida >= min && diasVida <= max;
+            });
             
             console.log(`🔍 TODAS las etapas encontradas para ${diasVida} días:`, etapasCorrespondientes);
             console.log(`📊 Cantidad de etapas encontradas: ${etapasCorrespondientes.length}`);
@@ -428,37 +549,96 @@ export class PollosAlimentacionComponent implements OnInit {
                 });
               });
               
-              // ✅ CREAR TODAS LAS OPCIONES DE ALIMENTOS DISPONIBLES
-              this.etapasDisponiblesLote = etapasCorrespondientes.map((etapa, index) => ({
+              // 🧭 DETERMINAR PLAN PRINCIPAL SEGÚN NOMBRE CON RANGO QUE CONTENGA LA EDAD (buscar en TODAS las etapas)
+              const planPrincipal = this.determinarPlanPrincipal(planPollos.etapas, diasVida);
+              this.planPrincipalNombre = planPrincipal?.nombre || (etapasCorrespondientes[0]?.planNombre || null);
+              this.planPrincipalRango = {
+                min: planPrincipal?.rango?.min ?? null,
+                max: planPrincipal?.rango?.max ?? null
+              };
+              console.log('🧭 Plan principal detectado:', this.planPrincipalNombre, this.planPrincipalRango);
+
+              // Filtrar sub-etapas por rango principal detectado (min-max) SIN limitar al día actual
+              let etapasDelPlanPrincipal: any[] = [];
+              if (this.planPrincipalRango.min != null && this.planPrincipalRango.max != null) {
+                const minP = this.planPrincipalRango.min as number;
+                const maxP = this.planPrincipalRango.max as number;
+                etapasDelPlanPrincipal = planPollos.etapas.filter((e: any) => {
+                  const r = this.extraerRangoDesdeNombre(e.planNombre);
+                  // Preferir emparejar por rango del nombre del plan
+                  if (r) return r.min === minP && r.max === maxP;
+                  // Si no hay rango en el nombre del plan, al menos exigir que la sub-etapa esté contenida en el rango
+                  return e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP;
+                });
+
+                // 🔁 Fallback de robustez: si por inconsistencias de nombre se perdió alguna sub-etapa del rango, unir con todas las sub-etapas contenidas
+                const candidatasPorRango = planPollos.etapas.filter((e: any) => e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP);
+                const unicas: any[] = [];
+                const vistos = new Set<number | string>();
+                [...etapasDelPlanPrincipal, ...candidatasPorRango].forEach((e: any) => {
+                  const key = e.id ?? `${e.producto?.id}-${e.diasEdad?.min}-${e.diasEdad?.max}`;
+                  if (!vistos.has(key)) {
+                    vistos.add(key);
+                    unicas.push(e);
+                  }
+                });
+                etapasDelPlanPrincipal = unicas;
+              } else if (this.planPrincipalNombre) {
+                // Fallback: agrupar por nombre exacto del plan si no pudimos extraer rango
+                etapasDelPlanPrincipal = planPollos.etapas.filter((e: any) => e.planNombre === this.planPrincipalNombre);
+              } else {
+                // Último fallback: usar solo las etapas correspondientes al día actual
+                etapasDelPlanPrincipal = etapasCorrespondientes;
+              }
+              console.log('📋 Sub-etapas del plan principal:', etapasDelPlanPrincipal);
+
+              // ✅ CREAR TODAS LAS OPCIONES DE ALIMENTOS DISPONIBLES SOLO DEL PLAN PRINCIPAL
+              // Ordenar por rango
+              const etapasOrdenadas = [...etapasDelPlanPrincipal].sort((a: any, b: any) => {
+                if (a.diasEdad?.min !== b.diasEdad?.min) return (a.diasEdad?.min || 0) - (b.diasEdad?.min || 0);
+                return (a.diasEdad?.max || 0) - (b.diasEdad?.max || 0);
+              });
+
+              this.etapasDisponiblesLote = etapasOrdenadas.map((etapa, index) => ({
                 id: index + 1,
                 alimentoRecomendado: etapa.producto?.name || etapa.tipoAlimento,
                 quantityPerAnimal: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
                 unidad: 'kg',
-                seleccionado: true, // ✅ PRESELECCIONAR TODOS LOS ALIMENTOS
+                // ✅ Seleccionar por defecto TODAS las opciones disponibles del plan principal
+                seleccionado: true,
                 productosDetalle: [
                   {
                     nombre: etapa.producto?.name || etapa.tipoAlimento,
                     cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
                     unidad: 'kg'
                   }
-                ]
+                ],
+                // ✅ Sub-rango visual
+                dayStart: etapa.diasEdad?.min,
+                dayEnd: etapa.diasEdad?.max,
+                // ✅ ID real del producto para inventario
+                productoId: etapa.producto?.id
               }));
               
               // ✅ CONFIGURAR ETAPA ACTUAL CON INFORMACIÓN COMBINADA
-              const primeraEtapa = etapasCorrespondientes[0]; // Usar primera etapa como base
-              const todasLasEtapas = etapasCorrespondientes.map(etapa => ({
+              const etapaActual = etapasOrdenadas.find((e: any) => {
+                const min = Number(e?.diasEdad?.min);
+                const max = Number(e?.diasEdad?.max);
+                return Number.isFinite(min) && Number.isFinite(max) && diasVida >= min && diasVida <= max;
+              }) || etapasOrdenadas[0];
+              const todasLasEtapas = etapasOrdenadas.map(etapa => ({
                 nombre: etapa.producto?.name || etapa.tipoAlimento,
                 cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
                 unidad: 'kg'
               }));
               
               this.etapaActualLote = {
-                nombre: `Etapa ${primeraEtapa.diasEdad.min}-${primeraEtapa.diasEdad.max} días`,
-                descripcion: `${etapasCorrespondientes.length} opciones de alimentación disponibles`,
-                alimentoRecomendado: `${etapasCorrespondientes.length} opciones: ${etapasCorrespondientes.map(e => e.producto?.name || e.tipoAlimento).join(', ')}`,
-                quantityPerAnimal: parseFloat((primeraEtapa.quantityPerAnimal || (primeraEtapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
-                diasInicio: primeraEtapa.diasEdad.min,
-                diasFin: primeraEtapa.diasEdad.max,
+                nombre: `Etapa ${etapaActual.diasEdad.min}-${etapaActual.diasEdad.max} días` + (this.planPrincipalNombre ? ` • ${this.planPrincipalNombre}` : ''),
+                descripcion: `${etapasOrdenadas.length} opciones de alimentación disponibles`,
+                alimentoRecomendado: `${etapasOrdenadas.length} opciones: ${etapasOrdenadas.map(e => e.producto?.name || e.tipoAlimento).join(', ')}`,
+                quantityPerAnimal: parseFloat((etapaActual.quantityPerAnimal || (etapaActual.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
+                diasInicio: etapaActual.diasEdad.min,
+                diasFin: etapaActual.diasEdad.max,
                 productosDetalle: todasLasEtapas
               };
               
@@ -466,8 +646,10 @@ export class PollosAlimentacionComponent implements OnInit {
               console.log('✅ TODOS los alimentos REALES cargados:', this.etapasDisponiblesLote);
               
             } else {
-              console.warn(`⚠️ No se encontró etapa para ${diasVida} días, usando fallback`);
-              this.cargarAlimentosFallback(diasVida);
+              console.warn(`⚠️ No se encontró etapa para ${diasVida} días en los planes del administrador.`);
+              this.etapasDisponiblesLote = [];
+              this.etapaActualLote = null;
+              this.uiMessageError = `No hay etapas configuradas para ${diasVida} días. Configure los rangos en Admin > Plan Nutricional > Etapas.`;
             }
             
             // Actualizar alimentos seleccionados
@@ -478,114 +660,26 @@ export class PollosAlimentacionComponent implements OnInit {
             console.log('🔄 Detección de cambios forzada');
             
           } else {
-            console.warn('⚠️ No se encontró plan nutricional, usando fallback');
-            this.cargarAlimentosFallback(diasVida);
+            console.warn('⚠️ No se encontró plan nutricional activo para pollos.');
+            this.etapasDisponiblesLote = [];
+            this.etapaActualLote = null;
+            this.uiMessageError = 'No existe un plan de alimentación activo para pollos. Configure uno en Admin > Plan Nutricional.';
           }
         },
         error: (error) => {
           console.error('❌ Error al cargar plan nutricional:', error);
-          console.log('🔄 Usando datos de fallback por error');
-          this.cargarAlimentosFallback(diasVida);
+          this.etapasDisponiblesLote = [];
+          this.etapaActualLote = null;
+          this.uiMessageError = 'Ocurrió un error al cargar el plan de alimentación. Intente nuevamente o verifique la configuración en Admin.';
         }
       });
       
     } catch (error) {
       console.error('❌ Error crítico al cargar alimentos:', error);
-      this.cargarAlimentosFallback(diasVida);
+      this.etapasDisponiblesLote = [];
+      this.etapaActualLote = null;
+      this.uiMessageError = 'Error crítico al cargar el plan de alimentación. Verifique la configuración en Admin.';
     }
-  }
-
-  private cargarAlimentosFallback(diasVida: number): void {
-    console.log('🔄 Cargando alimentos de fallback para', diasVida, 'días');
-    
-    let etapaNombre = '';
-    let rangoEtapa = '';
-    let alimentoPrincipal = '';
-    let cantidadRecomendada = 0;
-    let vacunasProgramadas = '';
-    
-    if (diasVida <= 7) {
-      etapaNombre = 'Pre-inicial';
-      rangoEtapa = '1 - 7 días';
-      alimentoPrincipal = 'Concentrado Pre-inicial';
-      cantidadRecomendada = 0.025;
-      vacunasProgramadas = 'Newcastle día 7, Bronquitis día 7';
-    } else if (diasVida <= 21) {
-      etapaNombre = 'Inicial';
-      rangoEtapa = '8 - 21 días';
-      alimentoPrincipal = 'Concentrado Inicial';
-      cantidadRecomendada = 0.050;
-      vacunasProgramadas = 'Gumboro día 14, Newcastle día 21';
-    } else if (diasVida <= 35) {
-      etapaNombre = 'Crecimiento I';
-      rangoEtapa = '22 - 35 días';
-      alimentoPrincipal = 'Balanceado Crecimiento';
-      cantidadRecomendada = 0.085;
-      vacunasProgramadas = 'Newcastle día 28, Bronquitis día 35';
-    } else if (diasVida <= 49) {
-      etapaNombre = 'Crecimiento II';
-      rangoEtapa = '36 - 49 días';
-      alimentoPrincipal = 'Balanceado Engorde';
-      cantidadRecomendada = 0.120;
-      vacunasProgramadas = 'Newcastle día 42';
-    } else if (diasVida <= 70) {
-      etapaNombre = 'Engorde';
-      rangoEtapa = '50 - 70 días';
-      alimentoPrincipal = 'Concentrado Engorde';
-      cantidadRecomendada = 0.140;
-      vacunasProgramadas = 'Newcastle día 56, Bronquitis día 63';
-    } else if (diasVida <= 120) {
-      etapaNombre = 'Acabado Temprano';
-      rangoEtapa = '71 - 120 días';
-      alimentoPrincipal = 'Concentrado Finalizador';
-      cantidadRecomendada = 0.150;
-      vacunasProgramadas = 'Newcastle día 84, Newcastle día 105';
-    } else if (diasVida <= 200) {
-      etapaNombre = 'Acabado Medio';
-      rangoEtapa = '121 - 200 días';
-      alimentoPrincipal = 'Concentrado Finalizador Plus';
-      cantidadRecomendada = 0.160;
-      vacunasProgramadas = 'Newcastle día 140, Newcastle día 175';
-    } else {
-      etapaNombre = 'Acabado Tardío';
-      rangoEtapa = `201+ días (${diasVida} días actuales)`;
-      alimentoPrincipal = 'Concentrado Mantenimiento';
-      cantidadRecomendada = 0.170;
-      vacunasProgramadas = 'Newcastle cada 60 días, próxima según calendario';
-    }
-    
-    this.etapasDisponiblesLote = [
-      {
-        id: 1,
-        alimentoRecomendado: alimentoPrincipal,
-        quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)),
-        unidad: 'kg',
-        seleccionado: true,
-        productosDetalle: [
-          {
-            nombre: alimentoPrincipal,
-            cantidad: parseFloat(cantidadRecomendada.toFixed(2)),
-            unidad: 'kg'
-          }
-        ]
-      }
-    ];
-    
-    this.etapaActualLote = {
-      nombre: etapaNombre,
-      descripcion: `Etapa de fallback para pollos de ${diasVida} días`,
-      alimentoRecomendado: alimentoPrincipal,
-      quantityPerAnimal: parseFloat(cantidadRecomendada.toFixed(2)),
-      productosDetalle: [
-        {
-          nombre: alimentoPrincipal,
-          cantidad: parseFloat(cantidadRecomendada.toFixed(2)),
-          unidad: 'kg'
-        }
-      ]
-    };
-    
-    this.actualizarAlimentosSeleccionados();
   }
 
   // ✅ FUNCIÓN FALTANTE - ACTUALIZAR ALIMENTOS SELECCIONADOS
@@ -625,18 +719,28 @@ export class PollosAlimentacionComponent implements OnInit {
         return;
       }
 
+      // ✅ Hacer opcional mortalidad/enfermedad y auto-calcular consumo desde selección
+      const totalSeleccionado = this.getCantidadTotalAlimentosSeleccionados();
+      if (this.registroCompleto.cantidadAplicada == null || this.registroCompleto.cantidadAplicada <= 0) {
+        if (totalSeleccionado > 0) {
+          this.registroCompleto.cantidadAplicada = totalSeleccionado;
+          console.log(`🔄 Cantidad aplicada autocalculada desde selección: ${totalSeleccionado} kg`);
+        }
+      }
+      // Si aún no hay consumo ni mortalidad ni enfermedad, permitir continuar opcionalmente
       if ((this.registroCompleto.cantidadAplicada == null || this.registroCompleto.cantidadAplicada <= 0) &&
-          (this.registroCompleto.animalesMuertos == null || this.registroCompleto.animalesMuertos <= 0)) {
-        alert('❌ La cantidad debe ser mayor a 0 o debe registrar animales muertos');
-        return;
+          (this.registroCompleto.animalesMuertos == null || this.registroCompleto.animalesMuertos <= 0) &&
+          (this.registroCompleto.animalesEnfermos == null || this.registroCompleto.animalesEnfermos <= 0)) {
+        const continuar = confirm('ℹ️ No se registrará consumo ni mortalidad/enfermedad para este lote. ¿Desea continuar de todas formas?');
+        if (!continuar) return;
       }
 
       // Confirmación
       const mensajeConfirmacion = (this.registroCompleto.cantidadAplicada > 0)
-        ? `¿Confirmar registro de ${this.registroCompleto.cantidadAplicada} kg para el lote ${this.loteSeleccionado.codigo}?\n\n` +
-          `✅ Se deducirá automáticamente del inventario de alimentos.`
+        ? `¿Confirmar registro de ${this.registroCompleto.cantidadAplicada} kg (total de seleccionados) para el lote ${this.loteSeleccionado.codigo}?\n\n` +
+          `✅ Se deducirá automáticamente del inventario por cada producto seleccionado.`
         : `¿Confirmar registro sin consumo de alimento para el lote ${this.loteSeleccionado.codigo}?\n\n` +
-          `🐔 Se registrará únicamente la mortalidad indicada y se actualizará el lote.`;
+          `🐔 Se registrará mortalidad/enfermedad solo si fue indicada.`;
       const confirmar = confirm(mensajeConfirmacion);
       if (!confirmar) return;
 
@@ -645,14 +749,10 @@ export class PollosAlimentacionComponent implements OnInit {
           (this.registroCompleto.animalesMuertos != null && this.registroCompleto.animalesMuertos > 0)) {
         try {
           this.loading = true;
-          if (this.registroCompleto.causaMortalidad) {
-            await this.registrarMortalidadAutomatica();
-          } else {
-            // Redirigir a la pantalla de mortalidad para completar causa si no se indicó
-            this.router.navigate(['/pollos/mortalidad'], { 
-              queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesMuertos }
-            });
+          if (!this.registroCompleto.causaMortalidad) {
+            this.registroCompleto.causaMortalidad = 'Causa Desconocida';
           }
+          await this.registrarMortalidadAutomatica();
         } catch (e) {
           console.error('❌ Error en flujo de solo mortalidad:', e);
           alert('❌ Ocurrió un error al registrar la mortalidad. Intente nuevamente.');
@@ -664,87 +764,169 @@ export class PollosAlimentacionComponent implements OnInit {
 
       this.loading = true;
 
-      // ✅ NUEVA LÓGICA: Registrar consumo con deducción automática de inventario
-      const consumoRequest: RegistroConsumoRequest = {
-        loteId: String(this.loteSeleccionado.id!),
-        tipoAlimentoId: 1, // Por ahora usamos ID 1 como default, se puede mejorar
-        cantidadKg: this.registroCompleto.cantidadAplicada,
-        observaciones: this.registroCompleto.observacionesGenerales || 
-          `Consumo registrado para lote ${this.loteSeleccionado.codigo} - ${new Date().toLocaleString()}`
+      // ✅ Delegar deducción a backend (consumo automático por nombre de producto del plan activo)
+      const datosRegistro = {
+        loteId: String(this.loteSeleccionado.id || this.loteSeleccionado.codigo || ''),
+        fecha: this.registroCompleto.fecha,
+        cantidadAplicada: this.registroCompleto.cantidadAplicada || 0,
+        animalesVivos: this.registroCompleto.animalesVivos,
+        animalesMuertos: this.registroCompleto.animalesMuertos,
+        observaciones: this.registroCompleto.observacionesGenerales || ''
       };
 
-      console.log('📤 Enviando solicitud de consumo:', consumoRequest);
+      console.log('📤 Enviando registro de alimentación al backend (consumo automático):', datosRegistro);
+      const responseAlimentacion = await this.alimentacionService.registrarAlimentacion(datosRegistro).toPromise();
 
-      // Registrar consumo y deducir inventario automáticamente
-      const responseInventario = await this.inventarioService.registrarConsumoAlimento(consumoRequest).toPromise();
-      
-      console.log('✅ Respuesta del inventario:', responseInventario);
+      if (responseAlimentacion) {
+        // ❗ No ajustar cantidad local de animales vivos; el backend actualiza tras registrar mortalidad.
+        // ✅ DESCONTAR INVENTARIO: por cada alimento seleccionado llamamos al endpoint oficial
+        //    /api/plan-alimentacion/registrar-consumo para que descuente en inventario_alimentos
+        //    y sincronice a inventario_producto. Se calcula la cantidad por alimento.
+        try {
+          const loteIdStr = String(this.loteSeleccionado.id || this.loteSeleccionado.codigo || '');
+          const llamadas = this.alimentosSeleccionados.map(async (al) => {
+            // Cantidad por este alimento = cantidadPorAnimal * animales del lote
+            const cantidad = parseFloat(((al.quantityPerAnimal || 0) * (this.loteSeleccionado?.quantity || 0)).toFixed(3));
+            if (cantidad <= 0) return null;
 
-      if (responseInventario && responseInventario.success) {
-        // ✅ NOTIFICACIÓN: Informar al usuario sobre la deducción automática de inventario
-        console.log(`✅ INVENTARIO AUTOMÁTICO: Se dedujo ${responseInventario.cantidadConsumida} kg de alimento del inventario`);
-        console.log(`   Stock anterior: ${responseInventario.stockAnterior} kg`);
-        console.log(`   Stock nuevo: ${responseInventario.stockNuevo} kg`);
-        
-        // ✅ Registro exitoso en inventario, ahora registrar en alimentación tradicional
-        const datosRegistro = {
-          loteId: this.loteSeleccionado.codigo || '',
-          fecha: this.registroCompleto.fecha,
-          cantidadAplicada: this.registroCompleto.cantidadAplicada,
-          animalesVivos: this.registroCompleto.animalesVivos,
-          animalesMuertos: this.registroCompleto.animalesMuertos,
-          observaciones: this.registroCompleto.observacionesGenerales || ''
-        };
-
-        const responseAlimentacion = await this.alimentacionService.registrarAlimentacion(datosRegistro).toPromise();
-        
-        if (responseAlimentacion) {
-          // ✅ ACTUALIZACIÓN AUTOMÁTICA: Si hay animales muertos, actualizar el lote localmente
-          if (this.registroCompleto.animalesMuertos > 0) {
-            console.log(`🔄 Actualizando cantidad local del lote ${this.loteSeleccionado.codigo}:`);
-            console.log(`   - Cantidad anterior: ${this.loteSeleccionado.quantity}`);
-            console.log(`   - Animales muertos: ${this.registroCompleto.animalesMuertos}`);
-            
-            // Actualizar la cantidad local inmediatamente
-            this.loteSeleccionado.quantity = Math.max(0, this.loteSeleccionado.quantity - this.registroCompleto.animalesMuertos);
-            
-            console.log(`   - Nueva cantidad: ${this.loteSeleccionado.quantity}`);
-            
-            // Actualizar también en la lista de lotes
-            const loteEnLista = this.lotesActivos.find(l => l.id === this.loteSeleccionado.id);
-            if (loteEnLista) {
-              loteEnLista.quantity = this.loteSeleccionado.quantity;
+            // Obtener producto para extraer typeFoodId (si tenemos productoId es directo)
+            let tipoAlimentoId: number | null = null;
+            let productId: number | null = al.productoId || null;
+            if (productId) {
+              try {
+                const prod = await this.productService.getProductById(productId).toPromise();
+                tipoAlimentoId = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
+                // Asegurar que mantenemos el productId correcto por seguridad
+                productId = prod?.id ?? productId;
+              } catch (e) {
+                console.warn('⚠️ No se pudo obtener product por ID', al.productoId, e);
+              }
             }
-          }
-          
-          // ✅ Mostrar mensaje de éxito con información del inventario
-          const mensaje = `✅ Alimentación registrada exitosamente!\n\n` +
-            `📦 Inventario actualizado:\n` +
-            `   • Cantidad consumida: ${responseInventario.cantidadConsumida} kg\n` +
-            `   • Stock anterior: ${responseInventario.stockAnterior} kg\n` +
-            `   • Stock actual: ${responseInventario.stockNuevo} kg\n` +
-            (this.registroCompleto.animalesMuertos > 0 ? 
-              `\n🐔 Animales vivos actualizados: ${this.loteSeleccionado.quantity}` : '');
-          
-          alert(mensaje);
 
-          // Si hay animales muertos y se especificó una causa, registrar la mortalidad automáticamente
-          if (this.registroCompleto.animalesMuertos > 0 && this.registroCompleto.causaMortalidad) {
-            await this.registrarMortalidadAutomatica();
-          } else if (this.registroCompleto.animalesMuertos > 0) {
-            // Si hay muertos pero no se especificó causa, ir a la página de mortalidad
-            this.router.navigate(['/pollos/mortalidad'], { queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesMuertos } });
-          } else if (this.registroCompleto.animalesEnfermos > 0) {
-            this.router.navigate(['/pollos/morbilidad'], { queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesEnfermos } });
-          } else {
-            this.cerrarModal();
-            await this.cargarDatosIniciales();
+            // Fallback: buscar por nombre si no tuvimos productoId o fallo anterior
+            if (!tipoAlimentoId && al.alimentoRecomendado) {
+              try {
+                const lista = await this.productService.getProducts({ name: al.alimentoRecomendado } as any).toPromise();
+                const prod = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
+                tipoAlimentoId = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
+                // Importante: NO fijar productId cuando solo lo obtuvimos por nombre.
+                // Si no vino productId desde el plan, dejamos que el backend consuma por tipo (FIFO).
+              } catch (e) {
+                console.warn('⚠️ No se pudo buscar producto por nombre', al.alimentoRecomendado, e);
+              }
+            }
+
+            const payload: any = {
+              loteId: loteIdStr,
+              cantidadKg: cantidad,
+              observaciones: `Alimentación diaria - ${al.alimentoRecomendado}`,
+              // ✅ Enviar nombre del producto (backend normaliza y resuelve Product correcto)
+              nombreProducto: al.alimentoRecomendado
+            };
+            // Priorizar consumo estricto por PRODUCTO cuando está disponible
+            if (productId) {
+              payload.productId = productId;
+            }
+            const tipoNum = Number(tipoAlimentoId);
+            if (Number.isFinite(tipoNum)) {
+              payload.tipoAlimentoId = tipoNum;
+            }
+            // ⚠️ Guard: permitir llamada si tenemos nombreProducto o tipoAlimentoId
+            if ((!payload.nombreProducto || payload.nombreProducto.trim() === '') &&
+                (payload.tipoAlimentoId === undefined || payload.tipoAlimentoId === null)) {
+              console.warn('⏭️ Saltando consumo: falta nombreProducto y tipoAlimentoId para', al);
+              return null;
+            }
+            console.log('📦 Registrando consumo en inventario:', payload);
+            try {
+              const resp: any = await this.inventarioService.registrarConsumoAlimento(payload).toPromise();
+              return { alimento: al.alimentoRecomendado, solicitado: cantidad, resp };
+            } catch (err: any) {
+              console.error('❌ Error registrando consumo para', al.alimentoRecomendado, err);
+              return { alimento: al.alimentoRecomendado, solicitado: cantidad, error: err };
+            }
+          });
+          const respuestas: any[] = (await Promise.all(llamadas))?.filter(Boolean) as any[];
+          console.log('✅ Resultados de consumos:', respuestas);
+
+          let totalSolicitado = 0, totalConsumido = 0, totalPendiente = 0, parciales = 0, errores = 0;
+          const detalleLineas: string[] = [];
+          respuestas.forEach(r => {
+            totalSolicitado += Number(r?.solicitado || 0);
+            const res: any = r?.resp || {};
+            const consumida = Number(res?.cantidadConsumida ?? 0);
+            const pendiente = Number(res?.cantidadPendiente ?? 0);
+            const bloqueoVenc = Boolean(res?.bloqueoPorVencido);
+            const ok = res?.success === true && pendiente === 0 && !bloqueoVenc;
+            const parcial = res?.success === true && pendiente > 0;
+            const sinStock = res?.success === false && String(res?.error || '').toLowerCase().includes('stock insuficiente');
+            const huboError = Boolean(r?.error) || (res?.success === false && !sinStock && !bloqueoVenc);
+            let estado = 'OK';
+            if (bloqueoVenc) estado = 'VENCIDO';
+            else if (parcial) estado = 'PARCIAL';
+            else if (sinStock) estado = 'SIN STOCK';
+            else if (!ok) estado = 'ERROR';
+            let extra = '';
+            if (bloqueoVenc) extra = 'Stock vencido. Registre una entrada vigente.';
+            else if (parcial) extra = `Consumo parcial. Pendiente ${pendiente.toFixed(2)} kg.`;
+            else if (sinStock) extra = 'No hay stock disponible.';
+            else if (huboError) extra = String(res?.error || 'Error desconocido');
+            detalleLineas.push(`${r?.alimento || 'Alimento'}: ${estado}${extra ? ` — ${extra}` : ''}`);
+            if (r?.error || res?.success === false) errores++;
+            if (pendiente > 0) parciales++;
+            totalConsumido += consumida;
+            totalPendiente += pendiente;
+          });
+
+          (this as any)._resumenConsumo = { totalSolicitado, totalConsumido, totalPendiente, parciales, errores, detalleLineas };
+          console.log('📊 Resumen consumo:', (this as any)._resumenConsumo);
+        } catch (e) {
+          console.error('❌ Error descontando inventario por alimento(s):', e);
+          // Continuamos sin bloquear el flujo de la UI
+        }
+
+        // ✅ Mensaje de éxito (en banner, sin alert())
+        const resumen = (this as any)._resumenConsumo || null;
+        let mensaje = `✅ Alimentación registrada exitosamente!\n\n`;
+        if (resumen) {
+          const { totalSolicitado, totalConsumido, totalPendiente, parciales, errores } = resumen;
+          mensaje += `📦 Inventario: solicitado=${totalSolicitado.toFixed(2)} kg, consumido=${totalConsumido.toFixed(2)} kg`;
+          if (totalPendiente > 0) {
+            mensaje += `, pendiente=${totalPendiente.toFixed(2)} kg`;
           }
+          if (parciales > 0 || errores > 0) {
+            mensaje += `\n⚠️ Consumo parcial en ${parciales} items` + (errores > 0 ? `, errores=${errores}` : '');
+            mensaje += `\n💡 Sugerencia: reponga stock (Movimiento: ENTRADA) y vuelva a intentar.`;
+          }
+          mensaje += `\n`;
+          if (Array.isArray(resumen?.detalleLineas) && resumen.detalleLineas.length > 0) {
+            mensaje += `\nDetalle por alimento:\n` + resumen.detalleLineas.map((l: string) => `• ${l}`).join('\n') + `\n`;
+          }
+        } else {
+          mensaje += `📦 Inventario actualizado (alimentos seleccionados descontados).\n`;
+        }
+        if (this.registroCompleto.animalesMuertos > 0) {
+          mensaje += `\n🐔 Animales vivos actualizados: ${this.loteSeleccionado.quantity}`;
+        }
+        this.uiMessageSuccess = mensaje;
+        this.uiMessageError = null;
+
+        // WebSocket notification after successful consumption registration
+        this.websocketService.sendMessage('/topic/inventory-update', 'Inventory changed due to consumption in lote ' + this.loteSeleccionado?.codigo);
+
+        if (this.registroCompleto.animalesMuertos > 0) {
+          if (!this.registroCompleto.causaMortalidad) {
+            this.registroCompleto.causaMortalidad = 'Causa Desconocida';
+          }
+          await this.registrarMortalidadAutomatica();
+        } else if (this.registroCompleto.animalesEnfermos > 0) {
+          this.router.navigate(['/pollos/morbilidad'], { queryParams: { loteId: this.loteSeleccionado.id, cantidad: this.registroCompleto.animalesEnfermos } });
+        } else {
+          this.cerrarModal();
+          await this.cargarDatosIniciales();
         }
       } else {
-        // Error en el registro de inventario
-        const errorMsg = responseInventario?.error || 'Error desconocido en el inventario';
-        alert(`❌ Error al actualizar inventario: ${errorMsg}\n\nVerifica que hay suficiente stock disponible.`);
+        alert('❌ Error al registrar alimentación. Verifica los datos e intenta nuevamente.');
       }
 
     } catch (error: any) {
@@ -758,8 +940,8 @@ export class PollosAlimentacionComponent implements OnInit {
       } else {
         errorMessage += 'Verifica los datos e intenta nuevamente.';
       }
-      
-      alert(errorMessage);
+      this.uiMessageError = errorMessage;
+      this.uiMessageSuccess = null;
     } finally {
       this.loading = false;
     }
@@ -1029,13 +1211,9 @@ export class PollosAlimentacionComponent implements OnInit {
 
   // Función requerida por el template para obtener placeholder de cantidad
   getPlaceholderCantidad(): string {
-    if (!this.loteSeleccionado) return '0.0';
-    
-    const diasVida = this.calcularDiasDeVida(this.loteSeleccionado.birthdate);
-    const cantidadSugerida = this.getCantidadPorAnimalSegunEdad(diasVida);
-    const cantidadTotal = cantidadSugerida * (this.loteSeleccionado.quantity || 0);
-    
-    return this.formatearCantidad(cantidadTotal);
+    if (!this.loteSeleccionado) return '0.00';
+    const total = this.getCantidadTotalSugerida();
+    return this.formatearCantidad(total);
   }
 
   private getRegistroVacio(): RegistroAlimentacionCompleto {
@@ -1162,14 +1340,47 @@ export class PollosAlimentacionComponent implements OnInit {
     try {
       console.log('🔄 Registrando mortalidad automáticamente desde alimentación...');
       
+      if (!this.causasMortalidad || this.causasMortalidad.length === 0) {
+        try {
+          const causas = await this.mortalidadService.getCausas().toPromise();
+          this.causasMortalidad = causas || [];
+          this.causasMortalidadFiltradas = [...this.causasMortalidad];
+        } catch (e) {
+          console.error('❌ No se pudieron cargar las causas de mortalidad antes de registrar:', e);
+        }
+      }
+      
+      if (!this.causasMortalidad || this.causasMortalidad.length === 0) {
+        try {
+          const creada = await this.mortalidadService.createCausa({
+            nombre: 'Causa Desconocida',
+            descripcion: 'Sin causa aparente identificada',
+            color: '#6B7280'
+          }).toPromise();
+          if (creada) {
+            this.causasMortalidad = [creada];
+            this.causasMortalidadFiltradas = [...this.causasMortalidad];
+          }
+        } catch (e) {
+          console.error('❌ No se pudo crear la causa por defecto:', e);
+        }
+      }
+      
       // Buscar la causa por nombre o usar "Causa Desconocida" como fallback
       let causaSeleccionada = this.causasMortalidad.find(c => 
         c.nombre.toLowerCase() === this.registroCompleto.causaMortalidad?.toLowerCase()
       );
+      if (!causaSeleccionada && this.registroCompleto.causaMortalidad) {
+        const texto = this.registroCompleto.causaMortalidad.toLowerCase();
+        causaSeleccionada = this.causasMortalidad.find(c => c.nombre?.toLowerCase().includes(texto));
+      }
       
       if (!causaSeleccionada) {
         // Si no encontramos la causa exacta, usar "Causa Desconocida"
         causaSeleccionada = this.causasMortalidad.find(c => c.nombre === 'Causa Desconocida') || this.causasMortalidad[0];
+      }
+      if (!causaSeleccionada) {
+        throw new Error('No hay causas de mortalidad disponibles para registrar automáticamente.');
       }
 
       const diasDeVida = this.calcularDiasDeVida(this.loteSeleccionado?.birthdate || null);
@@ -1188,12 +1399,16 @@ export class PollosAlimentacionComponent implements OnInit {
       console.log('📤 Enviando registro de mortalidad automático:', registroMortalidad);
 
       await this.mortalidadService.registrarMortalidadConCausa(registroMortalidad).toPromise();
-      
+      const vivosPrevios = this.loteSeleccionado?.quantity || 0;
+      const muertos = this.registroCompleto.animalesMuertos || 0;
+      const restantes = Math.max(0, vivosPrevios - muertos);
       console.log('✅ Mortalidad registrada automáticamente');
       console.log('✅ El backend ha actualizado automáticamente la cantidad del lote');
-      alert(`✅ Mortalidad registrada automáticamente: ${this.registroCompleto.animalesMuertos} animales por "${this.registroCompleto.causaMortalidad}". La cantidad del lote se ha actualizado automáticamente.`);
-      
-      // Cerrar modal y recargar datos para reflejar las cantidades actualizadas desde el backend
+      if (restantes <= 0) {
+        alert(`✅ Mortalidad registrada: ${muertos} animales. El lote ${this.loteSeleccionado?.codigo || ''} ha llegado a 0 y fue movido al Histórico. Ciclo finalizado.`);
+      } else {
+        alert(`✅ Mortalidad registrada automáticamente: ${muertos} animales por "${this.registroCompleto.causaMortalidad}". La cantidad del lote se ha actualizado.`);
+      }
       this.cerrarModal();
       await this.cargarDatosIniciales();
       

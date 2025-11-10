@@ -27,7 +27,10 @@ import com.wil.avicola_backend.dto.PlanDetalleResponseDto;
 import com.wil.avicola_backend.model.PlanAlimentacion;
 import com.wil.avicola_backend.model.PlanDetalle;
 import com.wil.avicola_backend.service.PlanAlimentacionService;
+import com.wil.avicola_backend.service.PlanAlimentacionServiceSimplificado;
 import com.wil.avicola_backend.service.PlanDetalleService;
+import com.wil.avicola_backend.service.MaterializacionInventarioService;
+import com.wil.avicola_backend.error.RequestException;
 
 import jakarta.validation.Valid;
 
@@ -45,7 +48,13 @@ public class PlanAlimentacionController {
     private PlanAlimentacionService planAlimentacionService;
     
     @Autowired
+    private PlanAlimentacionServiceSimplificado planAlimentacionServiceSimplificado;
+    
+    @Autowired
     private PlanDetalleService planDetalleService;
+    
+    @Autowired
+    private MaterializacionInventarioService materializacionInventarioService;
     
     /**
      * Endpoint de prueba sin autenticación para debuggear
@@ -141,7 +150,7 @@ public class PlanAlimentacionController {
      * Crear un nuevo plan de alimentación
      */
     @PostMapping
-    public ResponseEntity<PlanAlimentacion> createPlan(
+    public ResponseEntity<?> createPlan(
             @Valid @RequestBody PlanAlimentacionRequestDto planRequest,
             Principal principal) {
         
@@ -153,13 +162,22 @@ public class PlanAlimentacionController {
         Long userId = 1L; 
         
         try {
-            ResponseEntity<PlanAlimentacion> response = planAlimentacionService.createPlanFromDto(planRequest, userId);
+            ResponseEntity<?> response = planAlimentacionService.createPlanFromDto(planRequest, userId);
             System.out.println("✅ Plan creado exitosamente - Status: " + response.getStatusCode());
             return response;
+        } catch (RequestException rex) {
+            System.err.println("⚠️ Error de validación creando plan: " + rex.getMessage());
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "success", false,
+                "error", rex.getMessage()
+            ));
         } catch (Exception e) {
             System.err.println("❌ Error creando plan: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ResponseEntity.status(500).body(java.util.Map.of(
+                "success", false,
+                "error", "Error interno creando plan: " + (e.getMessage() != null ? e.getMessage() : "ver logs")
+            ));
         }
     }
     
@@ -167,7 +185,7 @@ public class PlanAlimentacionController {
      * Actualizar un plan existente - ENDPOINT PRINCIPAL QUE ESTÁ FALLANDO
      */
     @PutMapping("/{planId}")
-    public ResponseEntity<PlanAlimentacionResponseDto> updatePlan(
+    public ResponseEntity<?> updatePlan(
             @PathVariable Long planId,
             @Valid @RequestBody PlanAlimentacionUpdateDto planRequest) {
         
@@ -182,13 +200,22 @@ public class PlanAlimentacionController {
         System.out.println("📝 Contexto autenticación: " + (authContext != null ? authContext.getClass().getSimpleName() : "NULL"));
         
         try {
-            ResponseEntity<PlanAlimentacionResponseDto> response = planAlimentacionService.updatePlanFromDto(planId, planRequest);
+            ResponseEntity<?> response = planAlimentacionService.updatePlanFromDto(planId, planRequest);
             System.out.println("✅ Plan actualizado exitosamente - Status: " + response.getStatusCode());
             return response;
+        } catch (RequestException rex) {
+            System.err.println("⚠️ Error de validación actualizando plan: " + rex.getMessage());
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "success", false,
+                "error", rex.getMessage()
+            ));
         } catch (Exception e) {
             System.err.println("❌ Error actualizando plan: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ResponseEntity.status(500).body(java.util.Map.of(
+                "success", false,
+                "error", "Error interno actualizando plan: " + (e.getMessage() != null ? e.getMessage() : "ver logs")
+            ));
         }
     }
     
@@ -381,12 +408,24 @@ public class PlanAlimentacionController {
         System.out.println("   - Usuario: " + (principal != null ? principal.getName() : "Anónimo"));
         
         try {
-            // Extraer parámetros del request - CORREGIDO para manejar UUID
-            String loteId = requestData.get("loteId").toString(); // UUID como string
-            Long tipoAlimentoId = Long.valueOf(requestData.get("tipoAlimentoId").toString());
+            // Extraer parámetros del request - robusto ante nulos/strings vacíos
+            String loteId = (requestData != null && requestData.get("loteId") != null)
+                ? requestData.get("loteId").toString().trim()
+                : null; // UUID como string
+            Long tipoAlimentoId = null;
+            if (requestData.containsKey("tipoAlimentoId") && requestData.get("tipoAlimentoId") != null &&
+                !requestData.get("tipoAlimentoId").toString().trim().isEmpty()) {
+                tipoAlimentoId = Long.valueOf(requestData.get("tipoAlimentoId").toString());
+            }
             
-            // Manejar cantidad como String o Number
+            // Manejar cantidad como String o Number (validar null antes de parsear)
             Object cantidadObj = requestData.get("cantidadKg");
+            if (cantidadObj == null) {
+                return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "error", "cantidadKg es requerido"
+                ));
+            }
             java.math.BigDecimal cantidadKg;
             if (cantidadObj instanceof Number) {
                 cantidadKg = java.math.BigDecimal.valueOf(((Number) cantidadObj).doubleValue());
@@ -397,19 +436,80 @@ public class PlanAlimentacionController {
             String observaciones = (String) requestData.get("observaciones");
             String usuarioRegistro = principal != null ? principal.getName() : "Usuario desconocido";
             
-            // Llamar al servicio
-            return planAlimentacionService.registrarConsumoAlimento(
-                loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones
-            );
+            // productId opcional para descuento dirigido por producto
+            Long productId = null;
+            if (requestData.containsKey("productId") && requestData.get("productId") != null) {
+                try {
+                    productId = Long.valueOf(requestData.get("productId").toString());
+                } catch (Exception ignore) {}
+            }
+
+            // NUEVO: permitir trabajar solo con nombre_producto
+            // Si viene nombreProductoId o nombreProducto, RESOLVER siempre productId desde ese nombre
+            // (toma prioridad sobre un productId que pueda venir del plan) para garantizar descuento correcto.
+            Long nombreProductoId = null;
+            String nombreProducto = null;
+            try {
+                if (requestData.containsKey("nombreProductoId") && requestData.get("nombreProductoId") != null) {
+                    nombreProductoId = Long.valueOf(requestData.get("nombreProductoId").toString());
+                }
+            } catch (Exception ignore) {}
+            if (requestData.containsKey("nombreProducto") && requestData.get("nombreProducto") != null) {
+                nombreProducto = requestData.get("nombreProducto").toString();
+            }
+            if ((nombreProductoId != null) || (nombreProducto != null && !nombreProducto.isBlank())) {
+                try {
+                    Long pid = materializacionInventarioService.asegurarProductoEInventarioDesdeNombre(
+                        nombreProductoId,
+                        nombreProducto,
+                        null,
+                        usuarioRegistro,
+                        "Materialización automática por consumo"
+                    );
+                    productId = pid; // prioridad por nombre
+                    System.out.println("✅ productId resuelto por nombre_producto => " + pid + " (nombre='" + nombreProducto + "')");
+                } catch (Exception ex) {
+                    System.err.println("❌ No se pudo resolver productId desde nombreProducto: '" + nombreProducto + "' | Causa: " + ex.getMessage());
+                    // Fallback: si tenemos tipoAlimentoId, consumir por TIPO para no romper el flujo
+                    if (tipoAlimentoId != null) {
+                        System.out.println("↩️ Fallback a consumo POR TIPO. tipoAlimentoId=" + tipoAlimentoId);
+                        return planAlimentacionServiceSimplificado.registrarConsumoAlimento(
+                            loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones
+                        );
+                    }
+                    // Sin tipo: responder mensaje claro
+                    return ResponseEntity.ok(Map.of(
+                        "success", false,
+                        "error", "Producto no encontrado para '" + nombreProducto + "'. Regístrelo en Configuración > Productos o seleccione un Tipo de Alimento."
+                    ));
+                }
+            }
+
+            if (productId != null) {
+                System.out.println("📌 Consumo por PRODUCTO. productId seleccionado = " + productId);
+                // ✅ USAR SERVICIO SIMPLIFICADO - RESUELVE EL ERROR 400
+                System.out.println("🔧 Usando servicio simplificado para evitar error de sanitización");
+                return planAlimentacionServiceSimplificado.registrarConsumoAlimentoPorProducto(
+                    loteId, tipoAlimentoId, productId, cantidadKg, usuarioRegistro, observaciones
+                );
+            } else {
+                // ✅ USAR SERVICIO SIMPLIFICADO TAMBIÉN PARA TIPO DE ALIMENTO
+                System.out.println("🔧 Usando servicio simplificado para registro por tipo");
+                return planAlimentacionServiceSimplificado.registrarConsumoAlimento(
+                    loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones
+                );
+            }
             
         } catch (Exception e) {
             System.err.println("❌ Error en endpoint registrar-consumo: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.badRequest()
-                .body(Map.of(
+            // Nunca devolver 400 aquí para no romper el flujo del frontend
+            return ResponseEntity.ok(
+                Map.of(
                     "success", false,
                     "error", "Error procesando solicitud: " + e.getMessage()
-                ));
+                )
+            );
         }
     }
     

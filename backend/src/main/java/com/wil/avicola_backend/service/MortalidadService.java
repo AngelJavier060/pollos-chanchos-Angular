@@ -35,13 +35,19 @@ public class MortalidadService {
      */
     public RegistroMortalidad crearRegistroConCausaId(RegistroMortalidad registro, Long causaId) {
         // Buscar la causa por ID
-        Optional<CausaMortalidad> causaOpt = causaMortalidadRepository.findById(causaId);
-        if (causaOpt.isEmpty()) {
-            throw new RuntimeException("Causa de mortalidad no encontrada con ID: " + causaId);
-        }
-        
-        // Asignar la causa al registro
-        registro.setCausa(causaOpt.get());
+        CausaMortalidad causa = causaMortalidadRepository.findById(causaId)
+                .orElseGet(() -> {
+                    CausaMortalidad porNombre = causaMortalidadRepository.findByNombre("Causa Desconocida");
+                    if (porNombre != null) return porNombre;
+                    CausaMortalidad nueva = new CausaMortalidad();
+                    nueva.setNombre("Causa Desconocida");
+                    nueva.setDescripcion("Generada automáticamente");
+                    nueva.setColor("#9e9e9e");
+                    nueva.setActivo(true);
+                    return causaMortalidadRepository.save(nueva);
+                });
+
+        registro.setCausa(causa);
         registro.setFechaRegistro(LocalDateTime.now());
         
         // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE

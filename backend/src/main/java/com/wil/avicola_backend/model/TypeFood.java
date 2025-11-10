@@ -6,6 +6,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
@@ -30,6 +31,9 @@ public class TypeFood {
 
     @NotBlank(message = "Por favor, ingrese nombre del tipo de alimento.")
     private String name;
+
+    @Column(name = "controla_stock")
+    private Boolean controlaStock; // Si null, se asume true en lógica de negocio
 
     @CreatedDate
     LocalDateTime create_date;

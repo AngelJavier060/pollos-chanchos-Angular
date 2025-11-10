@@ -79,6 +79,16 @@ public class VentaAnimalService {
         return ventaAnimalRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
+    public List<VentaAnimal> listarPorLote(String loteId) {
+        return ventaAnimalRepository.findByLoteId(loteId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VentaAnimal> listarPorLoteEmitidas(String loteId) {
+        return ventaAnimalRepository.findByLoteIdAndEstado(loteId, VentaAnimal.Estado.EMITIDA);
+    }
+
     @Transactional
     public VentaAnimal actualizarVenta(Long id, VentaAnimalDTO dto) {
         VentaAnimal existente = ventaAnimalRepository.findById(id)

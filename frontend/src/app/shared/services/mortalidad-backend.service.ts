@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 // Interfaces para mortalidad
@@ -55,34 +56,42 @@ export class MortalidadBackendService {
    * ✅ OBTENER TODOS LOS REGISTROS
    */
   obtenerRegistros(): Observable<RegistroMortalidadResponse[]> {
-    return this.http.get<RegistroMortalidadResponse[]>(`${this.apiUrl}/todos`);
+    return this.http.get<any>(`${this.apiUrl}/registros`).pipe(
+      map(res => (res && typeof res === 'object' && 'data' in res) ? res.data as RegistroMortalidadResponse[] : res as RegistroMortalidadResponse[])
+    );
   }
 
   /**
    * ✅ OBTENER REGISTROS POR LOTE
    */
   obtenerRegistrosPorLote(loteId: string): Observable<RegistroMortalidadResponse[]> {
-    return this.http.get<RegistroMortalidadResponse[]>(`${this.apiUrl}/lote/${loteId}`);
+    return this.http.get<any>(`${this.apiUrl}/lote/${loteId}`).pipe(
+      map(res => (res && typeof res === 'object' && 'data' in res) ? res.data as RegistroMortalidadResponse[] : res as RegistroMortalidadResponse[])
+    );
   }
 
   /**
    * ✅ OBTENER CAUSAS DE MORTALIDAD
    */
   obtenerCausas(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/causas`);
+    return this.http.get<any>(`${this.apiUrl}/causas`).pipe(
+      map(res => (res && typeof res === 'object' && 'data' in res) ? res.data as any[] : res as any[])
+    );
   }
 
   /**
    * ✅ CONFIRMAR REGISTRO
    */
   confirmarRegistro(id: number): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${id}/confirmar`, {});
+    return this.http.patch<any>(`${this.apiUrl}/${id}/confirmar`, {}).pipe(
+      map(res => (res && typeof res === 'object' && 'data' in res) ? res.data : res)
+    );
   }
 
   /**
    * ✅ ELIMINAR REGISTRO
    */
   eliminarRegistro(id: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`);
+    return this.http.delete<any>(`${this.apiUrl}/${id}`);
   }
 }

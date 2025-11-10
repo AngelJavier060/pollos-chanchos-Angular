@@ -154,10 +154,10 @@
               <span class="text-blue-700 font-bold">{{ lote.quantity }} pollos</span>
             </div>
             
-            <!-- Mortalidad real calculada -->
+            <!-- Morbilidad (enfermos activos) -->
             <div class="info-item flex items-center justify-between">
-              <span class="text-gray-600 font-medium">Mortalidad</span>
-              <span class="text-gray-900 font-bold">{{ calcularMortalidadReal(lote) }}</span>
+              <span class="text-gray-600 font-medium">Morbilidad</span>
+              <span class="text-gray-900 font-bold">{{ calcularMorbilidadActual(lote) }}</span>
             </div>
             
             <!-- Mostrar mortalidad solo si hay datos -->
@@ -176,7 +176,7 @@
 
           <!-- Mostrar etapa cuando el modal esté abierto y tengamos el lote seleccionado -->
           <div class="etapa-correspondiente mb-4" 
-               *ngIf="modalAbierto && loteSeleccionado && etapaActualLote">
+               *ngIf="modalAbierto && loteSeleccionado && etapaActualLote && loteSeleccionado.id === lote.id">
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-blue-800 font-semibold text-sm">
@@ -219,7 +219,7 @@
 
           <!-- Sin etapa correspondiente -->
           <div class="etapa-correspondiente mb-4" 
-               *ngIf="modalAbierto && loteSeleccionado && !etapaActualLote">
+               *ngIf="modalAbierto && loteSeleccionado && !etapaActualLote && loteSeleccionado.id === lote.id">
             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <div class="text-center">
                 <i class="fas fa-exclamation-triangle text-yellow-500 mb-1"></i>
@@ -328,6 +328,26 @@
 
       <!-- Contenido del Modal -->
       <div class="p-6 space-y-6">
+
+        <!-- Feedback de operación -->
+        <div *ngIf="uiMessageSuccess" class="p-4 rounded-md border bg-green-50 border-green-200">
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-600 mt-0.5 mr-3"></i>
+            <pre class="whitespace-pre-wrap text-sm text-green-800 flex-1">{{ uiMessageSuccess }}</pre>
+            <button (click)="uiMessageSuccess = null" class="ml-3 text-green-700 hover:text-green-900">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <div *ngIf="uiMessageError" class="p-4 rounded-md border bg-red-50 border-red-200">
+          <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-3"></i>
+            <pre class="whitespace-pre-wrap text-sm text-red-800 flex-1">{{ uiMessageError }}</pre>
+            <button (click)="uiMessageError = null" class="ml-3 text-red-700 hover:text-red-900">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
         
         <!-- Información de la Etapa Actual DEL PLAN NUTRICIONAL DEL ADMINISTRADOR -->
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -451,6 +471,15 @@
                         Selección múltiple
                       </span>
                     </div>
+                    <!-- 🧭 Rango principal detectado -->
+                    <div *ngIf="planPrincipalNombre || (planPrincipalRango.min && planPrincipalRango.max)" class="-mt-1 mb-2 text-[11px] text-indigo-700">
+                      <i class="fas fa-flag mr-1"></i>
+                      Rango principal: 
+                      <span class="font-semibold">{{ planPrincipalNombre || 'Plan detectado' }}</span>
+                      <span *ngIf="planPrincipalRango.min && planPrincipalRango.max" class="ml-1 bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                        {{ planPrincipalRango.min }}-{{ planPrincipalRango.max }} días
+                      </span>
+                    </div>
                     <div class="space-y-2">
                       <!-- 🎯 MOSTRAR OPCIONES INDIVIDUALES SI EXISTEN -->
                       <div *ngIf="etapasDisponiblesLote.length > 0 && etapasDisponiblesLote[0].opcionesIndividuales; else etapasNormales">
@@ -465,7 +494,12 @@
                           <div class="flex-1">
                             <div class="flex items-center justify-between">
                               <span class="font-semibold text-blue-900">{{ opcion.alimentoRecomendado }}</span>
-                              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                              <div class="flex items-center space-x-2">
+                                <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs" *ngIf="opcion.dayStart && opcion.dayEnd">
+                                  {{ opcion.dayStart }}-{{ opcion.dayEnd }} días
+                                </span>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                              </div>
                             </div>
                             <div class="text-blue-700 text-sm mt-1">
                               <i class="fas fa-weight mr-1"></i>
@@ -502,7 +536,12 @@
                           <div class="flex-1">
                             <div class="flex items-center justify-between">
                               <span class="font-semibold text-blue-900">{{ etapa.alimentoRecomendado }}</span>
-                              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                              <div class="flex items-center space-x-2">
+                                <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs" *ngIf="etapa.dayStart && etapa.dayEnd">
+                                  {{ etapa.dayStart }}-{{ etapa.dayEnd }} días
+                                </span>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                              </div>
                             </div>
                             <div class="text-blue-700 text-sm mt-1">
                               <i class="fas fa-weight mr-1"></i>
@@ -535,7 +574,12 @@
                       </div>
                       <div class="space-y-1">
                         <div *ngFor="let alimento of alimentosSeleccionados" class="flex justify-between items-center bg-white px-2 py-1 rounded border border-green-200 group">
-                          <span class="text-xs text-green-800 font-medium">{{ alimento.alimentoRecomendado }}</span>
+                          <span class="text-xs text-green-800 font-medium">
+                            {{ alimento.alimentoRecomendado }}
+                            <span *ngIf="alimento.dayStart && alimento.dayEnd" class="ml-1 text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded">
+                              {{ alimento.dayStart }}-{{ alimento.dayEnd }} días
+                            </span>
+                          </span>
                           <div class="flex items-center space-x-2">
                             <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">{{ formatearCantidad(alimento.quantityPerAnimal * (loteSeleccionado?.quantity || 0)) }} kg</span>
                             <button 

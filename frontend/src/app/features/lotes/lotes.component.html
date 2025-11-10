@@ -65,6 +65,19 @@
           Este nombre se utilizará para identificar fácilmente el lote. El código se generará automáticamente.
         </p>
       </div>
+
+      <!-- Campo Descripción (origen del lote) -->
+      <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
+        <label for="descripcion" class="block text-sm font-semibold text-gray-700 mb-1">Descripción (origen)</label>
+        <select id="descripcion" formControlName="descripcion"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+          <option value="">Seleccione una opción</option>
+          <option value="Compra de pollos vivos">Compra de pollos vivos</option>
+          <option value="Se encubaron">Se encubaron</option>
+          <option value="Saco crías la gallina">Saco crías la gallina</option>
+        </select>
+        <p class="text-xs text-gray-500 mt-2">Este campo no se persiste aún en el backend. Se añadirá soporte si lo deseas.</p>
+      </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Campo Cantidad -->
@@ -258,8 +271,8 @@
   
   <!-- Barra de pestañas -->
   <div class="flex items-center gap-2 mb-4">
-    <button (click)="activeTab = 'activos'" [ngClass]="{'bg-blue-600 text-white': activeTab === 'activos', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'activos'}" class="px-4 py-2 rounded-lg transition-colors">Activos</button>
-    <button (click)="activeTab = 'historico'" [ngClass]="{'bg-blue-600 text-white': activeTab === 'historico', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'historico'}" class="px-4 py-2 rounded-lg transition-colors">Histórico por fechas</button>
+    <button (click)="setTab('activos')" [ngClass]="{'bg-blue-600 text-white': activeTab === 'activos', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'activos'}" class="px-4 py-2 rounded-lg transition-colors">Activos</button>
+    <button (click)="setTab('historico')" [ngClass]="{'bg-blue-600 text-white': activeTab === 'historico', 'bg-white text-blue-600 border border-blue-200': activeTab !== 'historico'}" class="px-4 py-2 rounded-lg transition-colors">Histórico</button>
   </div>
 
   <!-- Sección de Lotes Activos con filtros dinámicos -->
@@ -364,7 +377,7 @@
   <!-- Sección de Histórico por Fechas -->
   <div *ngIf="activeTab === 'historico'" class="bg-indigo-50 p-6 rounded-lg border border-indigo-100 mt-6">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold text-indigo-700">Histórico por Fechas</h2>
+      <h2 class="text-xl font-semibold text-indigo-700">Histórico (Lotes desactivados)</h2>
     </div>
     
     <!-- Filtros: Especie + Rango de fechas -->

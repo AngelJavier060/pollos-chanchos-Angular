@@ -79,6 +79,7 @@ export class LotesComponent implements OnInit {
   private initForm(): void {
     this.loteForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(3)]],
+      descripcion: [''],
       quantity: ['', [Validators.required, Validators.min(1)]],
       birthdate: ['', [Validators.required]],
       cost: ['', [Validators.required, Validators.min(0)]],
@@ -91,6 +92,19 @@ export class LotesComponent implements OnInit {
     this.loadAndValidateRaces();
     // Cargar resumen inicial (general)
     this.loadResumen();
+  }
+
+  // Cambio de pestaña con carga automática
+  setTab(tab: 'activos' | 'historico'): void {
+    this.activeTab = tab;
+    if (tab === 'activos') {
+      this.loadLotes();
+    } else {
+      // Al entrar al histórico, limpiar fechas para listar TODOS los lotes cerrados
+      this.fechaDesde = null;
+      this.fechaHasta = null;
+      this.buscarHistorico();
+    }
   }
 
   toggleForm(): void {
@@ -119,10 +133,10 @@ export class LotesComponent implements OnInit {
 
   loadLotes(): void {
     this.loading = true;
-    this.loteService.getLotes().subscribe({
+    this.loteService.getActivos().subscribe({
       next: (data) => {
-        this.lotes = data;
-        this.lotesFiltrados = data;
+        this.lotes = data || [];
+        this.lotesFiltrados = this.lotes; // ya vienen solo activos desde backend
         this.identificarTiposAnimales(); // Identificar tipos de animales disponibles
         this.loading = false;
       },
@@ -247,6 +261,9 @@ export class LotesComponent implements OnInit {
   changeAnimalResumen(id: string): void {
     this.selectedAnimalId = id ? Number(id) : null;
     this.loadResumen();
+    if (this.activeTab === 'historico') {
+      this.buscarHistorico();
+    }
   }
 
   loadResumen(): void {
@@ -269,17 +286,22 @@ export class LotesComponent implements OnInit {
   // ====== Histórico por fechas ======
   buscarHistorico(): void {
     this.loadingHistorico = true;
-    this.loteService.getHistoricoPorFechas({
-      desde: this.fechaDesde || undefined,
-      hasta: this.fechaHasta || undefined,
-      animalId: this.selectedAnimalId ?? undefined
-    }).subscribe({
+    const animalId = this.selectedAnimalId ?? undefined;
+    const tieneRango = !!(this.fechaDesde || this.fechaHasta);
+    const obs = tieneRango
+      ? this.loteService.getHistoricoPorFechas({
+          desde: this.fechaDesde || undefined,
+          hasta: this.fechaHasta || undefined,
+          animalId
+        })
+      : this.loteService.getHistorico(animalId);
+    obs.subscribe({
       next: (lotes) => {
         this.historicoFechas = lotes;
         this.loadingHistorico = false;
       },
       error: (err) => {
-        console.error('Error al cargar histórico por fechas', err);
+        console.error('Error al cargar histórico', err);
         this.loadingHistorico = false;
       }
     });
@@ -327,6 +349,7 @@ export class LotesComponent implements OnInit {
   editLote(lote: Lote): void {
     this.loteForm.patchValue({
       name: lote.name,
+      descripcion: (lote as any)?.descripcion || '',
       quantity: lote.quantity,
       birthdate: this.formatDate(lote.birthdate),
       cost: lote.cost,
@@ -363,10 +386,11 @@ export class LotesComponent implements OnInit {
   // Método para aplicar filtro por tipo de animal
   filtrarPorTipoAnimal(tipo: string): void {
     this.filtroAnimalActual = tipo;
+    const base = this.lotes.filter(l => (Number(l.quantity) || 0) > 0);
     if (tipo === 'all') {
-      this.lotesFiltrados = this.lotes;
+      this.lotesFiltrados = base;
     } else {
-      this.lotesFiltrados = this.lotes.filter(lote => 
+      this.lotesFiltrados = base.filter(lote => 
         lote.race?.animal?.name?.toLowerCase() === tipo.toLowerCase()
       );
     }

@@ -33,6 +33,41 @@ const routes: Routes = [
       { path: 'lotes', component: LotesComponent, title: 'Gestión de Lotes' },
       { path: 'inventario', component: InventarioComponent, title: 'Inventario' },
       {
+        path: 'inventario/sanidad',
+        loadComponent: () => import('../inventario/sanidad-cuidado-animal.component').then(m => m.SanidadCuidadoAnimalComponent),
+        title: 'Sanidad y Cuidado Animal',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
+        path: 'inventario/operacion',
+        loadComponent: () => import('../inventario/gastos-operacion.component').then(m => m.GastosOperacionComponent),
+        title: 'Gastos de Operación',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
+        path: 'inventario/mano-obra',
+        loadComponent: () => import('../inventario/mano-obra.component').then(m => m.ManoObraComponent),
+        title: 'Mano de Obra',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
+        path: 'inventario/logistica',
+        loadComponent: () => import('../inventario/logistica.component').then(m => m.LogisticaComponent),
+        title: 'Movilización y Logística',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
+        path: 'inventario/fijos',
+        loadComponent: () => import('../inventario/costos-fijos.component').then(m => m.CostosFijosComponent),
+        title: 'Costos Fijos',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
         path: 'ventas/huevos',
         loadComponent: () => import('../ventas/ventas-huevos.page').then(m => m.VentasHuevosPage),
         title: 'Venta de Huevo',
@@ -47,6 +82,13 @@ const routes: Routes = [
         data: { roles: [ERole.ROLE_ADMIN] }
       },
       { path: 'plan-nutricional', component: PlanNutricionalComponent, title: 'Plan Nutricional' },
+      {
+        path: 'analisis-financiero',
+        loadComponent: () => import('../analisis-financiero/analisis-financiero.component').then(m => m.AnalisisFinancieroComponent),
+        title: 'Análisis Financiero',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
       { path: 'reportes', component: ReportesComponent, title: 'Reportes' },
       { path: 'profile', component: ProfileComponent, title: 'Perfil' },
       { 

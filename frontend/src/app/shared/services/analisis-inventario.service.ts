@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable, combineLatest, of } from 'rxjs';
+import { Observable, combineLatest, of, forkJoin } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { LoteService } from '../../features/lotes/services/lote.service';
 import { ProductService } from './product.service';
@@ -7,6 +7,8 @@ import { PlanNutricionalIntegradoService } from './plan-nutricional-integrado.se
 import { PlanAlimentacionService } from '../../features/plan-nutricional/services/plan-alimentacion.service';
 import { Lote } from '../../features/lotes/interfaces/lote.interface';
 import { Product } from '../models/product.model';
+import { VentasService } from './ventas.service';
+import { MortalidadBackendService } from './mortalidad-backend.service';
 
 export interface ConsumoAlimentoData {
   periodo: string;
@@ -27,6 +29,24 @@ export interface AnalisisLoteData {
   diasVida: number;
   rendimiento: number;
   rentabilidad: number;
+  ingresosTotal?: number;
+  vendidos?: number;
+  detalleAlimentos?: Array<{
+    typeFood: string;
+    unidad: string;
+    precioUnitario: number; // promedio ponderado
+    consumoKg: number;
+    costoParcial: number;
+  }>;
+  costos?: {
+    alimentacion: number;
+    sanidad: number;
+    variables: number;
+    manoObra: number;
+    logistica: number;
+    fijos: number;
+    total: number;
+  };
 }
 
 export interface InventarioAnalisis {
@@ -55,6 +75,11 @@ export interface InventarioAnalisis {
     chanchos: number;
     otros: number;
   };
+  ingresosTotales?: number;
+  vendidosTotales?: number;
+  mortalidadTotal?: number;
+  beneficioTotal?: number;
+  costoUnitarioVendidoPromedio?: number;
 }
 
 @Injectable({
@@ -80,13 +105,15 @@ export class AnalisisInventarioService {
     private loteService: LoteService,
     private productService: ProductService,
     private planNutricionalService: PlanNutricionalIntegradoService,
-    private planAlimentacionService: PlanAlimentacionService
+    private planAlimentacionService: PlanAlimentacionService,
+    private ventasService: VentasService,
+    private mortalidadService: MortalidadBackendService
   ) {}
 
   /**
    * Obtener análisis completo del inventario con datos reales de planes nutricionales
    */
-  getAnalisisInventario(): Observable<InventarioAnalisis> {
+  getAnalisisInventario(animalId?: number): Observable<InventarioAnalisis> {
     console.log('🔍 [AnalisisInventario] Iniciando carga de datos...');
     
     return combineLatest([
@@ -112,7 +139,6 @@ export class AnalisisInventarioService {
         })
       )
     ]).pipe(
-      // 🔁 Antes de analizar, si existe un plan de pollos, obtener sus detalles reales
       switchMap(([lotes, productos, planes]) => {
         console.log('🔍 [AnalisisInventario] Datos combinados recibidos:', {
           lotes: lotes.length,
@@ -120,110 +146,126 @@ export class AnalisisInventarioService {
           planes: planes.length
         });
 
-        // Filtrar solo lotes de pollos
-        const lotesPollos = lotes.filter(lote => 
-          lote.race?.animal?.name?.toLowerCase().includes('pollo') ||
-          lote.race?.animal?.id === 1
-        );
-        
-        console.log('🐔 [AnalisisInventario] Lotes de pollos encontrados:', lotesPollos.length, lotesPollos);
+        // Filtrar lotes por animal (por defecto: pollos)
+        const lotesSeleccionados = this.filtrarLotesPorAnimal(lotes, animalId);
+        console.log('🐔 [AnalisisInventario] Lotes seleccionados:', lotesSeleccionados.length, lotesSeleccionados);
 
         // Si no hay datos, devolver análisis vacío pero funcional
         if (lotes.length === 0 && productos.length === 0 && planes.length === 0) {
           console.warn('⚠️ [AnalisisInventario] No hay datos disponibles, devolviendo análisis vacío');
           return of(this.getAnalisisVacio());
         }
-        // Detectar un plan de pollos para asegurar que tenga detalles
-        const planPolloSimple = planes.find(plan => {
-          const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
-          const planName = plan.name?.toLowerCase() || '';
-          return animalName.includes('pollo') || planName.includes('pollo') || plan.animalId === 1;
-        });
 
-        if (planPolloSimple?.id) {
-          console.log('🔄 Cargando detalles del plan de pollos para análisis real. Plan ID:', planPolloSimple.id);
-          return this.planAlimentacionService.getDetallesByPlan(planPolloSimple.id).pipe(
-            map(detalles => {
-              // Inyectar detalles en el array de planes
-              const planesConDetalles = planes.map(p => p.id === planPolloSimple.id ? { ...p, detalles } : p);
+        // Detectar un plan del animal seleccionado para asegurar que tenga detalles
+        const planSeleccionadoSimple = this.encontrarPlanPorAnimal(planes, animalId);
+        const movimientos$ = forkJoin(
+          lotesSeleccionados.map(l => this.planAlimentacionService.getMovimientosPorLote(l.id || '').pipe(catchError(() => of([]))))
+        );
+        const ventas$ = forkJoin(
+          lotesSeleccionados.map(l => this.ventasService.listarVentasAnimalesPorLoteEmitidas(l.id || '').pipe(catchError(() => of([]))))
+        );
+        const mortalidad$ = forkJoin(
+          lotesSeleccionados.map(l => this.mortalidadService.obtenerRegistrosPorLote(l.id || '').pipe(catchError(() => of([]))))
+        );
 
-              // Análisis por lote usando datos reales de planes nutricionales
-              const analisisPorLote = this.analizarLotesConPlanesReales(lotesPollos, planesConDetalles, productos);
-              console.log('📊 [AnalisisInventario] Análisis por lote completado:', analisisPorLote.length);
-
-              // Consumo por períodos
-              const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
-              const consumoMensual = this.generarConsumoMensual(analisisPorLote);
-              const consumoAnual = this.generarConsumoAnual(analisisPorLote);
-
-              // Totales
-              const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
-              const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
-              const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
-              const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
-
-              // Promedios
-              const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
-              const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
-              const promedioRentabilidad = analisisPorLote.length > 0 ?
-                analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
-
-              const resultado = {
-                consumoSemanal,
-                consumoMensual,
-                consumoAnual,
-                analisisPorLote,
-                totalPollosVivos,
-                totalPollosMuertos,
-                totalConsumoAlimento,
-                totalCostoAlimento,
-                promedioConsumoPorPollo,
-                promedioCostoPorPollo,
-                promedioRentabilidad,
-                costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos)
-              };
-
-              console.log('✅ [AnalisisInventario] Análisis completado exitosamente (con detalles):', resultado);
-              return resultado;
+        if (planSeleccionadoSimple?.id) {
+          return this.planAlimentacionService.getDetallesByPlan(planSeleccionadoSimple.id).pipe(
+            switchMap(detalles => {
+              const planesConDetalles = planes.map(p => p.id === planSeleccionadoSimple.id ? { ...p, detalles } : p);
+              return forkJoin([movimientos$, ventas$, mortalidad$]).pipe(
+                map(([movsArr, ventasArr, mortArr]) => {
+                  const movsMap = new Map<string, any[]>();
+                  const ventasMap = new Map<string, any[]>();
+                  const mortMap = new Map<string, any[]>();
+                  lotesSeleccionados.forEach((l, idx) => {
+                    movsMap.set(l.id || '', movsArr[idx] || []);
+                    ventasMap.set(l.id || '', ventasArr[idx] || []);
+                    mortMap.set(l.id || '', mortArr[idx] || []);
+                  });
+                  let analisisPorLote = this.analizarLotesUsandoMovimientosOLPlan(lotesSeleccionados, planesConDetalles, productos, movsMap);
+                  const enr = this.enriquecerConVentasYMortalidad(analisisPorLote, lotesSeleccionados, ventasMap, mortMap);
+                  analisisPorLote = enr.analisis;
+                  const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
+                  const consumoMensual = this.generarConsumoMensual(analisisPorLote);
+                  const consumoAnual = this.generarConsumoAnual(analisisPorLote);
+                  const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
+                  const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
+                  const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
+                  const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
+                  const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
+                  const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
+                  const promedioRentabilidad = analisisPorLote.length > 0 ?
+                    analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
+                  return {
+                    consumoSemanal,
+                    consumoMensual,
+                    consumoAnual,
+                    analisisPorLote,
+                    totalPollosVivos,
+                    totalPollosMuertos,
+                    totalConsumoAlimento,
+                    totalCostoAlimento,
+                    promedioConsumoPorPollo,
+                    promedioCostoPorPollo,
+                    promedioRentabilidad,
+                    costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos),
+                    ingresosTotales: enr.totals.ingresosTotales,
+                    vendidosTotales: enr.totals.vendidosTotales,
+                    mortalidadTotal: enr.totals.mortalidadTotal,
+                    beneficioTotal: enr.totals.beneficioTotal,
+                    costoUnitarioVendidoPromedio: enr.totals.costoUnitarioVendidoPromedio
+                  };
+                })
+              );
             })
           );
         }
 
-        // Si no hay plan de pollos, continuar con análisis estándar (posible estimación)
-        const analisisPorLote = this.analizarLotesConPlanesReales(lotesPollos, planes, productos);
-        console.log('📊 [AnalisisInventario] Análisis por lote completado (sin detalles adicionales):', analisisPorLote.length);
-
-        const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
-        const consumoMensual = this.generarConsumoMensual(analisisPorLote);
-        const consumoAnual = this.generarConsumoAnual(analisisPorLote);
-
-        const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
-        const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
-        const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
-        const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
-
-        const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
-        const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
-        const promedioRentabilidad = analisisPorLote.length > 0 ?
-          analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
-
-        const resultado = {
-          consumoSemanal,
-          consumoMensual,
-          consumoAnual,
-          analisisPorLote,
-          totalPollosVivos,
-          totalPollosMuertos,
-          totalConsumoAlimento,
-          totalCostoAlimento,
-          promedioConsumoPorPollo,
-          promedioCostoPorPollo,
-          promedioRentabilidad,
-          costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos)
-        };
-
-        console.log('✅ [AnalisisInventario] Análisis completado exitosamente (estándar):', resultado);
-        return of(resultado);
+        return forkJoin([movimientos$, ventas$, mortalidad$]).pipe(
+          map(([movsArr, ventasArr, mortArr]) => {
+            const movsMap = new Map<string, any[]>();
+            const ventasMap = new Map<string, any[]>();
+            const mortMap = new Map<string, any[]>();
+            lotesSeleccionados.forEach((l, idx) => {
+              movsMap.set(l.id || '', movsArr[idx] || []);
+              ventasMap.set(l.id || '', ventasArr[idx] || []);
+              mortMap.set(l.id || '', mortArr[idx] || []);
+            });
+            let analisisPorLote = this.analizarLotesUsandoMovimientosOLPlan(lotesSeleccionados, planes, productos, movsMap);
+            const enr = this.enriquecerConVentasYMortalidad(analisisPorLote, lotesSeleccionados, ventasMap, mortMap);
+            analisisPorLote = enr.analisis;
+            const consumoSemanal = this.generarConsumoSemanal(analisisPorLote);
+            const consumoMensual = this.generarConsumoMensual(analisisPorLote);
+            const consumoAnual = this.generarConsumoAnual(analisisPorLote);
+            const totalPollosVivos = analisisPorLote.reduce((total, lote) => total + lote.pollosVivos, 0);
+            const totalPollosMuertos = analisisPorLote.reduce((total, lote) => total + lote.pollosMuertos, 0);
+            const totalConsumoAlimento = analisisPorLote.reduce((total, lote) => total + lote.consumoTotalKg, 0);
+            const totalCostoAlimento = analisisPorLote.reduce((total, lote) => total + lote.costoTotalLote, 0);
+            const promedioConsumoPorPollo = totalPollosVivos > 0 ? totalConsumoAlimento / totalPollosVivos : 0;
+            const promedioCostoPorPollo = totalPollosVivos > 0 ? totalCostoAlimento / totalPollosVivos : 0;
+            const promedioRentabilidad = analisisPorLote.length > 0 ?
+              analisisPorLote.reduce((total, lote) => total + lote.rentabilidad, 0) / analisisPorLote.length : 0;
+            return {
+              consumoSemanal,
+              consumoMensual,
+              consumoAnual,
+              analisisPorLote,
+              totalPollosVivos,
+              totalPollosMuertos,
+              totalConsumoAlimento,
+              totalCostoAlimento,
+              promedioConsumoPorPollo,
+              promedioCostoPorPollo,
+              promedioRentabilidad,
+              costoComprasPorAnimal: this.calcularTotalesComprasPorAnimal(productos),
+              ingresosTotales: enr.totals.ingresosTotales,
+              vendidosTotales: enr.totals.vendidosTotales,
+              mortalidadTotal: enr.totals.mortalidadTotal,
+              beneficioTotal: enr.totals.beneficioTotal,
+              costoUnitarioVendidoPromedio: enr.totals.costoUnitarioVendidoPromedio
+            };
+          })
+        );
       }),
       catchError(error => {
         console.error('❌ [AnalisisInventario] Error crítico en análisis:', error);
@@ -236,6 +278,207 @@ export class AnalisisInventarioService {
         return of(analisisVacio);
       })
     );
+  }
+
+  private analizarLotesUsandoMovimientosOLPlan(lotes: Lote[], planes: any[], productos: Product[], movsMap: Map<string, any[]>): AnalisisLoteData[] {
+    return lotes.map(lote => {
+      const diasVida = this.calcularDiasDeVida(lote.birthdate);
+      const { consumoKg, costoTotal, detalles } = this.obtenerConsumoYCostoDesdeMovimientos(lote, movsMap, productos);
+      let consumoTotalKg = consumoKg;
+      let costoTotalLote = costoTotal;
+      if (consumoTotalKg <= 0) {
+        const planPollo = planes.find(plan => {
+          const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
+          const planName = plan.name?.toLowerCase() || '';
+          return animalName.includes('pollo') || animalName.includes('chicken') || planName.includes('pollo') || planName.includes('chicken') || plan.animalId === 1;
+        });
+        const est = this.calcularConsumoYCostoReales(lote, diasVida, planPollo, productos);
+        consumoTotalKg = est.consumoEstimado;
+        costoTotalLote = est.costoEstimado;
+      }
+      const pollosVivos = lote.quantity || 0;
+      const pollosMuertos = this.calcularPollosMuertos(lote);
+      const costoPorPollo = pollosVivos > 0 ? costoTotalLote / pollosVivos : 0;
+      const rendimiento = this.calcularRendimiento(lote, diasVida);
+      const rentabilidad = this.calcularRentabilidad(lote, costoTotalLote);
+      const costos = {
+        alimentacion: Math.round(costoTotalLote * 100) / 100,
+        sanidad: 0,
+        variables: 0,
+        manoObra: 0,
+        logistica: 0,
+        fijos: 0,
+        total: Math.round(costoTotalLote * 100) / 100
+      };
+      return {
+        lote,
+        consumoTotalKg: Math.round(consumoTotalKg * 100) / 100,
+        costoTotalLote: Math.round(costoTotalLote * 100) / 100,
+        costoPorPollo: Math.round(costoPorPollo * 100) / 100,
+        pollosVivos,
+        pollosMuertos,
+        estadoLote: pollosVivos > 0 ? 'activo' : 'inactivo',
+        diasVida,
+        rendimiento,
+        rentabilidad,
+        detalleAlimentos: detalles,
+        costos
+      };
+    });
+  }
+
+  private obtenerConsumoYCostoDesdeMovimientos(
+    lote: Lote,
+    movsMap: Map<string, any[]>,
+    productos: Product[]
+  ): { consumoKg: number; costoTotal: number; detalles: Array<{ typeFood: string; unidad: string; precioUnitario: number; consumoKg: number; costoParcial: number }> } {
+    const movs = movsMap.get(lote.id || '') || [];
+    if (!movs || movs.length === 0) return { consumoKg: 0, costoTotal: 0, detalles: [] };
+    let consumo = 0;
+    let costo = 0;
+    const detalleMap = new Map<string, { unidad: string; consumoKg: number; costo: number }>();
+    for (const m of movs) {
+      const tipo = (m?.tipoMovimiento || m?.tipo || '').toString();
+      if (tipo !== 'CONSUMO_LOTE') continue;
+      const cant = Number(m?.cantidad ?? 0);
+      if (isNaN(cant) || cant <= 0) continue;
+      consumo += cant;
+      let cu = m?.costoUnitario != null ? Number(m.costoUnitario) : null;
+      if (cu == null || isNaN(cu) || cu <= 0) {
+        const inv = m?.inventarioProducto;
+        if (inv?.costoUnitarioPromedio != null) {
+          const v = Number(inv.costoUnitarioPromedio);
+          if (!isNaN(v) && v > 0) cu = v;
+        }
+      }
+      if (cu == null || isNaN(cu) || cu <= 0) {
+        const pid = m?.inventarioProducto?.product?.id ?? m?.product?.id;
+        const p = productos.find(pp => pp.id === pid);
+        const v = Number(p?.price_unit ?? 0);
+        if (!isNaN(v) && v > 0) cu = v;
+      }
+      if (cu == null || isNaN(cu) || cu < 0) cu = 0;
+      const costoMov = cant * cu;
+      costo += costoMov;
+
+      // Desglose por tipo de alimento
+      const pid = m?.inventarioProducto?.product?.id ?? m?.product?.id;
+      const p = productos.find(pp => pp.id === pid);
+      const tfName = (p?.typeFood?.name || 'Otros').toString();
+      const unidad = (p?.unitMeasurement?.name || 'kg').toString();
+      const prev = detalleMap.get(tfName) || { unidad, consumoKg: 0, costo: 0 };
+      prev.consumoKg += cant;
+      prev.costo += costoMov;
+      detalleMap.set(tfName, prev);
+    }
+    const detalles = Array.from(detalleMap.entries()).map(([typeFood, d]) => ({
+      typeFood,
+      unidad: d.unidad,
+      consumoKg: Math.round(d.consumoKg * 100) / 100,
+      costoParcial: Math.round(d.costo * 100) / 100,
+      precioUnitario: d.consumoKg > 0 ? Math.round((d.costo / d.consumoKg) * 100) / 100 : 0
+    })).sort((a, b) => a.typeFood.localeCompare(b.typeFood));
+    return { consumoKg: consumo, costoTotal: costo, detalles };
+  }
+
+  private enriquecerConVentasYMortalidad(
+    analisis: AnalisisLoteData[],
+    lotes: Lote[],
+    ventasMap: Map<string, any[]>,
+    mortMap: Map<string, any[]>
+  ): { analisis: AnalisisLoteData[]; totals: { ingresosTotales: number; vendidosTotales: number; mortalidadTotal: number; beneficioTotal: number; costoUnitarioVendidoPromedio: number } } {
+    let ingresosTotales = 0;
+    let vendidosTotales = 0;
+    let mortalidadTotal = 0;
+    let costoAsignadoVendidosTotal = 0;
+
+    const enriquecido = analisis.map(item => {
+      const loteId = item.lote.id || '';
+      const ventas = ventasMap.get(loteId) || [];
+      const morts = mortMap.get(loteId) || [];
+
+      const vendidos = ventas.reduce((s, v) => s + Number(v?.cantidad ?? 0), 0);
+      const ingresos = ventas.reduce((s, v) => s + Number(v?.total ?? 0), 0);
+
+      const confirmados = morts.filter((m: any) => m?.confirmado === true);
+      const muertos = (confirmados.length > 0 ? confirmados : morts).reduce((s: number, m: any) => s + Number(m?.cantidadMuertos ?? 0), 0);
+
+      const quantityOriginal = item.lote.quantityOriginal != null ? Number(item.lote.quantityOriginal) : null;
+      const baseAnimales = quantityOriginal != null && quantityOriginal > 0
+        ? quantityOriginal
+        : (Number(item.lote.quantity || 0) + vendidos + muertos);
+
+      const costoAsignadoVendidos = baseAnimales > 0 ? (item.costoTotalLote * vendidos) / baseAnimales : 0;
+
+      const beneficio = ingresos - costoAsignadoVendidos;
+      const rentabilidadReal = costoAsignadoVendidos > 0 ? Math.round(((beneficio) / costoAsignadoVendidos) * 100) : 0;
+
+      ingresosTotales += ingresos;
+      vendidosTotales += vendidos;
+      mortalidadTotal += muertos;
+      costoAsignadoVendidosTotal += costoAsignadoVendidos;
+
+      return {
+        ...item,
+        ingresosTotal: Math.round(ingresos * 100) / 100,
+        vendidos,
+        pollosMuertos: muertos,
+        rentabilidad: rentabilidadReal,
+        costoPorPollo: item.pollosVivos > 0 ? Math.round((item.costoTotalLote / item.pollosVivos) * 100) / 100 : 0
+      } as AnalisisLoteData;
+    });
+
+    const costoUnitarioVendidoPromedio = vendidosTotales > 0 ? Math.round((costoAsignadoVendidosTotal / vendidosTotales) * 100) / 100 : 0;
+    const beneficioTotal = Math.round((ingresosTotales - costoAsignadoVendidosTotal) * 100) / 100;
+
+    return {
+      analisis: enriquecido,
+      totals: {
+        ingresosTotales: Math.round(ingresosTotales * 100) / 100,
+        vendidosTotales,
+        mortalidadTotal,
+        beneficioTotal,
+        costoUnitarioVendidoPromedio
+      }
+    };
+  }
+
+  private filtrarLotesPorAnimal(lotes: Lote[], animalId?: number): Lote[] {
+    if (!animalId) {
+      return lotes.filter(lote => 
+        lote.race?.animal?.name?.toLowerCase().includes('pollo') ||
+        lote.race?.animal?.id === 1
+      );
+    }
+    const nombreAnimal = (l: Lote) => l.race?.animal?.name?.toLowerCase() || '';
+    if (animalId === 1) {
+      return lotes.filter(l => l.race?.animal?.id === 1 || nombreAnimal(l).includes('pollo') || nombreAnimal(l).includes('ave') || nombreAnimal(l).includes('broiler'));
+    }
+    if (animalId === 2) {
+      return lotes.filter(l => l.race?.animal?.id === 2 || nombreAnimal(l).includes('chancho') || nombreAnimal(l).includes('cerdo') || nombreAnimal(l).includes('porcino'));
+    }
+    return lotes.filter(l => l.race?.animal?.id === animalId);
+  }
+
+  private encontrarPlanPorAnimal(planes: any[], animalId?: number): any {
+    if (!planes || planes.length === 0) return null;
+    if (!animalId || animalId === 1) {
+      return planes.find(plan => {
+        const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
+        const planName = plan.name?.toLowerCase() || '';
+        return animalName.includes('pollo') || planName.includes('pollo') || plan.animalId === 1;
+      });
+    }
+    if (animalId === 2) {
+      return planes.find(plan => {
+        const animalName = plan.animal?.name?.toLowerCase() || plan.animalName?.toLowerCase() || '';
+        const planName = plan.name?.toLowerCase() || '';
+        return animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porcino') ||
+               planName.includes('chancho') || planName.includes('cerdo') || planName.includes('porcino') ||
+               plan.animalId === 2;
+      });
+    }
+    return planes.find(plan => plan.animalId === animalId) || null;
   }
 
   /**
@@ -723,7 +966,12 @@ export class AnalisisInventarioService {
       promedioConsumoPorPollo: 0,
       promedioCostoPorPollo: 0,
       promedioRentabilidad: 0,
-      costoComprasPorAnimal: { pollos: 0, chanchos: 0, otros: 0 }
+      costoComprasPorAnimal: { pollos: 0, chanchos: 0, otros: 0 },
+      ingresosTotales: 0,
+      vendidosTotales: 0,
+      mortalidadTotal: 0,
+      beneficioTotal: 0,
+      costoUnitarioVendidoPromedio: 0
     };
   }
 

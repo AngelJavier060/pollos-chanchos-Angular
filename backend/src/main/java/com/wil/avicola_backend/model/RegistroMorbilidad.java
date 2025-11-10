@@ -1,6 +1,8 @@
 package com.wil.avicola_backend.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,6 +20,7 @@ import java.time.LocalTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class RegistroMorbilidad {
     
     @Id
@@ -36,7 +39,7 @@ public class RegistroMorbilidad {
     @Column(name = "cantidad_enfermos", nullable = false)
     private Integer cantidadEnfermos;
     
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "enfermedad_id", nullable = false)
     private Enfermedad enfermedad;
     
@@ -53,6 +56,7 @@ public class RegistroMorbilidad {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medicamento_id")
+    @JsonIgnore
     private Medicamento medicamento;
     
     @Column(name = "dosis_aplicada")

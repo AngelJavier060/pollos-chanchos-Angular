@@ -4,6 +4,123 @@
     <h1 class="text-3xl font-bold text-blue-800">Gestión de Inventario</h1>
     <p class="text-gray-600 mt-2">Administra los productos e insumos del sistema avícola</p>
   </div>
+
+<!-- Vista de Alertas -->
+<div *ngIf="vistaActual === 'alertas'" class="space-y-6">
+  <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-gray-800">
+        <i class="fas fa-bell text-yellow-500 mr-2"></i>Alertas de Vencimiento
+      </h2>
+      <div class="flex items-center space-x-2">
+        <label class="text-sm text-gray-700">Días:</label>
+        <input type="number" class="w-24 p-2 border border-gray-300 rounded-md" [(ngModel)]="diasAlertaPorVencer">
+        <button (click)="cargarAlertasEntradas(diasAlertaPorVencer)" class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <i class="fas fa-sync-alt mr-1"></i>Actualizar
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Por Vencer -->
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 class="text-lg font-semibold text-yellow-800 mb-3">
+          <i class="fas fa-hourglass-half mr-2"></i>Por vencer (≤ {{ diasAlertaPorVencer }} días)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vence</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Stock base</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let e of alertasPorVencer">
+                <td class="px-3 py-2">{{ e.product?.name || 'Producto' }}</td>
+                <td class="px-3 py-2">{{ e.codigoLote || '-' }}</td>
+                <td class="px-3 py-2">{{ e.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
+                <td class="px-3 py-2 text-right">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
+              </tr>
+              <tr *ngIf="alertasPorVencer.length === 0">
+                <td colspan="4" class="px-3 py-3 text-center text-sm text-gray-500">Sin alertas por vencer</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Vencidas -->
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 class="text-lg font-semibold text-red-800 mb-3">
+          <i class="fas fa-times-circle mr-2"></i>Vencidas
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Venció</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Stock base</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let e of alertasVencidas">
+                <td class="px-3 py-2">{{ e.product?.name || 'Producto' }}</td>
+                <td class="px-3 py-2">{{ e.codigoLote || '-' }}</td>
+                <td class="px-3 py-2">{{ e.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
+                <td class="px-3 py-2 text-right">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
+              </tr>
+              <tr *ngIf="alertasVencidas.length === 0">
+                <td colspan="4" class="px-3 py-3 text-center text-sm text-gray-500">Sin entradas vencidas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Stock Bajo -->
+      <div class="bg-white border border-orange-200 rounded-lg p-4">
+        <h3 class="text-lg font-semibold text-orange-800 mb-3">
+          <i class="fas fa-exclamation-triangle mr-2 text-orange-600"></i>Stock bajo
+          <span class="ml-2 text-sm text-orange-600" *ngIf="inventariosStockBajo?.length">({{ inventariosStockBajo.length }})</span>
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo/Producto</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Mínimo</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let item of inventariosStockBajo">
+                <td class="px-3 py-2">
+                  {{ item?.tipoAlimento?.name || 'Producto' }}
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <span class="text-red-700 font-semibold">{{ item.cantidadStock | number:'1.0-2' }}</span>
+                  <span class="text-gray-500 text-xs ml-1">{{ item.unidadMedida }}</span>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <span class="text-gray-800">{{ item.stockMinimo | number:'1.0-2' }}</span>
+                  <span class="text-gray-500 text-xs ml-1">{{ item.unidadMedida }}</span>
+                </td>
+              </tr>
+              <tr *ngIf="!inventariosStockBajo || inventariosStockBajo.length === 0">
+                <td colspan="3" class="px-3 py-3 text-center text-sm text-gray-500">Sin ítems con stock bajo</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
   
   <!-- Navegación entre vistas -->
   <div class="flex justify-center mb-6">
@@ -21,266 +138,23 @@
         <i class="fas fa-warehouse mr-2"></i>Inventario Automático
       </button>
       <button 
-        (click)="cambiarVista('analisis')" 
-        [class]="vistaActual === 'analisis' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        (click)="cambiarVista('entradas')" 
+        [class]="vistaActual === 'entradas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
-        <i class="fas fa-chart-line mr-2"></i>Análisis
+        <i class="fas fa-inbox mr-2"></i>Entradas
       </button>
+      <button 
+        (click)="cambiarVista('alertas')" 
+        [class]="vistaActual === 'alertas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
+        <i class="fas fa-bell mr-2"></i>Alertas
+      </button>
+      
+      
     </div>
   </div>
 
-  <!-- Vista de Análisis -->
-  <div *ngIf="vistaActual === 'analisis'">
-    <!-- Indicador de carga -->
-    <div *ngIf="cargandoAnalisis" class="flex justify-center items-center py-12">
-      <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
-      <span class="ml-4 text-gray-600">Cargando análisis de inventario...</span>
-    </div>
-    
-    <!-- Análisis de inventario -->
-    <div *ngIf="!cargandoAnalisis && analisisInventario" class="space-y-6">
-      
-      <!-- Tarjetas de resumen -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Total Pollos Vivos -->
-        <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-green-100 text-sm font-medium">Total Pollos Vivos</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.totalPollosVivos) }}</p>
-            </div>
-            <div class="p-3 bg-green-400 rounded-full">
-              <i class="fas fa-heart text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Total Pollos Muertos -->
-        <div class="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-red-100 text-sm font-medium">Total Pollos Muertos</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.totalPollosMuertos) }}</p>
-            </div>
-            <div class="p-3 bg-red-400 rounded-full">
-              <i class="fas fa-skull text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Consumo Total de Alimento -->
-        <div class="bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-yellow-100 text-sm font-medium">Consumo Total (kg)</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.totalConsumoAlimento) }}</p>
-            </div>
-            <div class="p-3 bg-yellow-400 rounded-full">
-              <i class="fas fa-utensils text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Costo Total -->
-        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-blue-100 text-sm font-medium">Costo Total ($)</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.totalCostoAlimento) }}</p>
-            </div>
-            <div class="p-3 bg-blue-400 rounded-full">
-              <i class="fas fa-dollar-sign text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Promedios -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div class="text-center">
-            <div class="text-3xl font-bold text-blue-600 mb-2">{{ formatearNumero(analisisInventario.promedioConsumoPorPollo) }}</div>
-            <div class="text-gray-700 font-medium">Consumo Promedio por Pollo (kg)</div>
-          </div>
-        </div>
-        
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div class="text-center">
-            <div class="text-3xl font-bold text-green-600 mb-2">${{ formatearNumero(analisisInventario.promedioCostoPorPollo) }}</div>
-            <div class="text-gray-700 font-medium">Costo Promedio por Pollo</div>
-          </div>
-        </div>
-        
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div class="text-center">
-            <div [class]="getColorRentabilidad(analisisInventario.promedioRentabilidad)" class="text-3xl font-bold mb-2">
-              {{ formatearNumero(analisisInventario.promedioRentabilidad) }}%
-            </div>
-            <div class="text-gray-700 font-medium">Rentabilidad Promedio</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Gráficos de consumo -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Consumo Semanal -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold text-gray-800 mb-4">
-            <i class="fas fa-calendar-week text-blue-500 mr-2"></i>Consumo Semanal
-          </h3>
-          <div class="space-y-3">
-            <div *ngFor="let item of analisisInventario.consumoSemanal" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div class="flex-1">
-                <div class="font-medium text-gray-800">{{ item.periodo }}</div>
-                <div class="text-sm text-gray-600">{{ formatearNumero(item.consumoTotal) }} kg</div>
-              </div>
-              <div class="text-right">
-                <div class="font-medium text-blue-600">${{ formatearNumero(item.costoTotal) }}</div>
-                <div class="text-sm text-gray-500">{{ formatearNumero(item.consumoPorPollo) }} kg/pollo</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Consumo Mensual -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold text-gray-800 mb-4">
-            <i class="fas fa-calendar-alt text-green-500 mr-2"></i>Consumo Mensual
-          </h3>
-          <div class="space-y-3">
-            <div *ngFor="let item of analisisInventario.consumoMensual.slice(-6)" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div class="flex-1">
-                <div class="font-medium text-gray-800">{{ item.periodo }}</div>
-                <div class="text-sm text-gray-600">{{ formatearNumero(item.consumoTotal) }} kg</div>
-              </div>
-              <div class="text-right">
-                <div class="font-medium text-green-600">${{ formatearNumero(item.costoTotal) }}</div>
-                <div class="text-sm text-gray-500">{{ formatearNumero(item.consumoPorPollo) }} kg/pollo</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Análisis por Lote -->
-      <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">
-          <i class="fas fa-clipboard-list text-purple-500 mr-2"></i>Análisis por Lote
-        </h3>
-        
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pollos Vivos</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pollos Muertos</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consumo (kg)</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Total</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo/Pollo</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días Vida</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rendimiento</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rentabilidad</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr *ngFor="let lote of analisisInventario.analisisPorLote; let i = index" [class]="i % 2 === 0 ? 'bg-white' : 'bg-gray-50'">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {{ lote.lote.codigo || 'Lote ' + (lote.lote.id || 'N/A') }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatearNumero(lote.pollosVivos) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                  {{ formatearNumero(lote.pollosMuertos) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatearNumero(lote.consumoTotalKg) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${{ formatearNumero(lote.costoTotalLote) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${{ formatearNumero(lote.costoPorPollo) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ lote.diasVida }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" [class]="getColorRendimiento(lote.rendimiento)">
-                  {{ lote.rendimiento }}%
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" [class]="getColorRentabilidad(lote.rentabilidad)">
-                  {{ lote.rentabilidad }}%
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span [class]="getClaseEstado(lote.estadoLote)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
-                    {{ lote.estadoLote }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      <!-- Compras por Animal -->
-      <div *ngIf="analisisInventario.costoComprasPorAnimal" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Compras Pollos -->
-        <div class="bg-gradient-to-r from-sky-500 to-cyan-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sky-100 text-sm font-medium">Compras Pollos ($)</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.costoComprasPorAnimal.pollos) }}</p>
-            </div>
-            <div class="p-3 bg-sky-400 rounded-full">
-              <i class="fas fa-drumstick-bite text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-
-        <!-- Compras Chanchos -->
-        <div class="bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white rounded-lg p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-pink-100 text-sm font-medium">Compras Chanchos ($)</p>
-              <p class="text-2xl font-bold">{{ formatearNumero(analisisInventario.costoComprasPorAnimal.chanchos) }}</p>
-            </div>
-            <div class="p-3 bg-pink-400 rounded-full">
-              <i class="fas fa-piggy-bank text-white text-xl"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-      
-      <!-- Consumo Anual -->
-      <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">
-          <i class="fas fa-chart-bar text-indigo-500 mr-2"></i>Consumo Anual
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div *ngFor="let item of analisisInventario.consumoAnual" class="text-center p-4 bg-gray-50 rounded-lg">
-            <div class="text-2xl font-bold text-indigo-600 mb-2">{{ item.periodo }}</div>
-            <div class="text-gray-700 font-medium">{{ formatearNumero(item.consumoTotal) }} kg</div>
-            <div class="text-sm text-gray-600">${{ formatearNumero(item.costoTotal) }}</div>
-            <div class="text-xs text-gray-500 mt-1">{{ formatearNumero(item.consumoPorPollo) }} kg/pollo</div>
-          </div>
-        </div>
-      </div>
-      
-    </div>
-    
-    <!-- Estado sin datos -->
-    <div *ngIf="!cargandoAnalisis && !analisisInventario" class="text-center py-12">
-      <div class="text-gray-400 text-6xl mb-4">
-        <i class="fas fa-chart-line"></i>
-      </div>
-      <p class="text-gray-600">No hay datos de análisis disponibles</p>
-      <button (click)="cargarAnalisisInventario()" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-        Cargar Análisis
-      </button>
-    </div>
-  </div>
+ 
 
   <!-- Vista de Productos (existente) -->
   <div *ngIf="vistaActual === 'productos'">
@@ -346,11 +220,23 @@
   <div class="mb-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold text-blue-800">Listado de Productos</h2>
-      <button 
-        (click)="openForm(false)" 
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
-        <span class="mr-1">+</span> Nuevo Producto
-      </button>
+      <div class="flex items-center space-x-2">
+        <button 
+          (click)="actualizarProductosYStock()" 
+          class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
+          <i class="fas fa-sync-alt mr-2"></i> Actualizar
+        </button>
+        <button 
+          (click)="sincronizarInventario()" 
+          class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
+          <i class="fas fa-link mr-2"></i> Sincronizar inventario
+        </button>
+        <button 
+          (click)="openForm(false)" 
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
+          <span class="mr-1">+</span> Nuevo Producto
+        </button>
+      </div>
     </div>
     
     <!-- Tabla de productos -->
@@ -360,9 +246,10 @@
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Real</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disminución</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Unitario</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Compra</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Alimento</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
             <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -370,29 +257,37 @@
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr *ngIf="filteredProducts.length === 0 && !isLoading" class="hover:bg-gray-50">
-            <td colspan="8" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
+            <td colspan="9" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
           </tr>
           <tr *ngFor="let product of filteredProducts" class="hover:bg-gray-50">
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ product.name }}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.quantity }}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.price_unit }}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-              {{ product.date_compra ? (product.date_compra | date:'dd/MM/yyyy') : '-' }}
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ getStockTotalProducto(product) | number:'1.0-2' }}</td>
+            <!-- Cantidad Real (proporcional por tipo) -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold" [ngClass]="{'text-green-700': getCantidadRealProducto(product) > 0, 'text-red-700': getCantidadRealProducto(product) === 0}">{{ getCantidadRealProducto(product) | number:'1.0-2' }}</td>
+            <!-- Disminución real -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-orange-700 font-semibold">
+              {{ getDisminucionProducto(product) | number:'1.0-2' }}
             </td>
-            <!-- Mostramos el nombre del provider directo si está disponible, sino usamos el helper -->
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ product.price_unit | currency:'USD':'symbol':'1.2-2' }}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-              {{ product.provider?.name || getProviderName(product.provider_id) }}
+              {{ product.date_compra ? (toDate(product.date_compra) | date:'dd/MM/yyyy') : '-' }}
             </td>
-            <!-- Mostramos el nombre del typeFood directo si está disponible, sino usamos el helper -->
+            <!-- Tipo de Alimento -->
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
               {{ product.typeFood?.name || getTypeFoodName(product.typeFood_id) }}
             </td>
-            <!-- Mostramos el nombre del animal directo si está disponible, sino usamos el helper -->
+            <!-- Animal -->
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
               {{ product.animal?.name || getAnimalName(product.animal_id) }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
               <div class="flex justify-center space-x-2">
+                <button *ngIf="getCantidadRealProducto(product) === 0"
+                  (click)="reponerProducto(product)" 
+                  class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                  title="Crear entrada vigente (FEFO)">
+                  Reponer
+                </button>
                 <button 
                   (click)="openForm(true, product)" 
                   class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100 transition-colors">
@@ -446,6 +341,10 @@
                 <div *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" class="text-sm text-red-600">
                   Este campo es requerido
                 </div>
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Descripción</label>
+                <textarea formControlName="description" rows="2" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Descripción del producto"></textarea>
               </div>
               
               <!-- Tipo de Alimento -->
@@ -570,6 +469,271 @@
 </div>
 
 </div> <!-- Fin de la vista de productos -->
+
+<!-- Vista de Entradas -->
+<div *ngIf="vistaActual === 'entradas'">
+  <div class="space-y-6">
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">
+        <i class="fas fa-inbox mr-2 text-blue-600"></i>Registrar Entradas por Producto
+      </h2>
+      <!-- Nota explicativa: Unidad de control vs Unidad base -->
+      <div class="mb-4 p-3 rounded-md border border-blue-200 bg-blue-50 text-blue-800 text-sm">
+        <div class="flex items-start">
+          <i class="fas fa-info-circle mt-0.5 mr-2"></i>
+          <div>
+            <p class="font-semibold">Unidad de control vs Unidad de medida (base)</p>
+            <p>
+              La <strong>Unidad de control</strong> es el empaque (saco, frasco, caja, etc.).
+              Los <strong>cálculos de stock</strong> se hacen en la <strong>unidad base</strong> del producto
+              (kg, g, L, ml), usando <em>Contenido por unidad (base)</em> × <em>Cantidad de unidades</em>.
+              Por ejemplo: 10 sacos de 40&nbsp;kg = 400&nbsp;kg.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Producto</label>
+          <select class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                  [ngModel]="selectedProductIdEntradas" 
+                  (ngModelChange)="onProductoEntradasChange($event)">
+            <option [ngValue]="null">Seleccione un producto</option>
+            <option *ngFor="let p of products" [ngValue]="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Unidad de control</label>
+          <input type="text" list="unidadesControlLista" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" [formControl]="entradaForm.get('unidadControl')" placeholder="Ej.: saco, frasco, caja">
+          <datalist id="unidadesControlLista">
+            <option value="saco"></option>
+            <option value="bolsa"></option>
+            <option value="caja"></option>
+            <option value="frasco"></option>
+            <option value="sobre"></option>
+            <option value="bidón"></option>
+            <option value="balde"></option>
+            <option value="galón"></option>
+            <option value="quintal"></option>
+            <option value="unidad"></option>
+          </datalist>
+        </div>
+        <div class="flex items-end">
+          <button (click)="selectedProductIdEntradas && cargarEntradasPorProducto(selectedProductIdEntradas)" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Refrescar</button>
+        </div>
+      </div>
+
+      <!-- Resumen del inventario del producto seleccionado (por producto) -->
+      <div *ngIf="invProductoSeleccionado" class="mb-4 p-4 border rounded-lg bg-gray-50">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-semibold text-gray-800">{{ invProductoSeleccionado.product?.name }}</h3>
+            <p class="text-sm text-gray-600">Unidad base: {{ invProductoSeleccionado.unidadMedida || getUnidadBaseProducto(selectedProductIdEntradas) }}</p>
+          </div>
+          <div>
+            <span class="px-2 py-1 rounded text-xs font-medium"
+                  [ngClass]="(invProductoSeleccionado.cantidadStock || 0) <= (invProductoSeleccionado.stockMinimo || 0) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'">
+              {{ (invProductoSeleccionado.cantidadStock || 0) <= (invProductoSeleccionado.stockMinimo || 0) ? 'CRÍTICO' : 'OK' }}
+            </span>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
+          <div class="p-3 bg-white rounded border">
+            <p class="text-xs text-gray-500">Stock actual</p>
+            <p class="text-lg font-semibold">{{ invProductoSeleccionado.cantidadStock || 0 | number:'1.0-2' }} {{ invProductoSeleccionado.unidadMedida }}</p>
+          </div>
+          <div class="p-3 bg-white rounded border">
+            <p class="text-xs text-gray-500">Stock mínimo</p>
+            <p class="text-lg">{{ getStockMinimoProductoSeleccionado() | number:'1.0-2' }} {{ invProductoSeleccionado.unidadMedida || getUnidadBaseProducto(selectedProductIdEntradas) }}</p>
+          </div>
+          <div class="p-3 bg-white rounded border">
+            <p class="text-xs text-gray-500">Costo unitario promedio</p>
+            <p class="text-lg">{{ invProductoSeleccionado.costoUnitarioPromedio || 0 | number:'1.2-4' }}</p>
+          </div>
+          <div class="p-3 bg-white rounded border">
+            <p class="text-xs text-gray-500">Actualizado</p>
+            <p class="text-lg">{{ invProductoSeleccionado.updateDate ? (toDate(invProductoSeleccionado.updateDate) | date:'dd/MM/yyyy') : '-' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <form [formGroup]="entradaForm" (ngSubmit)="crearEntrada()" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input type="hidden" formControlName="productId">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Contenido por unidad (base)
+            <span class="text-gray-500">[{{ getUnidadBaseProducto(selectedProductIdEntradas) }}]</span>
+          </label>
+          <input type="number" step="0.001" formControlName="contenidoPorUnidadBase" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="ej: 50 (ml) o 1 (kg)">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Cantidad de unidades</label>
+          <input type="number" step="0.001" formControlName="cantidadUnidades" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Código de lote</label>
+          <input type="text" formControlName="codigoLote" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div class="md:col-span-3 text-sm text-gray-600">
+          Total base calculado: 
+          <span class="font-semibold">{{ getTotalBaseCalculado() | number:'1.0-3' }} {{ getUnidadBaseProducto(selectedProductIdEntradas) }}</span>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Fecha ingreso</label>
+          <input type="date" formControlName="fechaIngreso" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Fecha vencimiento</label>
+          <input type="date" formControlName="fechaVencimiento" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Observaciones</label>
+          <input type="text" formControlName="observaciones" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Proveedor</label>
+          <select formControlName="providerId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option [ngValue]="null">Seleccione un proveedor</option>
+            <option *ngFor="let prov of providers" [ngValue]="prov.id">{{ prov.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Costo unitario (base)</label>
+          <input type="number" step="0.0001" formControlName="costoUnitarioBase" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="ej: costo por kg/ml">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Costo por unidad de control</label>
+          <input type="number" step="0.0001" formControlName="costoPorUnidadControl" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="opcional: costo por saco/frasco">
+        </div>
+        <div class="md:col-span-3 flex justify-end">
+          <button type="submit" [disabled]="entradaForm.invalid || !selectedProductIdEntradas" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+            Crear Entrada
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm" *ngIf="selectedProductIdEntradas">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-list mr-2 text-indigo-600"></i>Entradas del producto seleccionado
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingreso</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vence</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock base</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidades</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad ctrl</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo base</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo x unidad ctrl</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let e of entradasProducto">
+              <td class="px-4 py-2">{{ e.codigoLote || '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaIngreso ? (toDate(e.fechaIngreso) | date:'dd/MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaVencimiento ? (toDate(e.fechaVencimiento) | date:'MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">{{ e.stockUnidadesRestantes || 0 | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">{{ e.unidadControl || '-' }}</td>
+              <td class="px-4 py-2">{{ e.provider?.name || '-' }}</td>
+              <td class="px-4 py-2 text-right">{{ e.costoUnitarioBase || 0 | number:'1.2-4' }}</td>
+              <td class="px-4 py-2 text-right">{{ e.costoPorUnidadControl || 0 | number:'1.2-4' }}</td>
+              <td class="px-4 py-2">
+                <span class="px-2 py-1 rounded-full text-xs font-semibold" [ngClass]="e.activo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'">
+                  {{ e.activo ? 'Vigente' : 'Cerrada' }}
+                </span>
+              </td>
+              <td class="px-4 py-2 text-center">
+                <div class="flex justify-center space-x-2">
+                  <button (click)="openEditEntrada(e)" class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50" title="Editar entrada">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button (click)="eliminarEntrada(e)" class="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50" title="Eliminar (soft delete)">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="entradasProducto.length === 0">
+              <td colspan="11" class="px-4 py-4 text-center text-sm text-gray-500">No hay entradas para el producto seleccionado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal edición de entrada -->
+<div *ngIf="showEditEntradaModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">Editar Entrada</h3>
+        <button (click)="closeEditEntrada()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <form [formGroup]="editEntradaForm" (ngSubmit)="saveEditEntrada()" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Código de lote</label>
+          <input type="text" formControlName="codigoLote" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Unidad de control</label>
+          <input type="text" formControlName="unidadControl" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Fecha ingreso</label>
+          <input type="date" formControlName="fechaIngreso" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Fecha vencimiento</label>
+          <input type="date" formControlName="fechaVencimiento" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Contenido por unidad (base)
+            <span class="text-gray-500">[{{ getUnidadBaseProducto(selectedProductIdEntradas) }}]</span>
+          </label>
+          <input type="number" step="0.001" formControlName="contenidoPorUnidadBase" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Cantidad de unidades</label>
+          <input type="number" step="0.001" formControlName="cantidadUnidades" class="w-full p-2 border rounded-md" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-gray-700">Observaciones</label>
+          <input type="text" formControlName="observaciones" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Proveedor</label>
+          <select formControlName="providerId" class="w-full p-2 border rounded-md">
+            <option [ngValue]="null">Sin proveedor</option>
+            <option *ngFor="let prov of providers" [ngValue]="prov.id">{{ prov.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Costo unitario (base)</label>
+          <input type="number" step="0.0001" formControlName="costoUnitarioBase" class="w-full p-2 border rounded-md" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Costo por unidad de control</label>
+          <input type="number" step="0.0001" formControlName="costoPorUnidadControl" class="w-full p-2 border rounded-md" />
+        </div>
+        <div class="md:col-span-2 flex justify-end space-x-3 mt-2">
+          <button type="button" (click)="closeEditEntrada()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- Vista de Inventario Automático - NUEVA FUNCIONALIDAD -->
 <div *ngIf="vistaActual === 'inventario-automatico'">
@@ -733,40 +897,40 @@
                     </div>
                   </div>
                   <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">
-                      {{ inventario.tipoAlimento.name }}
+                    <div class="text-sm font-medium text-gray-900" [title]="getNombresProductosPorTipo(inventario, 10)">
+                      {{ getNombresProductosPorTipo(inventario) }}
                     </div>
                     <div class="text-sm text-gray-500">
-                      ID: {{ inventario.id }}
+                      Categoría: Alimento • Tipo: {{ inventario.tipoAlimento.name }}
                     </div>
                   </div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" title="Cantidad inicial registrada al crear el producto (consolidado por tipo)">
                 <span class="font-semibold text-blue-600">
-                  {{ inventario.cantidadOriginal || 'N/A' }}
+                  {{ getStockOriginalPorTipo(inventario) || 'N/A' }}
                 </span>
                 <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm">
+              <td class="px-6 py-4 whitespace-nowrap text-sm" title="Se actualiza automáticamente con consumos de lotes (stock válido, sin vencidos)">
                 <span class="font-bold" [ngClass]="{
                   'text-red-600': getEstadoStock(inventario) === 'CRÍTICO',
                   'text-yellow-600': getEstadoStock(inventario) === 'BAJO',
                   'text-green-600': getEstadoStock(inventario) === 'NORMAL'
                 }">
-                  {{ inventario.cantidadStock }}
+                  {{ getStockActualPorTipo(inventario) }}
                 </span>
                 <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" title="Consumo acumulado registrado por lotes (SALIDA/CONSUMO_LOTE)">
                 <span class="font-semibold text-orange-600">
-                  {{ (inventario.cantidadOriginal || inventario.cantidadStock) - inventario.cantidadStock || 0 }}
+                  {{ getConsumidoPorTipo(inventario) }}
                 </span>
                 <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" title="Umbral configurado al registrar el producto (consolidado por tipo)">
                 <span class="font-medium text-purple-600">
-                  {{ inventario.stockMinimo }}
+                  {{ getStockMinimoPorTipo(inventario) }}
                 </span>
                 <span class="text-gray-500 ml-1">{{ inventario.unidadMedida }}</span>
               </td>

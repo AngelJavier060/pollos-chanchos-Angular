@@ -125,6 +125,14 @@ export class MortalidadService {
   }
 
   /**
+   * Crear causa de mortalidad
+   */
+  createCausa(causa: Partial<CausaMortalidad>): Observable<CausaMortalidad> {
+    return this.http.post<{data: CausaMortalidad, success: boolean}>(`${this.API_URL}/causas`, causa)
+      .pipe(map(response => response.data));
+  }
+
+  /**
    * Obtener mortalidad del día actual
    */
   getMortalidadHoy(): Observable<number> {

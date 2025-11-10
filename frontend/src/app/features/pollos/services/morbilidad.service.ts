@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, BehaviorSubject, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { 
@@ -15,7 +16,7 @@ import {
   providedIn: 'root'
 })
 export class MorbilidadService {
-  private readonly API_URL = `${environment.apiUrl}/morbilidad`;
+  private readonly API_URL = `${environment.apiUrl}/api/morbilidad`;
   
   private morbilidadSubject = new BehaviorSubject<RegistroMorbilidad[]>([]);
   public morbilidad$ = this.morbilidadSubject.asObservable();
@@ -27,7 +28,12 @@ export class MorbilidadService {
    * Obtener todos los registros de morbilidad
    */
   getRegistrosMorbilidad(filtros?: any): Observable<RegistroMorbilidad[]> {
-    return this.http.get<RegistroMorbilidad[]>(`${this.API_URL}/registros`, { params: filtros });
+    return this.http
+      .get<{ data: RegistroMorbilidad[]; success: boolean; count?: number }>(
+        `${this.API_URL}/registros`,
+        { params: filtros }
+      )
+      .pipe(map((res) => res?.data || []));
   }
 
   /**
@@ -48,7 +54,12 @@ export class MorbilidadService {
    * Registrar nueva morbilidad
    */
   registrarMorbilidad(registro: RegistroMorbilidad): Observable<RegistroMorbilidad> {
-    return this.http.post<RegistroMorbilidad>(`${this.API_URL}/registrar`, registro);
+    return this.http
+      .post<{ data: RegistroMorbilidad; success: boolean; message?: string }>(
+        `${this.API_URL}/registrar`,
+        registro
+      )
+      .pipe(map((res) => res?.data as RegistroMorbilidad));
   }
 
   /**
@@ -113,7 +124,9 @@ export class MorbilidadService {
    * Obtener enfermedades disponibles
    */
   getEnfermedades(): Observable<Enfermedad[]> {
-    return this.http.get<Enfermedad[]>(`${this.API_URL}/enfermedades`);
+    return this.http
+      .get<{ data: Enfermedad[]; success: boolean }>(`${this.API_URL}/enfermedades`)
+      .pipe(map((res) => res?.data || []));
   }
 
   /**

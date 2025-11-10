@@ -6,6 +6,8 @@ import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
 import { MorbilidadService } from './services/morbilidad.service';
+import { MorbilidadBackendService, ConvertirMortalidadRequest } from '../../shared/services/morbilidad-backend.service';
+import { CausaMortalidad, CAUSAS_MORTALIDAD } from './models/mortalidad.model';
 import { RegistroMorbilidad, EstadisticasMorbilidad, Enfermedad, Tratamiento, EstadoEnfermedad, ESTADOS_ENFERMEDAD } from './models/morbilidad.model';
 
 @Component({
@@ -98,6 +100,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     private authService: AuthDirectService,
     private loteService: LoteService,
     private morbilidadService: MorbilidadService,
+    private morbilidadBackend: MorbilidadBackendService,
     private route: ActivatedRoute,
     private router: Router
   ) {}
@@ -122,13 +125,10 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     
     // Cargar lotes
     const lotesSub = this.loteService.getLotes().subscribe({
-      next: (response: any) => {
-        if (response?.status === 200 && response.object) {
-          this.lotesPollos = response.object.filter((lote: any) => 
-            lote.animal?.name?.toLowerCase().includes('pollo') && 
-            lote.status?.toLowerCase() === 'activo'
-          );
-        }
+      next: (lotes: Lote[]) => {
+        this.lotesPollos = (lotes || []).filter((lote: Lote) => 
+          lote?.race?.animal?.name?.toLowerCase().includes('pollo')
+        );
       },
       error: (error) => console.error('Error al cargar lotes:', error)
     });
@@ -146,7 +146,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     
     const morbilidadSub = this.morbilidadService.getRegistrosMorbilidad().subscribe({
       next: (data) => {
-        this.registrosMorbilidad = data;
+        this.registrosMorbilidad = (data || []).map((r: any) => this.mapRegistroDesdeBackend(r));
         this.calcularEstadisticas();
         this.cargando = false;
       },
@@ -165,16 +165,16 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   private calcularEstadisticas(): void {
     const registros = this.getRegistrosFiltrados();
     
-    this.estadisticas.totalEnfermos = registros.reduce((sum, r) => sum + r.cantidadEnfermos, 0);
-    this.estadisticas.enTratamiento = registros.filter(r => r.estado.nombre === 'En Tratamiento').length;
-    this.estadisticas.recuperados = registros.filter(r => r.estado.nombre === 'Recuperado').length;
-    this.estadisticas.movidosAMortalidad = registros.filter(r => r.derivadoAMortalidad).length;
+    this.estadisticas.totalEnfermos = registros.reduce((sum, r) => sum + (r.cantidadEnfermos || 0), 0);
+    this.estadisticas.enTratamiento = registros.filter(r => r.estado?.nombre === 'En Tratamiento').length;
+    this.estadisticas.recuperados = registros.filter(r => r.estado?.nombre === 'Recuperado').length;
+    this.estadisticas.movidosAMortalidad = registros.filter(r => !!r.derivadoAMortalidad).length;
     
     // Calcular principales enfermedades
     const enfermedadesMap = new Map<string, number>();
     registros.forEach(r => {
-      const nombreEnfermedad = r.enfermedad.nombre;
-      enfermedadesMap.set(nombreEnfermedad, (enfermedadesMap.get(nombreEnfermedad) || 0) + r.cantidadEnfermos);
+      const nombreEnfermedad = r.enfermedad?.nombre || 'Sin especificar';
+      enfermedadesMap.set(nombreEnfermedad, (enfermedadesMap.get(nombreEnfermedad) || 0) + (r.cantidadEnfermos || 0));
     });
 
     this.estadisticas.principalesEnfermedades = Array.from(enfermedadesMap.entries())
@@ -283,31 +283,84 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    * Registrar nueva morbilidad
    */
   registrarMorbilidad(): void {
-    if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.enfermedad || !this.nuevoRegistro.cantidadEnfermos) {
-      alert('Por favor complete todos los campos obligatorios: Lote, Enfermedad y Cantidad.');
+    if (!this.nuevoRegistro.loteId || !this.nuevoRegistro.cantidadEnfermos) {
+      alert('Por favor complete todos los campos obligatorios: Lote y Cantidad.');
       return;
     }
 
-    const registro: RegistroMorbilidad = {
-      loteId: this.nuevoRegistro.loteId!,
-      fechaRegistro: new Date(),
-      cantidadEnfermos: this.nuevoRegistro.cantidadEnfermos!,
-      enfermedad: this.nuevoRegistro.enfermedad!,
-      sintomas: this.nuevoRegistro.sintomas || [],
-      severidad: this.nuevoRegistro.severidad || 'leve',
-      estado: this.nuevoRegistro.estado!,
-      aislado: this.nuevoRegistro.aislado || false,
-      observaciones: this.nuevoRegistro.observaciones || '',
-      tratamiento: this.nuevoRegistro.tratamiento,
+    const ahora = new Date();
+    const fecha = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+    const fechaStr = `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
+    const horaStr = `${pad(ahora.getHours())}:${pad(ahora.getMinutes())}:${pad(ahora.getSeconds())}`;
+
+    let enfermedadSeleccionada: any = null;
+    if (this.nuevoRegistro.enfermedad && typeof (this.nuevoRegistro.enfermedad as any) === 'object') {
+      enfermedadSeleccionada = this.nuevoRegistro.enfermedad as any;
+    } else if (this.nuevoRegistro.enfermedad && typeof (this.nuevoRegistro.enfermedad as any) === 'string') {
+      const nombre = String(this.nuevoRegistro.enfermedad);
+      enfermedadSeleccionada = (this.enfermedades || []).find(e => e.nombre?.toLowerCase() === nombre.toLowerCase()) || null;
+    }
+    if (!enfermedadSeleccionada) {
+      alert('Seleccione una enfermedad válida.');
+      return;
+    }
+
+    const gravedadUi = (this.nuevoRegistro.severidad || 'leve').toLowerCase();
+    const gravedadEnum = gravedadUi === 'moderada' ? 'MODERADA' : (gravedadUi === 'grave' || gravedadUi === 'critica') ? 'SEVERA' : 'LEVE';
+
+    const estadoNombre = (this.nuevoRegistro.estado?.nombre || 'En Observación').toLowerCase();
+    let estadoTratamiento: string = 'EN_OBSERVACION';
+    if (estadoNombre.includes('tratamiento')) estadoTratamiento = 'EN_TRATAMIENTO';
+    else if (estadoNombre.includes('recuperado')) estadoTratamiento = 'RECUPERADO';
+    else if (estadoNombre.includes('mortalidad')) estadoTratamiento = 'MOVIDO_A_MORTALIDAD';
+
+    // Resolver loteId numérico para backend si el id del lote es UUID/código
+    let loteIdParaBackend: any = Number(String(this.nuevoRegistro.loteId));
+    if (isNaN(loteIdParaBackend)) {
+      const loteObj = this.lotesPollos.find(l => String(l.id) === String(this.nuevoRegistro.loteId));
+      const codigo = loteObj?.codigo || '';
+      const digits = (codigo.match(/\d+/g) || []).join('');
+      const parsed = Number(digits);
+      if (!isNaN(parsed) && parsed > 0) {
+        loteIdParaBackend = parsed;
+      } else {
+        // Si no se puede resolver, dejar como string (backend podría soportarlo)
+        loteIdParaBackend = String(this.nuevoRegistro.loteId);
+      }
+    }
+
+    const payload: any = {
+      loteId: loteIdParaBackend,
+      fecha: fechaStr,
+      hora: horaStr,
+      cantidadEnfermos: Number(this.nuevoRegistro.cantidadEnfermos),
+      enfermedad: { id: enfermedadSeleccionada.id },
+      sintomasObservados: (this.nuevoRegistro.sintomas || []).join(', '),
+      gravedad: gravedadEnum,
+      estadoTratamiento,
+      medicamento: undefined,
+      dosisAplicada: undefined,
+      fechaInicioTratamiento: undefined,
+      fechaFinTratamiento: undefined,
+      observacionesVeterinario: this.nuevoRegistro.observaciones || '',
+      proximaRevision: undefined,
+      costo: undefined,
+      requiereAislamiento: !!this.nuevoRegistro.aislado,
+      contagioso: (typeof (this.nuevoRegistro as any).contagioso === 'boolean') 
+        ? !!(this.nuevoRegistro as any).contagioso 
+        : !!enfermedadSeleccionada?.esContagiosa,
       usuarioRegistro: this.user?.username || 'Usuario',
+      animalesTratados: Number(this.nuevoRegistro.cantidadEnfermos)
     };
 
-    this.morbilidadService.registrarMorbilidad(registro).subscribe({
+    this.morbilidadService.registrarMorbilidad(payload as any).subscribe({
       next: (nuevoRegistro) => {
-        this.registrosMorbilidad.unshift(nuevoRegistro);
+        const adaptado = this.mapRegistroDesdeBackend(nuevoRegistro as any);
+        this.registrosMorbilidad.unshift(adaptado);
         this.calcularEstadisticas();
         this.cerrarModalMorbilidad();
-        console.log('✅ Morbilidad registrada exitosamente:', nuevoRegistro);
+        console.log('✅ Morbilidad registrada exitosamente:', adaptado);
         alert('Morbilidad registrada exitosamente');
       },
       error: (error) => {
@@ -331,6 +384,58 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
   editarRegistro(registro: RegistroMorbilidad): void {
     console.log('Editar registro:', registro);
     alert('Funcionalidad de edición en desarrollo');
+  }
+
+  /**
+   * Marcar como recuperado (registra costo)
+   */
+  marcarComoRecuperado(registro: RegistroMorbilidad): void {
+    if (!confirm('¿Confirma marcar como RECUPERADO? (No alterará stock del lote)')) return;
+    this.cargando = true;
+    const input = prompt('Ingrese el costo de recuperación (S/.):', '0');
+    if (input === null) { this.cargando = false; return; }
+    const costo = Number((input || '0').toString().replace(',', '.'));
+    this.morbilidadBackend.marcarComoRecuperado(registro.id!, isNaN(costo) ? undefined : costo).subscribe({
+      next: () => {
+        alert('✅ Registro marcado como RECUPERADO');
+        this.cargarDatos();
+      },
+      error: (err) => {
+        console.error('❌ Error al marcar como recuperado:', err);
+        alert('❌ Error al marcar como recuperado');
+        this.cargando = false;
+      }
+    });
+  }
+
+  /**
+   * Mover a mortalidad (redirige a módulo Mortalidad)
+   */
+  moverAMortalidad(registro: RegistroMorbilidad): void {
+    if (!confirm('¿Confirma mover estos animales a MORTALIDAD?')) return;
+    this.cargando = true;
+    const causa = (CAUSAS_MORTALIDAD || []).find(c => c.nombre === 'Causa Desconocida');
+    const causaId = causa?.id ?? 8;
+    const req: ConvertirMortalidadRequest = {
+      loteId: String(registro.loteId),
+      cantidad: registro.cantidadEnfermos,
+      causaId,
+      observaciones: `Derivado de morbilidad: ${registro.enfermedad?.nombre || ''}. ${registro.observaciones || ''}`.trim(),
+      confirmado: true,
+      usuarioRegistro: this.user?.username || 'Sistema'
+    };
+    this.morbilidadBackend.moverAMortalidad(registro.id!, req).subscribe({
+      next: () => {
+        alert('✅ Mortalidad registrada desde Morbilidad');
+        this.cargarDatos();
+        this.router.navigate(['/pollos/mortalidad']);
+      },
+      error: (err) => {
+        console.error('❌ Error al convertir a mortalidad:', err);
+        alert('❌ Error al convertir a mortalidad. Puede registrar manualmente en la pantalla de mortalidad.');
+        this.cargando = false;
+      }
+    });
   }
 
   /**
@@ -377,7 +482,7 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     let registros = [...this.registrosMorbilidad];
     
     if (this.filtroEstadoId) {
-      registros = registros.filter(r => r.estado.id === this.filtroEstadoId);
+      registros = registros.filter(r => r.estado && r.estado.id === this.filtroEstadoId);
     }
     
     if (this.filtroGravedad) {
@@ -385,7 +490,8 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     }
     
     if (this.filtroEnfermedad) {
-      registros = registros.filter(r => r.enfermedad.nombre.toLowerCase().includes(this.filtroEnfermedad.toLowerCase()));
+      const term = this.filtroEnfermedad.toLowerCase();
+      registros = registros.filter(r => (r.enfermedad?.nombre || '').toLowerCase().includes(term));
     }
     
     if (this.busquedaLote) {
@@ -413,6 +519,40 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
     return e1 && e2 ? e1.id === e2.id : e1 === e2;
   }
 
+  private mapRegistroDesdeBackend(r: any): RegistroMorbilidad {
+    const estadoTrat = (r?.estadoTratamiento || '').toString().toUpperCase();
+    const gravedadBk = (r?.gravedad || '').toString().toUpperCase();
+    const estado = this.mapEstadoTratamiento(estadoTrat);
+    const severidad = this.mapGravedad(gravedadBk);
+
+    const fechaReg = r?.fechaRegistro ? new Date(r.fechaRegistro) : new Date();
+    const derivadoAMortalidad = estadoTrat === 'MOVIDO_A_MORTALIDAD' ? true : !!r?.derivadoAMortalidad;
+
+    const registroAdaptado: any = {
+      ...r,
+      fechaRegistro: fechaReg,
+      estado,
+      severidad,
+      derivadoAMortalidad
+    };
+    return registroAdaptado as RegistroMorbilidad;
+  }
+
+  private mapEstadoTratamiento(estadoTrat: string): EstadoEnfermedad {
+    const nombre = estadoTrat === 'EN_TRATAMIENTO' ? 'En Tratamiento'
+      : estadoTrat === 'RECUPERADO' ? 'Recuperado'
+      : estadoTrat === 'MOVIDO_A_MORTALIDAD' ? 'Fallecido'
+      : 'En Observación';
+    return this.estados.find(e => e.nombre === nombre) || this.estados[1];
+  }
+
+  private mapGravedad(gravedad: string): 'leve' | 'moderada' | 'grave' | 'critica' {
+    if (gravedad === 'MODERADA') return 'moderada';
+    if (gravedad === 'SEVERA') return 'grave';
+    if (gravedad === 'CRITICA') return 'critica';
+    return 'leve';
+  }
+
   /**
    * Exportar datos
    */
@@ -434,13 +574,11 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
    */
   verificarAutoregistro(): void {
     this.route.queryParams.subscribe(params => {
+      const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
+
       if (params['autoRegistro'] === 'true' && params['datos']) {
         try {
           const datosAutoregistro = JSON.parse(params['datos']);
-          console.log('🔄 Autoregistro de morbilidad recibido:', datosAutoregistro);
-          const estadoPorDefecto = this.estados.find(e => e.nombre === 'En Observación');
-          
-          // Prellenar el formulario con los datos recibidos
           this.nuevoRegistro = {
             loteId: String(datosAutoregistro.loteId),
             cantidadEnfermos: Number(datosAutoregistro.cantidad),
@@ -452,106 +590,30 @@ export class PollosMorbilidadComponent implements OnInit, OnDestroy {
             observaciones: 'Registro automático desde alimentación.',
             usuarioRegistro: this.user?.username || '',
           };
-          
-          // Abrir el modal automáticamente
           this.modalMorbilidadAbierto = true;
-          
-          // Limpiar los query params
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: {},
-            replaceUrl: true
-          });
-          
+          this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
         } catch (error) {
           console.error('❌ Error al procesar autoregistro:', error);
         }
+        return;
+      }
+
+      if (params && (params['loteId'] || params['cantidad'])) {
+        this.nuevoRegistro = {
+          loteId: String(params['loteId'] || ''),
+          cantidadEnfermos: Number(params['cantidad'] || 1),
+          fechaRegistro: new Date(),
+          sintomas: [],
+          severidad: 'leve',
+          estado: estadoPorDefecto,
+          aislado: false,
+          observaciones: 'Registro automático desde alimentación.',
+          usuarioRegistro: this.user?.username || '',
+        };
+        this.modalMorbilidadAbierto = true;
+        this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
       }
     });
   }
 
-  /**
-   * ✅ FUNCIONALIDAD PARA RECUPERACIÓN DE ANIMALES
-   */
-  marcarComoRecuperado(registro: RegistroMorbilidad): void {
-    if (confirm('¿Confirma que los animales se han recuperado y deben volver al lote?')) {
-      // Cambiar estado a recuperado
-      const estadoRecuperado = this.estados.find(e => e.nombre === 'Recuperado');
-      if (estadoRecuperado) {
-        registro.estado = estadoRecuperado;
-      }
-      registro.fechaRecuperacion = new Date();
-      
-      // Devolver animales al lote
-      this.devolverAnimalesAlLote(registro);
-      
-      console.log('✅ Animales marcados como recuperados y devueltos al lote');
-    }
-  }
-
-  /**
-   * ✅ DEVOLVER ANIMALES RECUPERADOS AL LOTE
-   */
-  private async devolverAnimalesAlLote(registro: RegistroMorbilidad): Promise<void> {
-    try {
-      // Buscar el lote
-      const lote = this.lotesPollos.find(l => l.id === registro.loteId);
-      if (!lote) {
-        console.error('❌ Lote no encontrado');
-        return;
-      }
-      
-      // Incrementar la cantidad de animales
-      const nuevaCantidad = lote.quantity + registro.cantidadEnfermos;
-      
-      console.log(`🔄 Devolviendo ${registro.cantidadEnfermos} animales al lote ${lote.id}:`, {
-        cantidadAnterior: lote.quantity,
-        animalesRecuperados: registro.cantidadEnfermos,
-        nuevaCantidad: nuevaCantidad
-      });
-      
-      // Actualizar en el backend
-      const loteActualizado = { ...lote, quantity: nuevaCantidad };
-      await this.loteService.updateLote(loteActualizado).toPromise();
-      
-      // Actualizar en la vista local
-      lote.quantity = nuevaCantidad;
-      
-      alert(`✅ ${registro.cantidadEnfermos} animales recuperados devueltos al lote ${lote.name}`);
-      
-    } catch (error) {
-      console.error('❌ Error al devolver animales al lote:', error);
-      alert('Error al devolver animales al lote. Intente nuevamente.');
-    }
-  }
-
-  /**
-   * ✅ MOVER ANIMALES A MORTALIDAD
-   */
-  moverAMortalidad(registro: RegistroMorbilidad): void {
-    if (confirm('¿Confirma que los animales han muerto y deben registrarse en mortalidad?')) {
-      // Cambiar estado
-      const estadoMortalidad = this.estados.find(e => e.nombre === 'Muerto'); // Asumiendo que existe este estado
-      if(estadoMortalidad) {
-        registro.estado = estadoMortalidad;
-      }
-      registro.derivadoAMortalidad = true;
-      registro.fechaMuerte = new Date();
-      
-      // Redirigir a mortalidad con datos
-      const datosMortalidad = {
-        loteId: registro.loteId,
-        cantidad: registro.cantidadEnfermos,
-        fecha: new Date().toISOString(),
-        observaciones: `Derivado de morbilidad: ${registro.enfermedad.nombre}. ${registro.observaciones}`
-      };
-      
-      this.router.navigate(['/pollos/mortalidad'], {
-        queryParams: {
-          autoRegistro: 'true',
-          datos: JSON.stringify(datosMortalidad)
-        }
-      });
-    }
-  }
 }

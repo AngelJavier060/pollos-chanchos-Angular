@@ -116,6 +116,42 @@
                   <span class="text-gray-600 font-medium">Edad:</span>
                   <span class="text-gray-900 font-bold">{{ calcularDiasDeVida(lote.birthdate) }} días</span>
                 </div>
+
+              <!-- Cintillo de Etapa Actual (solo cuando el modal está abierto y hay etapa actual) -->
+              <div class="mb-4" *ngIf="modalAbierto && loteSeleccionado && etapaActualChanchos">
+                <div class="bg-pink-50 border border-pink-200 rounded-lg p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-pink-800 font-semibold text-sm">
+                      <i class="fas fa-chart-line mr-1"></i>
+                      Etapa {{ etapaActualChanchos.dayStart }}-{{ etapaActualChanchos.dayEnd }} días
+                    </span>
+                    <span class="bg-pink-100 text-pink-800 px-2 py-1 rounded text-xs font-bold">
+                      ACTUAL
+                    </span>
+                  </div>
+                  <div class="space-y-1 text-xs">
+                    <div class="flex justify-between">
+                      <span class="text-pink-600">Alimento:</span>
+                      <span class="text-pink-900 font-semibold">{{ etapaActualChanchos.alimentoRecomendado }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-pink-600">Rango principal:</span>
+                      <span class="text-pink-900 font-semibold">
+                        {{ planPrincipalNombre || 'Plan' }}
+                        <span *ngIf="planPrincipalRango.min && planPrincipalRango.max" class="ml-1 bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                          {{ planPrincipalRango.min }}-{{ planPrincipalRango.max }} días
+                        </span>
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-pink-600">Cantidad total:</span>
+                      <span class="text-green-700 font-bold">
+                        {{ formatearCantidad(etapaActualChanchos.quantityPerAnimal * (loteSeleccionado?.quantity || 0)) }} kg total
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
                 
                 <div class="info-item flex items-center justify-between">
                   <span class="text-gray-600 font-medium">Cantidad:</span>
@@ -264,18 +300,112 @@
 
               <!-- Alimentación -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de alimento *</label>
-                  <select 
-                    [(ngModel)]="registroCompleto.tipoAlimento"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                    <option value="">Seleccionar alimento</option>
-                    <option value="concentrado">Concentrado</option>
-                    <option value="maiz">Maíz</option>
-                    <option value="soya">Soya</option>
-                    <option value="balanceado">Balanceado</option>
-                    <option value="otro">Otro</option>
-                  </select>
+                <div class="space-y-3">
+                  <label class="block text-sm font-medium text-gray-700">Tipo de Alimento</label>
+
+                  <!-- Dinámico por plan nutricional -->
+                  <div *ngIf="etapasDisponiblesLote && etapasDisponiblesLote.length > 0; else selectFallback" class="mb-2">
+                    <div class="text-xs text-pink-700 mb-2 font-medium">
+                      <i class="fas fa-clipboard-list mr-1"></i>
+                      Alimentos recomendados del plan nutricional ({{ etapasDisponiblesLote.length }} opciones)
+                      <span class="text-green-700 font-semibold">
+                        • Selección múltiple
+                      </span>
+                    </div>
+                    <!-- Rango principal -->
+                    <div *ngIf="planPrincipalNombre || (planPrincipalRango.min && planPrincipalRango.max)" class="-mt-1 mb-2 text-[11px] text-indigo-700">
+                      <i class="fas fa-flag mr-1"></i>
+                      Rango principal:
+                      <span class="font-semibold">{{ planPrincipalNombre || 'Plan detectado' }}</span>
+                      <span *ngIf="planPrincipalRango.min && planPrincipalRango.max" class="ml-1 bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                        {{ planPrincipalRango.min }}-{{ planPrincipalRango.max }} días
+                      </span>
+                    </div>
+
+                    <div class="space-y-2">
+                      <label *ngFor="let etapa of etapasDisponiblesLote; let i = index"
+                             class="flex items-center p-3 border border-pink-200 rounded-lg bg-pink-50 hover:bg-pink-100 cursor-pointer transition-colors"
+                             [class.border-pink-400]="etapa.seleccionado"
+                             [class.bg-pink-100]="etapa.seleccionado">
+                        <input type="checkbox" 
+                               [(ngModel)]="etapa.seleccionado"
+                               (change)="actualizarAlimentosSeleccionados()"
+                               class="mr-3 text-pink-600">
+                        <div class="flex-1">
+                          <div class="flex items-center justify-between">
+                            <span class="font-semibold text-pink-900">{{ etapa.alimentoRecomendado }}</span>
+                            <div class="flex items-center space-x-2">
+                              <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs" *ngIf="etapa.dayStart && etapa.dayEnd">
+                                {{ etapa.dayStart }}-{{ etapa.dayEnd }} días
+                              </span>
+                              <span class="bg-pink-100 text-pink-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                            </div>
+                          </div>
+                          <div class="text-pink-700 text-sm mt-1">
+                            <i class="fas fa-weight mr-1"></i>
+                            {{ formatearCantidad(etapa.quantityPerAnimal) }} kg/animal/día
+                          </div>
+
+                          <!-- Detalles por producto -->
+                          <div *ngIf="etapa.productosDetalle && etapa.productosDetalle.length > 0" 
+                               class="text-pink-700 text-xs mt-2 pl-4 border-l-2 border-pink-200">
+                            <div class="font-medium mb-1">Detalles por producto:</div>
+                            <div *ngFor="let producto of etapa.productosDetalle" class="flex justify-between">
+                              <span>• {{ producto.nombre }}:</span>
+                              <span class="font-medium">{{ formatearCantidad(producto.cantidad) }} {{ producto.unidad }}/día</span>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    <!-- Resumen de seleccionados -->
+                    <div *ngIf="alimentosSeleccionados.length > 0" class="mt-3 p-3 bg-gradient-to-r from-green-50 to-green-100 border border-green-300 rounded-lg shadow-sm">
+                      <div class="flex items-center mb-2">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <div class="text-sm text-green-700 font-semibold">Alimentos Seleccionados</div>
+                      </div>
+                      <div class="space-y-1">
+                        <div *ngFor="let alimento of alimentosSeleccionados" class="flex justify-between items-center bg-white px-2 py-1 rounded border border-green-200 group">
+                          <span class="text-xs text-green-800 font-medium">
+                            {{ alimento.alimentoRecomendado }}
+                            <span *ngIf="alimento.dayStart && alimento.dayEnd" class="ml-1 text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded">
+                              {{ alimento.dayStart }}-{{ alimento.dayEnd }} días
+                            </span>
+                          </span>
+                          <div class="flex items-center space-x-2">
+                            <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">{{ formatearCantidad(alimento.quantityPerAnimal * (loteSeleccionado?.quantity || 0)) }} kg</span>
+                            <button 
+                              (click)="removerAlimento(alimento.alimentoRecomendado)"
+                              class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remover alimento">
+                              <i class="fas fa-times text-xs"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="mt-2 pt-2 border-t border-green-200">
+                        <div class="flex justify-between items-center">
+                          <span class="text-xs text-green-700 font-medium">Total:</span>
+                          <span class="text-xs text-green-800 font-bold">{{ formatearCantidad(getCantidadTotalAlimentosSeleccionados()) }} kg</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Fallback: select manual -->
+                  <ng-template #selectFallback>
+                    <select 
+                      [(ngModel)]="registroCompleto.tipoAlimento"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
+                      <option value="">Seleccionar alimento</option>
+                      <option value="concentrado">Concentrado</option>
+                      <option value="maiz">Maíz</option>
+                      <option value="soya">Soya</option>
+                      <option value="balanceado">Balanceado</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </ng-template>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad aplicada (kg) *</label>

@@ -32,18 +32,22 @@ export interface MovimientoInventario {
 
 export interface RegistroConsumoRequest {
   loteId: string; // Cambiado a string para UUID
-  tipoAlimentoId: number;
+  tipoAlimentoId?: number;
+  productId?: number; // Opcional: descuento específico por producto
   cantidadKg: number;
   observaciones?: string;
 }
 
 export interface RegistroConsumoResponse {
   success: boolean;
-  message: string;
-  movimientoId: number;
-  stockAnterior: number;
-  stockNuevo: number;
-  cantidadConsumida: number;
+  message?: string;
+  movimientoId?: number;
+  stockAnterior?: number;
+  stockNuevo?: number;
+  cantidadConsumida?: number;
+  cantidadPendiente?: number;
+  bloqueoPorVencido?: boolean;
+  detalles?: any;
   error?: string;
 }
 

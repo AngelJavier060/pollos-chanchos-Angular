@@ -46,6 +46,16 @@ public class VentaAnimalController {
         return ResponseEntity.ok(ventaAnimalService.listarPorRango(from, to));
     }
 
+    @GetMapping("/lote/{loteId}")
+    public ResponseEntity<List<VentaAnimal>> listarPorLote(@PathVariable String loteId) {
+        return ResponseEntity.ok(ventaAnimalService.listarPorLote(loteId));
+    }
+
+    @GetMapping("/lote/{loteId}/emitidas")
+    public ResponseEntity<List<VentaAnimal>> listarPorLoteEmitidas(@PathVariable String loteId) {
+        return ResponseEntity.ok(ventaAnimalService.listarPorLoteEmitidas(loteId));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<VentaAnimal> actualizar(@PathVariable Long id, @Valid @RequestBody VentaAnimalDTO body) {
         return ResponseEntity.ok(ventaAnimalService.actualizarVenta(id, body));

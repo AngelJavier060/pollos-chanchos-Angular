@@ -18,7 +18,7 @@ import com.wil.avicola_backend.service.InventarioAlimentoService;
 
 @RestController
 @RequestMapping("/api/inventarios")
-@CrossOrigin(origins = "http://localhost:4200")
+// @CrossOrigin(origins = "http://localhost:4200")
 public class InventarioAlimentoController {
 
     @Autowired
@@ -28,6 +28,10 @@ public class InventarioAlimentoController {
      * Obtener stock actual por lista de productIds.
      * Ejemplo: GET /api/inventarios/stock?productIds=1,2,3
      */
+    @GetMapping
+    public ResponseEntity<?> findInventarios() {
+        return inventarioAlimentoService.findInventarios();
+    }
     @GetMapping("/stock")
     public ResponseEntity<Map<Long, BigDecimal>> getStockPorProductos(
             @RequestParam(name = "productIds") String productIdsStr) {

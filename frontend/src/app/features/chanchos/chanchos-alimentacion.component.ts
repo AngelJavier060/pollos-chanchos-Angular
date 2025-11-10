@@ -3,6 +3,7 @@ import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { PlanAlimentacionService, PlanDetalle } from '../plan-nutricional/services/plan-alimentacion.service';
+import { PlanNutricionalIntegradoService } from '../../shared/services/plan-nutricional-integrado.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
 
 // Interface completa para el registro de alimentación
@@ -40,6 +41,24 @@ interface RegistroAlimentacionCompleto {
   // Estado del lote
   loteCerrado: boolean;
   motivoCierre: string;
+}
+
+// Interfaces para visualización dinámica de sub-etapas (similar a Pollos)
+interface ProductoDetalle {
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+}
+
+interface EtapaAlimento {
+  id: number;
+  alimentoRecomendado: string;
+  quantityPerAnimal: number;
+  unidad: string;
+  seleccionado: boolean;
+  productosDetalle: ProductoDetalle[];
+  dayStart: number;
+  dayEnd: number;
 }
 
 // Interface para el historial de registros
@@ -100,6 +119,13 @@ export class ChanchosAlimentacionComponent implements OnInit {
   etapasAlimentacion: PlanDetalle[] = [];
   loading = false;
   selectedDate = new Date();
+  
+  // UI dinámica de sub-etapas (similar a Pollos)
+  etapasDisponiblesLote: EtapaAlimento[] = [];
+  alimentosSeleccionados: EtapaAlimento[] = [];
+  planPrincipalNombre: string | null = null;
+  planPrincipalRango: { min: number | null, max: number | null } = { min: null, max: null };
+  etapaActualChanchos: EtapaAlimento | null = null;
   
   // Modal de alimentación completo
   modalAbierto = false;
@@ -169,7 +195,8 @@ export class ChanchosAlimentacionComponent implements OnInit {
   constructor(
     private authService: AuthDirectService,
     private loteService: LoteService,
-    private planService: PlanAlimentacionService
+    private planService: PlanAlimentacionService,
+    private planNutricionalService: PlanNutricionalIntegradoService
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -255,6 +282,117 @@ export class ChanchosAlimentacionComponent implements OnInit {
     this.modalAbierto = true;
     this.inicializarRegistroCompleto();
     this.prepararDatosModal(lote);
+
+    // ==== CARGA DINÁMICA DE SUB-ETAPAS PARA CHANCHOS ====
+    const diasVida = this.calcularDiasDeVida(lote.birthdate);
+    console.log('🐷 [Chanchos] Días de vida del lote:', diasVida);
+
+    try {
+      // Forzar recarga del plan (caché) y obtener plan integrado de chanchos
+      this.planNutricionalService.forzarRecargaCompleta();
+      this.planNutricionalService.obtenerPlanActivo('chanchos').subscribe({
+        next: (planChanchos) => {
+          console.log('✅ [Chanchos] Plan nutricional REAL recibido:', planChanchos);
+          if (planChanchos && planChanchos.etapas && planChanchos.etapas.length > 0) {
+            // Etapas que contienen el día actual (diagnóstico)
+            const etapasCorrespondientes = planChanchos.etapas.filter((e: any) =>
+              diasVida >= e.diasEdad.min && diasVida <= e.diasEdad.max
+            );
+            console.log(`🔍 [Chanchos] Etapas para ${diasVida} días:`, etapasCorrespondientes);
+
+            // Determinar plan principal usando TODAS las etapas
+            const planPrincipal = this.determinarPlanPrincipal(planChanchos.etapas, diasVida);
+            this.planPrincipalNombre = planPrincipal?.nombre || (etapasCorrespondientes[0]?.planNombre || null);
+            this.planPrincipalRango = {
+              min: planPrincipal?.rango?.min ?? null,
+              max: planPrincipal?.rango?.max ?? null
+            };
+            console.log('🧭 [Chanchos] Plan principal:', this.planPrincipalNombre, this.planPrincipalRango);
+
+            // Filtrar sub-etapas del plan principal SIN limitar al día actual
+            let etapasDelPlanPrincipal: any[] = [];
+            if (this.planPrincipalRango.min != null && this.planPrincipalRango.max != null) {
+              const minP = this.planPrincipalRango.min as number;
+              const maxP = this.planPrincipalRango.max as number;
+              etapasDelPlanPrincipal = planChanchos.etapas.filter((e: any) => {
+                const r = this.extraerRangoDesdeNombre(e.planNombre);
+                if (r) return r.min === minP && r.max === maxP;
+                return e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP;
+              });
+              // Unificar por rango para robustez
+              const candidatasPorRango = planChanchos.etapas.filter((e: any) => e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP);
+              const unicas: any[] = [];
+              const vistos = new Set<number | string>();
+              [...etapasDelPlanPrincipal, ...candidatasPorRango].forEach((e: any) => {
+                const key = e.id ?? `${e.producto?.id}-${e.diasEdad?.min}-${e.diasEdad?.max}`;
+                if (!vistos.has(key)) { vistos.add(key); unicas.push(e); }
+              });
+              etapasDelPlanPrincipal = unicas;
+            } else if (this.planPrincipalNombre) {
+              etapasDelPlanPrincipal = planChanchos.etapas.filter((e: any) => e.planNombre === this.planPrincipalNombre);
+            } else {
+              etapasDelPlanPrincipal = etapasCorrespondientes;
+            }
+
+            // Ordenar por rango y mapear a etapas disponibles
+            const etapasOrdenadas = [...etapasDelPlanPrincipal].sort((a: any, b: any) => {
+              if (a.diasEdad?.min !== b.diasEdad?.min) return (a.diasEdad?.min || 0) - (b.diasEdad?.min || 0);
+              return (a.diasEdad?.max || 0) - (b.diasEdad?.max || 0);
+            });
+
+            this.etapasDisponiblesLote = etapasOrdenadas.map((etapa: any, index: number) => ({
+              id: index + 1,
+              alimentoRecomendado: etapa.producto?.name || etapa.tipoAlimento,
+              quantityPerAnimal: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
+              unidad: 'kg',
+              seleccionado: diasVida >= (etapa.diasEdad?.min || 0) && diasVida <= (etapa.diasEdad?.max || 0),
+              productosDetalle: [
+                {
+                  nombre: etapa.producto?.name || etapa.tipoAlimento,
+                  cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
+                  unidad: 'kg'
+                }
+              ],
+              dayStart: etapa.diasEdad?.min,
+              dayEnd: etapa.diasEdad?.max
+            }));
+
+            // Establecer etapa actual visible en el cintillo (la que contiene el día actual)
+            const actual = etapasOrdenadas.find((e: any) => diasVida >= e.diasEdad?.min && diasVida <= e.diasEdad?.max) || etapasOrdenadas[0] || null;
+            this.etapaActualChanchos = actual
+              ? {
+                  id: 0,
+                  alimentoRecomendado: actual.producto?.name || actual.tipoAlimento,
+                  quantityPerAnimal: parseFloat((actual.quantityPerAnimal || (actual.consumoDiario.min / 1000)).toFixed(2)),
+                  unidad: 'kg',
+                  seleccionado: true,
+                  productosDetalle: [
+                    {
+                      nombre: actual.producto?.name || actual.tipoAlimento,
+                      cantidad: parseFloat((actual.quantityPerAnimal || (actual.consumoDiario.min / 1000)).toFixed(2)),
+                      unidad: 'kg'
+                    }
+                  ],
+                  dayStart: actual.diasEdad?.min,
+                  dayEnd: actual.diasEdad?.max
+                }
+              : null;
+
+            this.actualizarAlimentosSeleccionados();
+          } else {
+            console.warn('⚠️ [Chanchos] No se encontró plan de nutrición. Usando fallback.');
+            this.cargarAlimentosFallback(diasVida);
+          }
+        },
+        error: (err) => {
+          console.error('❌ [Chanchos] Error obteniendo plan integrado:', err);
+          this.cargarAlimentosFallback(diasVida);
+        }
+      });
+    } catch (e) {
+      console.error('❌ [Chanchos] Error general al cargar sub-etapas:', e);
+      this.cargarAlimentosFallback(diasVida);
+    }
   }
 
   /**
@@ -263,6 +401,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
   cerrarModal(): void {
     this.modalAbierto = false;
     this.loteSeleccionado = null;
+    this.etapaActualChanchos = null;
     this.resetearRegistro();
   }
 
@@ -335,6 +474,67 @@ export class ChanchosAlimentacionComponent implements OnInit {
     this.modalData.tipoAlimento = 'No especificado';
     this.modalData.etapaNombre = this.determinarEtapaLote(lote);
     this.modalData.animalesVivos = lote.quantity;
+  }
+
+  // ================= UTILIDADES DE PLAN PRINCIPAL (CHANCHOS) =================
+  private extraerRangoDesdeNombre(nombrePlan?: string): { min: number, max: number } | null {
+    if (!nombrePlan) return null;
+    const fuente = String(nombrePlan).toLowerCase();
+    const regex = /(\d+)\s*(?:-|–|—|al|a)\s*(\d+)/i;
+    const match = fuente.match(regex);
+    if (match) {
+      const min = Number(match[1]);
+      const max = Number(match[2]);
+      if (!isNaN(min) && !isNaN(max) && min > 0 && max >= min) return { min, max };
+    }
+    return null;
+  }
+
+  private determinarPlanPrincipal(etapas: any[], diasVida: number): { nombre: string, rango?: { min: number, max: number } } | null {
+    if (!etapas || etapas.length === 0) return null;
+    for (const e of etapas) {
+      const parsed = this.extraerRangoDesdeNombre(e.planNombre);
+      if (parsed && diasVida >= parsed.min && diasVida <= parsed.max) {
+        return { nombre: e.planNombre, rango: parsed };
+      }
+    }
+    const nombre = etapas[0]?.planNombre || null;
+    if (nombre) {
+      const parsed = this.extraerRangoDesdeNombre(nombre);
+      return { nombre, rango: parsed || undefined } as any;
+    }
+    return null;
+  }
+
+  // ================= CHECKLIST DE ALIMENTOS (CHANCHOS) =================
+  actualizarAlimentosSeleccionados(): void {
+    this.alimentosSeleccionados = this.etapasDisponiblesLote.filter(e => e.seleccionado);
+  }
+
+  removerAlimento(nombreAlimento: string): void {
+    const etapa = this.etapasDisponiblesLote.find(e => e.alimentoRecomendado === nombreAlimento);
+    if (etapa) {
+      etapa.seleccionado = false;
+      this.actualizarAlimentosSeleccionados();
+    }
+  }
+
+  private cargarAlimentosFallback(diasVida: number): void {
+    // Fallback simple: lista vacía y mantener el select manual
+    this.etapasDisponiblesLote = [];
+    this.alimentosSeleccionados = [];
+  }
+
+  // ================= UTILIDADES DE FORMATO / CÁLCULOS =================
+  formatearCantidad(valor: number | null | undefined): string {
+    const n = Number(valor || 0);
+    return n.toFixed(2);
+  }
+
+  getCantidadTotalAlimentosSeleccionados(): number {
+    const animales = this.loteSeleccionado?.quantity || 0;
+    const total = this.alimentosSeleccionados.reduce((acc, a) => acc + (a.quantityPerAnimal || 0) * animales, 0);
+    return Number(total.toFixed(2));
   }
 
   /**

@@ -53,6 +53,14 @@ export class VentasService {
     return this.http.get<any[]>(`${this.baseUrl}/api/ventas/animales`, { params });
   }
 
+  listarVentasAnimalesPorLote(loteId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/api/ventas/animales/lote/${loteId}`);
+  }
+
+  listarVentasAnimalesPorLoteEmitidas(loteId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/api/ventas/animales/lote/${loteId}/emitidas`);
+  }
+
   // --- Huevos: update/delete ---
   actualizarVentaHuevo(id: number, body: Partial<VentaHuevoDTO>): Observable<any> {
     return this.http.put(`${this.baseUrl}/api/ventas/huevos/${id}`, body);
