@@ -314,7 +314,7 @@ public class PlanEjecucionService {
             if (asignaciones.isEmpty()) {
                 logger.warn("⚠️ No se encontró asignación activa para el lote: {}", loteId);
                 // Crear una ejecución simple sin asignación específica
-                return crearEjecucionSimple(loteId, fechaEjecucion, cantidadAplicada, observaciones, userId);
+                return crearEjecucionSimple(loteId, fechaEjecucion, cantidadAplicada, observaciones, animalesVivos, animalesMuertos, userId);
             }
 
             PlanAsignacion asignacion = asignaciones.get(0);
@@ -333,7 +333,7 @@ public class PlanEjecucionService {
             PlanDetalle detalle = buscarDetalleParaDia(asignacion.getPlanAlimentacion().getId(), (int) diaDeVida);
             if (detalle == null) {
                 logger.warn("⚠️ No se encontró configuración para el día {} del plan", diaDeVida);
-                return crearEjecucionSimple(loteId, fechaEjecucion, cantidadAplicada, observaciones, userId);
+                return crearEjecucionSimple(loteId, fechaEjecucion, cantidadAplicada, observaciones, animalesVivos, animalesMuertos, userId);
             }
 
             // ✅ Resolver SIEMPRE un usuario ejecutor existente (no crear nuevos)
@@ -426,6 +426,17 @@ public class PlanEjecucionService {
             }
             obsEjecucion = (obsEjecucion + " | MovimientoInvId: " + (movimientoId != null ? movimientoId : "N/A")).trim();
 
+            // ➕ Agregar detalle del producto al texto de observaciones para consumo de la MAÑANA/TARDE
+            // Esto permite que el frontend muestre 'maíz/trigo/u otro' desde el modal (parseo por 'Producto:')
+            String nombreProducto = detalle.getProduct() != null ? detalle.getProduct().getName() : null;
+            Double porAnimal = detalle.getQuantityPerAnimal();
+            obsEjecucion = (obsEjecucion
+                + " | Producto: " + (nombreProducto != null ? nombreProducto : "N/A")
+                + " | porAnimal: " + (porAnimal != null ? String.format(java.util.Locale.US, "%.3f", porAnimal) : "0.000")
+                + " | vivos: " + vivosParaCalculo
+                + " | total: " + String.format(java.util.Locale.US, "%.3f", totalAConsumir)
+            ).trim();
+
             PlanEjecucion ejecucion = PlanEjecucion.builder()
                 .planAsignacion(asignacion)
                 .planDetalle(detalle)
@@ -451,8 +462,10 @@ public class PlanEjecucionService {
      */
     public ResponseEntity<List<AlertaRapidaDto>> getAlertasRapidas(Long userId, LocalDate fechaBase, Integer dias) {
         try {
-            if (!usuarioRepository.existsById(userId)) {
-                throw new RequestException("No existe el usuario especificado");
+            // Si no hay usuario o no existe en BD, devolver lista vacía en lugar de 500
+            if (userId == null || !usuarioRepository.existsById(userId)) {
+                logger.warn("[PlanEjecucionService] getAlertasRapidas: usuario {} no existe. Devolviendo lista vacía de alertas.", userId);
+                return ResponseEntity.ok(new ArrayList<>());
             }
 
             LocalDate base = (fechaBase != null) ? fechaBase : LocalDate.now();
@@ -505,18 +518,21 @@ public class PlanEjecucionService {
         } catch (RequestException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("Error al obtener alertas rápidas: {}", e.getMessage());
-            throw new RequestException("Error al obtener alertas rápidas");
+            logger.error("Error al obtener alertas rápidas", e);
+            // Evitar propagar 500 al frontend del dashboard; devolver lista vacía y log detallado
+            return ResponseEntity.ok(new ArrayList<>());
         }
     }
     /**
      * Crear ejecución simple sin asignación específica (para casos edge)
      */
     private ResponseEntity<PlanEjecucion> crearEjecucionSimple(
-            String loteId, 
-            LocalDate fecha, 
-            Double cantidad, 
-            String observaciones, 
+            String loteId,
+            LocalDate fecha,
+            Double cantidad,
+            String observaciones,
+            Integer animalesVivos,
+            Integer animalesMuertos,
             Long userId) {
         
         logger.info("📝 Creando ejecución simple para lote sin asignación: {}", loteId);
@@ -526,10 +542,18 @@ public class PlanEjecucionService {
             Usuario usuario = resolverUsuarioEjecutor(userId);
             
             // Construir observaciones más informativas
-            String observacionesCompletas = String.format(
-                "REGISTRO MANUAL SIN ASIGNACIÓN - Lote: %s | Fecha: %s | Cantidad: %.2f kg | Observaciones: %s", 
+            String observacionesCompletasBase = String.format(
+                "REGISTRO MANUAL SIN ASIGNACIÓN - Lote: %s | Fecha: %s | Cantidad: %.2f kg | Observaciones: %s",
                 loteId, fecha, cantidad, (observaciones != null ? observaciones : "Sin observaciones")
             );
+            StringBuilder obsExtra = new StringBuilder();
+            if (animalesVivos != null && animalesVivos > 0) {
+                obsExtra.append(" Animales vivos: ").append(animalesVivos).append(";");
+            }
+            if (animalesMuertos != null && animalesMuertos > 0) {
+                obsExtra.append(" Mortalidad registrada: ").append(animalesMuertos).append(";");
+            }
+            String observacionesCompletas = (observacionesCompletasBase + (obsExtra.length() > 0 ? (" " + obsExtra.toString()) : "")).trim();
             
             // Crear un registro básico sin asignación específica
             // Ahora planAsignacion y planDetalle son nullable

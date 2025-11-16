@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, switchMap, of } from 'rxjs';
-import { Product, ProductFilter, Provider, TypeFood, UnitMeasurement, Animal, Stage, Category, NombreProducto } from '../models/product.model';
+import { Product, ProductFilter, Provider, TypeFood, UnitMeasurement, Animal, Stage, Category, NombreProducto, Subcategory } from '../models/product.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -16,6 +16,7 @@ export class ProductService {
   private animalUrl = `${environment.apiUrl}/api/animal`;
   private stageUrl = `${environment.apiUrl}/api/stage`;
   private categoryUrl = `${environment.apiUrl}/api/category`;
+  private subcategoryUrl = `${environment.apiUrl}/api/subcategory`;
   // Tentative endpoint for catálogo de nombres de productos (adjust if backend differs)
   private nombreProductoUrl = `${environment.apiUrl}/api/nombre-producto`;
 
@@ -59,7 +60,7 @@ export class ProductService {
   // Crear un nuevo producto - MEJORADO para buscar un ID de categoría válido
   createProduct(product: Product): Observable<Product> {
     // Crear un objeto simple con solo los datos básicos del producto
-    const productData = {
+    const productData: any = {
       name: product.name,
       description: (product as any)?.description || '',
       quantity: product.quantity,
@@ -71,6 +72,18 @@ export class ProductService {
       name_stage: '', // Aseguramos que este campo no sea nulo
       active: true    // Backend requiere este campo sin valor por defecto
     };
+
+    // Campos adicionales opcionales
+    if (product.subcategory_id) productData.subcategory = { id: Number(product.subcategory_id) };
+    if (product.incluirEnBotiquin != null) productData.incluirEnBotiquin = !!product.incluirEnBotiquin;
+    if (product.usoPrincipal) productData.usoPrincipal = product.usoPrincipal;
+    if (product.dosisRecomendada) productData.dosisRecomendada = product.dosisRecomendada;
+    if (product.viaAdministracion) productData.viaAdministracion = product.viaAdministracion;
+    if (product.tiempoRetiro != null) productData.tiempoRetiro = Number(product.tiempoRetiro);
+    if (product.fechaVencimiento) productData.fechaVencimiento = product.fechaVencimiento;
+    if (product.observacionesMedicas) productData.observacionesMedicas = product.observacionesMedicas;
+    if (product.presentacion) productData.presentacion = product.presentacion;
+    if (product.infoNutricional) productData.infoNutricional = product.infoNutricional;
 
     // Primero buscar una categoría válida
     return this.getCategories().pipe(
@@ -119,6 +132,11 @@ export class ProductService {
 
   getStages(): Observable<Stage[]> {
     return this.http.get<Stage[]>(this.stageUrl);
+  }
+
+  // Subcategorías por categoría (TypeFood)
+  getSubcategoriesByTypeFood(typeFoodId: number): Observable<Subcategory[]> {
+    return this.http.get<Subcategory[]>(`${this.subcategoryUrl}/by-category/${typeFoodId}`);
   }
 
   // =====================

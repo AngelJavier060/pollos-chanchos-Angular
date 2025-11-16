@@ -32,7 +32,3 @@ backend/uploads/
 
 # Cache de npm
 .npm/
-
-# Carpeta que no se debe subir a producción
-app_granjaelvita/
-**/app_granjaelvita/

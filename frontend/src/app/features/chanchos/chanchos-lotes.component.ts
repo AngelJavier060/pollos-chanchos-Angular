@@ -214,6 +214,41 @@ export class ChanchosLotesComponent implements OnInit {
     return Math.min(100, Math.round((diasVida / cicloCompleto) * 100));
   }
 
+  getRegistrados(lote: Lote): number {
+    if (lote.quantityOriginal != null && !isNaN(lote.quantityOriginal)) {
+      return lote.quantityOriginal;
+    }
+    return lote.quantity;
+  }
+
+  getBajasTotales(lote: Lote): number {
+    const registrados = this.getRegistrados(lote);
+    const bajas = registrados - lote.quantity;
+    return bajas > 0 ? bajas : 0;
+  }
+
+  getPorcentajeBajas(lote: Lote): number {
+    const registrados = this.getRegistrados(lote);
+    const bajas = this.getBajasTotales(lote);
+    if (!registrados || registrados <= 0) {
+      return 0;
+    }
+    return Math.round((bajas / registrados) * 100);
+  }
+
+  getTotalSexo(lote: Lote): number {
+    const machos = lote.maleCount != null ? lote.maleCount : 0;
+    const hembras = lote.femaleCount != null ? lote.femaleCount : 0;
+    return machos + hembras;
+  }
+
+  getPorcentajeSexo(valor: number, total: number): number {
+    if (!total || total <= 0) {
+      return 0;
+    }
+    return Math.round((valor / total) * 100);
+  }
+
   /**
    * TrackBy para optimizar rendering
    */

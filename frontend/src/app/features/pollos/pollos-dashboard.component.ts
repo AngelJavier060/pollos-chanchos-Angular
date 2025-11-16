@@ -17,6 +17,7 @@ export class PollosDashboardComponent implements OnInit, OnDestroy {
   user: User | null = null;
   isUserMenuOpen = false;
   isSidebarCollapsed = false;
+  isDarkMode = false; // Tema claro/oscuro
   pageTitle: string = '';
 
   // Estadísticas en tiempo real
@@ -103,6 +104,13 @@ export class PollosDashboardComponent implements OnInit, OnDestroy {
   toggleSidebarCollapse(): void {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
     // Aquí podrías agregar lógica para persistir la preferencia del usuario
+  }
+
+  /**
+   * Toggle del tema claro/oscuro
+   */
+  toggleTheme(): void {
+    this.isDarkMode = !this.isDarkMode;
   }
 
   /**

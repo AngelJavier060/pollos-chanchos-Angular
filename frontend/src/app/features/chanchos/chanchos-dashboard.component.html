@@ -1,208 +1,80 @@
 <!-- Layout principal con sidebar -->
-<div class="chanchos-dashboard-layout flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+<div class="chanchos-dashboard-layout flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" [class.dark-mode]="isDarkMode">
   <!-- SIDEBAR PROFESIONAL -->
-  <aside class="sidebar w-80 bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col border-r border-gray-200 relative overflow-hidden">
+  <aside class="sidebar bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col border-r border-gray-200 relative overflow-hidden"
+         [ngClass]="{ 'collapsed': isSidebarCollapsed }"
+         [class.w-80]="!isSidebarCollapsed"
+         [class.w-20]="isSidebarCollapsed">
     <!-- Efecto de fondo decorativo -->
     <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-pink-400/10 to-rose-400/10 rounded-full -translate-y-16 translate-x-16"></div>
     <div class="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-pink-400/10 to-purple-400/10 rounded-full translate-y-12 -translate-x-12"></div>
     
-    <!-- Header del Usuario -->
-    <div class="relative z-10 p-6 border-b border-gray-100 bg-gradient-to-r from-pink-50 to-rose-50">
-      <div class="flex flex-col items-center text-center space-y-3">
-        <!-- Avatar con indicador de estado -->
-        <div class="relative">
-          <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" 
-               alt="Avatar" 
-               class="h-16 w-16 rounded-full border-3 border-pink-400 shadow-lg ring-4 ring-pink-100 transition-transform hover:scale-105">
-          <div class="absolute -bottom-1 -right-1 h-5 w-5 bg-green-400 border-2 border-white rounded-full shadow-sm animate-pulse"></div>
-        </div>
-        
-        <!-- Información del usuario -->
-        <div class="space-y-1">
-          <h3 class="font-bold text-lg text-gray-800 tracking-tight">{{ user?.name || user?.username }}</h3>
-          <p class="text-sm text-gray-600 font-medium">{{ user?.email }}</p>
-          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-800 border border-pink-200">
-            <i class="fas fa-pig mr-1 text-pink-600"></i>
-            {{ user?.roles?.[0] }}
-          </span>
+    <!-- Tarjeta de Perfil (igual a Pollos) -->
+    <div class="profile-card p-4">
+      <div class="profile-card__inner">
+        <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="avatar" />
+        <div class="info" *ngIf="!isSidebarCollapsed">
+          <div class="name">{{ user?.name || user?.username }}</div>
+          <div class="role">{{ (user?.roles?.[0] || 'Usuario') | titlecase }}</div>
         </div>
       </div>
-      
-      <!-- Mini Dashboard en el Sidebar -->
-      <div class="mt-4 grid grid-cols-2 gap-3">
-        <div class="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="flex items-center space-x-2">
-            <div class="p-2 bg-pink-100 rounded-lg">
-              <i class="fas fa-pig text-pink-600 text-sm"></i>
-            </div>
-            <div>
-              <p class="text-xs text-gray-500 font-medium">Lotes Activos</p>
-              <p class="text-lg font-bold text-gray-800">{{ getSidebarStats().lotesActivos }}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="flex items-center space-x-2">
-            <div class="p-2 bg-rose-100 rounded-lg">
-              <i class="fas fa-chart-line text-rose-600 text-sm"></i>
-            </div>
-            <div>
-              <p class="text-xs text-gray-500 font-medium">Total Chanchos</p>
-              <p class="text-lg font-bold text-gray-800">{{ getSidebarStats().totalChanchos }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div class="divider" *ngIf="!isSidebarCollapsed"></div>
     </div>
 
-    <!-- Navegación Principal -->
+    <!-- Navegación simple del Sidebar (igual a Pollos) -->
     <nav class="flex-1 p-4 space-y-2">
-      <div class="mb-4">
-        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">PANEL PRINCIPAL</h4>
-        
-        <ul class="space-y-1">
-          <li>
-            <a routerLink="dashboard" 
-               routerLinkActive="active"
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-pink-50 hover:to-rose-50 hover:text-pink-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-pink-100 text-pink-600 group-hover:bg-pink-200 transition-colors mr-3">
-                <i class="fas fa-chart-line text-sm"></i>
-              </div>
-              <span class="flex-1">Dashboard</span>
-              <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
-            </a>
-          </li>
-          
-          <li>
-            <a routerLink="alimentacion" routerLinkActive="active"
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 hover:text-green-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors mr-3">
-                <i class="fas fa-utensils text-sm"></i>
-              </div>
-              <span class="flex-1">Alimentación</span>
-              <span class="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">{{ getTareasPendientes() }}</span>
-            </a>
-          </li>
-          
-          <li>
-            <a routerLink="lotes" routerLinkActive="active"
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors mr-3">
-                <i class="fas fa-clipboard-list text-sm"></i>
-              </div>
-              <span class="flex-1">Lotes</span>
-              <span class="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">{{ getSidebarStats().lotesActivos }}</span>
-            </a>
-          </li>
-          
-          <li>
-            <a routerLink="historico" routerLinkActive="active"
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-200 transition-colors mr-3">
-                <i class="fas fa-archive text-sm"></i>
-              </div>
-              <span class="flex-1">Histórico</span>
-              <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
-            </a>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Sección de Gestión -->
-      <div class="mb-4">
-        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">GESTIÓN</h4>
-        
-        <ul class="space-y-1">
-          <li>
-            <a href="#" 
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 hover:text-orange-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-orange-100 text-orange-600 group-hover:bg-orange-200 transition-colors mr-3">
-                <i class="fas fa-warehouse text-sm"></i>
-              </div>
-              <span class="flex-1">Inventario</span>
-              <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
-            </a>
-          </li>
-          
-          <li>
-            <a href="#" 
-               class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-teal-50 hover:to-cyan-50 hover:text-teal-700 transition-all duration-200 font-medium">
-              <div class="p-2 rounded-lg bg-teal-100 text-teal-600 group-hover:bg-teal-200 transition-colors mr-3">
-                <i class="fas fa-dollar-sign text-sm"></i>
-              </div>
-              <span class="flex-1">Finanzas</span>
-              <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
-            </a>
-          </li>
-        </ul>
-      </div>
+      <ul class="space-y-1">
+        <li>
+          <a routerLink="dashboard" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-chart-line text-sm mr-3"></i>
+            <span class="flex-1">Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="alimentacion" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-utensils text-sm mr-3"></i>
+            <span class="flex-1">Alimentación</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="lotes" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-clipboard-list text-sm mr-3"></i>
+            <span class="flex-1">Lotes</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="historico" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-archive text-sm mr-3"></i>
+            <span class="flex-1">Histórico</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="mortalidad" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-exclamation-triangle text-sm mr-3"></i>
+            <span class="flex-1">Mortalidad</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="morbilidad" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-stethoscope text-sm mr-3"></i>
+            <span class="flex-1">Morbilidad</span>
+          </a>
+        </li>
+        <li *ngIf="isAdmin()">
+          <a routerLink="inventario" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
+            <i class="fas fa-warehouse text-sm mr-3"></i>
+            <span class="flex-1">Inventario</span>
+          </a>
+        </li>
+      </ul>
     </nav>
-
-    <!-- Métricas en Tiempo Real -->
-    <div class="p-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">ESTADO HOY</h4>
-      
-      <div class="space-y-3">
-        <!-- Progreso de Alimentación -->
-        <div class="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-gray-700">Alimentación</span>
-            <span class="text-xs text-green-600 font-semibold">{{ getAlimentacionProgress() }}%</span>
-          </div>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500" 
-                 [style.width.%]="getAlimentacionProgress()"></div>
-          </div>
-        </div>
-        
-        <!-- Indicador de Salud General -->
-        <div class="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <div class="p-1.5 bg-green-100 rounded-full">
-                <i class="fas fa-heart text-green-600 text-xs"></i>
-              </div>
-              <span class="text-sm font-medium text-gray-700">Salud General</span>
-            </div>
-            <span class="text-xs font-semibold text-green-600">{{ getSaludGeneral() }}</span>
-          </div>
-        </div>
-        
-        <!-- Alerta de Tareas -->
-        <div class="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <div class="p-1.5 bg-yellow-100 rounded-full">
-                <i class="fas fa-bell text-yellow-600 text-xs"></i>
-              </div>
-              <span class="text-sm font-medium text-gray-700">Tareas Pendientes</span>
-            </div>
-            <span class="text-xs font-semibold text-yellow-600">{{ getTareasPendientes() }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer del Sidebar -->
-    <div class="p-4 border-t border-gray-100 bg-gradient-to-r from-white to-gray-50">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-2">
-          <div class="p-2 bg-gray-100 rounded-lg">
-            <i class="fas fa-cog text-gray-600 text-sm"></i>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Configuración</p>
-            <p class="text-xs font-semibold text-gray-700">Sistema v2.1</p>
-          </div>
-        </div>
-        
-        <button (click)="toggleSidebarCollapse()" 
-                class="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <i class="fas fa-chevron-left text-gray-500 text-sm"></i>
-        </button>
-      </div>
-    </div>
   </aside>
 
   <!-- CONTENIDO PRINCIPAL -->
@@ -221,6 +93,11 @@
         
         <!-- Acciones Rápidas -->
         <div class="flex items-center space-x-4">
+          <!-- Toggle Sidebar -->
+          <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" (click)="toggleSidebarCollapse()" title="Colapsar/Expandir menú">
+            <i class="fas text-gray-600" [ngClass]="{ 'fa-bars': isSidebarCollapsed, 'fa-chevron-left': !isSidebarCollapsed }"></i>
+          </button>
+          
           <!-- Notificaciones -->
           <button class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
             <i class="fas fa-bell text-gray-600"></i>
@@ -300,4 +177,9 @@
       <router-outlet></router-outlet>
     </div>
   </main>
+
+  <!-- Botón flotante para cambiar tema -->
+  <button class="theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
+    <i [class]="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+  </button>
 </div> 

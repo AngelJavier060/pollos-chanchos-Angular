@@ -14,6 +14,7 @@ export class ChanchosDashboardComponent implements OnInit, OnDestroy {
   user: User | null = null;
   isUserMenuOpen = false;
   isSidebarCollapsed = false;
+  isDarkMode = false; // Tema claro/oscuro
 
   // Estadísticas en tiempo real
   sidebarStats = {
@@ -89,6 +90,21 @@ export class ChanchosDashboardComponent implements OnInit, OnDestroy {
    */
   toggleSidebarCollapse(): void {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
+  }
+
+  /**
+   * Toggle del tema claro/oscuro
+   */
+  toggleTheme(): void {
+    this.isDarkMode = !this.isDarkMode;
+  }
+
+  /**
+   * Verificar si el usuario es ADMIN (para mostrar opciones como Inventario)
+   */
+  isAdmin(): boolean {
+    const roles = this.user?.roles || [];
+    return roles.includes('ROLE_ADMIN') || roles.includes('ADMIN');
   }
 
   /**

@@ -63,6 +63,19 @@ public class Lote {
     @JoinColumn(name = "race_id")
     private Race race;
     
+    // Campos específicos para chanchos - distribución por sexo y propósito
+    @Column(name = "male_count")
+    private Integer maleCount; // Cantidad de machos
+    
+    @Column(name = "female_count")
+    private Integer femaleCount; // Cantidad de hembras
+    
+    @Column(name = "male_purpose", length = 50)
+    private String malePurpose; // Propósito de los machos: engorde, reproduccion, etc.
+    
+    @Column(name = "female_purpose", length = 50)
+    private String femalePurpose; // Propósito de las hembras: engorde, reproduccion, etc.
+    
     // Este campo no se persiste, solo se usa durante la generación del código
     @Transient
     private static final String PREFIJO_POLLO = "00";

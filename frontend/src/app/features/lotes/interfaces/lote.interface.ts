@@ -15,4 +15,9 @@ export interface Lote {
   race: Race;
   // Añadimos animal_id opcional por si necesitas usar la relación directa con Animal
   race_animal_id?: number;
+  // Distribución por sexo (solo chanchos)
+  maleCount?: number;
+  femaleCount?: number;
+  malePurpose?: string;   // engorde | reproduccion | venta, etc.
+  femalePurpose?: string; // engorde | reproduccion | venta, etc.
 }

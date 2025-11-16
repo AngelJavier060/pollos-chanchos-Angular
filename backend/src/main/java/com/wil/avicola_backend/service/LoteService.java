@@ -64,6 +64,23 @@ public class LoteService {
             lote.setQuantityOriginal(lote.getQuantity());
         }
         
+        // Validación de distribución por sexo para chanchos
+        if (lote.getMaleCount() != null || lote.getFemaleCount() != null) {
+            int maleCount = lote.getMaleCount() != null ? lote.getMaleCount() : 0;
+            int femaleCount = lote.getFemaleCount() != null ? lote.getFemaleCount() : 0;
+            
+            if (maleCount + femaleCount != lote.getQuantity()) {
+                throw new RequestException(
+                    "La suma de machos (" + maleCount + ") y hembras (" + femaleCount + 
+                    ") debe ser igual a la cantidad total (" + lote.getQuantity() + ")"
+                );
+            }
+            
+            if (maleCount < 0 || femaleCount < 0) {
+                throw new RequestException("Las cantidades de machos y hembras no pueden ser negativas");
+            }
+        }
+        
         // Generamos el código secuencial según el tipo de animal
         String codigo = codigoLoteService.generarCodigoLote(raza);
         lote.setCodigo(codigo);
@@ -92,6 +109,20 @@ public class LoteService {
             // Solo establecemos quantityOriginal si no existe (para lotes creados antes de esta funcionalidad)
             if (lote_old.getQuantityOriginal() == null && lote.getQuantityOriginal() == null) {
                 lote_old.setQuantityOriginal(lote.getQuantity());
+            }
+            
+            // Actualizar campos de distribución por sexo para chanchos (si vienen informados)
+            if (lote.getMaleCount() != null) {
+                lote_old.setMaleCount(lote.getMaleCount());
+            }
+            if (lote.getFemaleCount() != null) {
+                lote_old.setFemaleCount(lote.getFemaleCount());
+            }
+            if (lote.getMalePurpose() != null && !lote.getMalePurpose().trim().isEmpty()) {
+                lote_old.setMalePurpose(lote.getMalePurpose().trim());
+            }
+            if (lote.getFemalePurpose() != null && !lote.getFemalePurpose().trim().isEmpty()) {
+                lote_old.setFemalePurpose(lote.getFemalePurpose().trim());
             }
             
             // Mantenemos el código original, no lo modificamos al actualizar

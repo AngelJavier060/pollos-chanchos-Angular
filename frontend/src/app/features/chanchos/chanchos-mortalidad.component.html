@@ -1,0 +1,230 @@
+<div class="mortalidad-container max-w-7xl mx-auto p-6">
+  <!-- Header Principal -->
+  <div class="header-section mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-red-900 mb-2">
+          <i class="fas fa-skull mr-3 text-red-600"></i>
+          Control de Mortalidad (Chanchos)
+        </h1>
+        <p class="text-gray-600">Registro y seguimiento detallado de mortalidad en lotes de chanchos</p>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <button (click)="exportarDatos()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-download mr-2"></i>
+          Exportar Datos
+        </button>
+        <button (click)="cargarDatosIniciales()" class="refresh-btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadísticas Principales -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-red-600 text-sm font-medium mb-1">Total Muertes</p>
+          <p class="text-3xl font-bold text-red-900">{{ estadisticas?.totalMuertes || 0 }}</p>
+        </div>
+        <div class="p-3 bg-red-200 rounded-lg">
+          <i class="fas fa-skull text-red-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-orange-600 text-sm font-medium mb-1">Lotes Afectados</p>
+          <p class="text-3xl font-bold text-orange-900">{{ estadisticas?.totalLotes || 0 }}</p>
+        </div>
+        <div class="p-3 bg-orange-200 rounded-lg">
+          <i class="fas fa-clipboard-list text-orange-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-yellow-600 text-sm font-medium mb-1">Tasa Promedio</p>
+          <p class="text-3xl font-bold text-yellow-900">{{ (estadisticas?.tasaPromedioMortalidad || 0).toFixed(1) }}%</p>
+        </div>
+        <div class="p-3 bg-yellow-200 rounded-lg">
+          <i class="fas fa-percentage text-yellow-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-blue-600 text-sm font-medium mb-1">Alertas Activas</p>
+          <p class="text-3xl font-bold text-blue-900">{{ estadisticas?.alertas?.length || 0 }}</p>
+        </div>
+        <div class="p-3 bg-blue-200 rounded-lg">
+          <i class="fas fa-exclamation-triangle text-blue-600 text-xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alertas Importantes -->
+  <div *ngIf="estadisticas?.alertas?.length && estadisticas.alertas.length > 0" class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🚨 Alertas y Notificaciones</h3>
+    <div class="space-y-3">
+      <div *ngFor="let alerta of estadisticas?.alertas || []" class="p-4 rounded-lg border" [ngClass]="getClaseAlerta(alerta.tipo)">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+              <p class="font-medium">{{ alerta.titulo }}</p>
+              <p class="text-sm">{{ alerta.mensaje }}</p>
+            </div>
+          </div>
+          <span class="px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-50">{{ alerta.tipo.toUpperCase() }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros y Búsqueda -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros y Búsqueda</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Fecha desde:</label>
+        <input type="date" [(ngModel)]="filtroFechaInicio" (change)="aplicarFiltros()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Causa de mortalidad:</label>
+        <select [(ngModel)]="filtroCausa" (change)="aplicarFiltros()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Todas las causas</option>
+          <option *ngFor="let causa of causasMortalidad" [value]="causa.nombre">{{ causa.nombre }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Buscar lote:</label>
+        <input type="text" placeholder="Código del lote..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Principales Causas de Mortalidad -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Principales Causas</h3>
+      <div class="space-y-4">
+        <div *ngFor="let causa of estadisticas?.principalesCausas || []" class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex justify-between mb-1">
+              <span class="text-sm font-medium text-gray-700">{{ causa.causa }}</span>
+              <span class="text-sm text-gray-500">{{ causa.cantidad }} muertes</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-red-500 h-2 rounded-full transition-all duration-500" [style.width.%]="causa.porcentaje || 0"></div>
+            </div>
+          </div>
+          <span class="ml-4 text-sm font-semibold text-red-600">{{ (causa.porcentaje || 0).toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📈 Tendencia Semanal</h3>
+      <div class="space-y-3">
+        <div *ngFor="let dia of estadisticas?.tendenciaSemanal || []" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <span class="text-sm font-medium text-gray-700">{{ dia.fecha | date:'dd/MM' }}</span>
+          <div class="flex items-center space-x-2">
+            <div class="w-16 bg-gray-200 rounded-full h-2">
+              <div class="bg-red-500 h-2 rounded-full" [style.width.%]="dia.muertes * 10"></div>
+            </div>
+            <span class="text-sm font-semibold text-red-600">{{ dia.muertes }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial de Registros -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-800">📋 Registros de Mortalidad</h3>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Muertes</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Causa</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let registro of getRegistrosFiltrados()" class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ registro.fechaRegistro | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ getNombreLote(registro.loteId) }}</td>
+            <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-bold">{{ registro.cantidadMuertos || 0 }}</span></td>
+            <td class="px-6 py-4 text-sm text-gray-900">
+              <span *ngIf="registro.causa?.nombre" class="text-gray-700">{{ registro.causa.nombre }}</span>
+              <span *ngIf="!registro.causa?.nombre" class="text-gray-400 italic">Sin especificar</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <button *ngIf="!registro.causa?.nombre" (click)="abrirModalCausa(registro)" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">Agregar Causa</button>
+              <span *ngIf="registro.causa?.nombre" class="text-green-600 text-xs">✓ Completo</span>
+            </td>
+          </tr>
+          <tr *ngIf="getRegistrosFiltrados().length === 0">
+            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+              <i class="fas fa-inbox text-4xl mb-2 text-gray-300"></i>
+              <p>No se encontraron registros de mortalidad</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+
+  <!-- Modal Simple para Agregar Causa -->
+  <div *ngIf="mostrarModalCausa" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" (click)="cerrarModalCausa()"></div>
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10"><i class="fas fa-clipboard-list text-blue-600"></i></div>
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+              <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Agregar Causa de Mortalidad</h3>
+              <div class="mt-4">
+                <p class="text-sm text-gray-500 mb-4">Selecciona la causa de muerte para el registro del {{ registroSeleccionado?.fechaRegistro | date:'dd/MM/yyyy' }}</p>
+                <div class="space-y-2">
+                  <button *ngFor="let causa of causasMortalidad" (click)="guardarCausa(causa.id)" class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="flex items-center">
+                      <div class="w-3 h-3 rounded-full mr-3" [style.background-color]="causa.color"></div>
+                      <div>
+                        <div class="font-medium text-gray-900">{{ causa.nombre }}</div>
+                        <div class="text-sm text-gray-500">{{ causa.descripcion }}</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <button type="button" (click)="cerrarModalCausa()" class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

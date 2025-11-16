@@ -25,6 +25,17 @@ export class LotesComponent implements OnInit {
   loading: boolean = false;
   errorMessage: string = '';
   showForm: boolean = false;
+  // Distribución por sexo (solo chanchos)
+  showDistribucionChanchos: boolean = false;
+  distribucionError: string = '';
+  
+  // Opciones de descripción según tipo de animal
+  opcionesDescripcion: string[] = [];
+  
+  // Posición del formulario flotante
+  tablePanelPosition = { x: 0, y: 0 };
+  private isTableDragging = false;
+  private tableDragStart = { x: 0, y: 0 };
   
   // Tabs
   activeTab: 'activos' | 'historico' = 'activos';
@@ -65,15 +76,88 @@ export class LotesComponent implements OnInit {
     this.initForm();
   }
 
-  // Construir lista de especies únicas a partir de races
-  private buildAnimalOptionsFromRaces(): void {
-    const map = new Map<number, string>();
-    this.races.forEach(r => {
-      if (r.animal?.id && r.animal.name) {
-        map.set(r.animal.id, r.animal.name);
-      }
-    });
-    this.animalOptions = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  // Métodos para arrastre del formulario flotante
+  onTableDragStart(event: MouseEvent | TouchEvent): void {
+    this.isTableDragging = true;
+    const clientX = event instanceof MouseEvent ? event.clientX : event.touches[0].clientX;
+    const clientY = event instanceof MouseEvent ? event.clientY : event.touches[0].clientY;
+    
+    this.tableDragStart = {
+      x: clientX - this.tablePanelPosition.x,
+      y: clientY - this.tablePanelPosition.y
+    };
+    
+    if (event instanceof TouchEvent) {
+      event.preventDefault();
+    }
+  }
+  
+  onTableDragMove(event: MouseEvent | TouchEvent): void {
+    if (!this.isTableDragging) return;
+    
+    const clientX = event instanceof MouseEvent ? event.clientX : event.touches[0].clientX;
+    const clientY = event instanceof MouseEvent ? event.clientY : event.touches[0].clientY;
+    
+    this.tablePanelPosition = {
+      x: clientX - this.tableDragStart.x,
+      y: clientY - this.tableDragStart.y
+    };
+    
+    if (event instanceof TouchEvent) {
+      event.preventDefault();
+    }
+  }
+  
+  onTableDragEnd(event: MouseEvent | TouchEvent): void {
+    this.isTableDragging = false;
+  }
+  
+  // Validar distribución por sexo
+  validarDistribucion(): void {
+    if (!this.showDistribucionChanchos) { 
+      this.distribucionError = ''; 
+      return; 
+    }
+    
+    const male = Number(this.loteForm.get('maleCount')?.value || 0);
+    const female = Number(this.loteForm.get('femaleCount')?.value || 0);
+    
+    // Validar que no sean negativos
+    if (male < 0 || female < 0) {
+      this.distribucionError = 'Las cantidades no pueden ser negativas.';
+    } else if (male === 0 && female === 0) {
+      this.distribucionError = 'Debe ingresar al menos un macho o una hembra.';
+    } else {
+      this.distribucionError = '';
+    }
+  }
+
+  // Actualizar opciones de descripción según el tipo de animal
+  actualizarOpcionesDescripcion(animalName: string): void {
+    const esPollo = animalName.includes('pollo') || animalName.includes('ave') || animalName.includes('gallina');
+    const esChancho = animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porc');
+    
+    if (esPollo) {
+      this.opcionesDescripcion = [
+        'Compra de pollos vivos',
+        'Se encubaron',
+        'Sacó crías la gallina'
+      ];
+    } else if (esChancho) {
+      this.opcionesDescripcion = [
+        'Compra de chanchos',
+        'Sacaron crías por parto'
+      ];
+    } else {
+      // Opciones genéricas para otros animales
+      this.opcionesDescripcion = [
+        'Compra',
+        'Reproducción propia'
+      ];
+    }
+    
+    // Limpiar el campo descripción cuando cambia el animal
+    this.loteForm.patchValue({ descripcion: '' }, { emitEvent: false });
   }
 
   private initForm(): void {
@@ -83,7 +167,12 @@ export class LotesComponent implements OnInit {
       quantity: ['', [Validators.required, Validators.min(1)]],
       birthdate: ['', [Validators.required]],
       cost: ['', [Validators.required, Validators.min(0)]],
-      raceId: ['', [Validators.required]]
+      raceId: ['', [Validators.required]],
+      // Campos opcionales para chanchos
+      maleCount: [null],
+      femaleCount: [null],
+      malePurpose: [''],
+      femalePurpose: ['']
     });
   }
 
@@ -92,6 +181,62 @@ export class LotesComponent implements OnInit {
     this.loadAndValidateRaces();
     // Cargar resumen inicial (general)
     this.loadResumen();
+
+    // Event listeners para arrastre del formulario flotante
+    document.addEventListener('mousemove', (e) => {
+      this.onTableDragMove(e);
+    });
+    document.addEventListener('mouseup', (e) => {
+      this.onTableDragEnd(e);
+    });
+    document.addEventListener('touchmove', (e) => {
+      this.onTableDragMove(e);
+    }, { passive: false });
+    document.addEventListener('touchend', (e) => {
+      this.onTableDragEnd(e);
+    });
+
+    // Reaccionar al cambio de raza para mostrar distribución cuando sea chanchos
+    this.loteForm.get('raceId')?.valueChanges.subscribe((val) => {
+      const raceId = Number(val);
+      const r = this.races.find(x => x.id === raceId);
+      const animalName = r?.animal?.name?.toLowerCase() || '';
+      const esChancho = animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porc');
+      this.showDistribucionChanchos = esChancho;
+      
+      // Actualizar opciones de descripción según el animal
+      this.actualizarOpcionesDescripcion(animalName);
+      
+      // Habilitar/deshabilitar campo cantidad según si es chancho
+      const quantityControl = this.loteForm.get('quantity');
+      if (this.showDistribucionChanchos) {
+        quantityControl?.disable({ emitEvent: false });
+        quantityControl?.setValue(0, { emitEvent: false });
+      } else {
+        quantityControl?.enable({ emitEvent: false });
+      }
+      
+      // Limpiar y validar
+      if (!this.showDistribucionChanchos) {
+        this.loteForm.patchValue({ maleCount: null, femaleCount: null, malePurpose: '', femalePurpose: '' }, { emitEvent: false });
+        this.distribucionError = '';
+      }
+      this.validarDistribucion();
+    });
+
+    // Calcular cantidad automáticamente cuando cambian machos o hembras
+    const calcularCantidadTotal = () => {
+      if (this.showDistribucionChanchos) {
+        const male = Number(this.loteForm.get('maleCount')?.value || 0);
+        const female = Number(this.loteForm.get('femaleCount')?.value || 0);
+        const total = male + female;
+        this.loteForm.patchValue({ quantity: total }, { emitEvent: false });
+        this.validarDistribucion();
+      }
+    };
+    
+    this.loteForm.get('maleCount')?.valueChanges.subscribe(() => calcularCantidadTotal());
+    this.loteForm.get('femaleCount')?.valueChanges.subscribe(() => calcularCantidadTotal());
   }
 
   // Cambio de pestaña con carga automática
@@ -117,9 +262,15 @@ export class LotesComponent implements OnInit {
     if (!this.showForm) {
       this.resetForm();
     } else {
+      // Seleccionar la primera raza y actualizar opciones
+      const primeraRaza = this.races[0];
       this.loteForm.patchValue({
-        raceId: this.races[0].id
+        raceId: primeraRaza.id
       });
+      
+      // Inicializar opciones de descripción
+      const animalName = primeraRaza.animal?.name?.toLowerCase() || '';
+      this.actualizarOpcionesDescripcion(animalName);
     }
   }
 
@@ -180,6 +331,34 @@ export class LotesComponent implements OnInit {
     }
   }
 
+  private buildAnimalOptionsFromRaces(): void {
+    // Construir opciones de animales desde las razas cargadas
+    const animalsMap = new Map<string, { id: string; nombre: string; color: string }>();
+    
+    this.races.forEach(race => {
+      if (race.animal?.id && race.animal?.name) {
+        const animalId = race.animal.id.toString();
+        if (!animalsMap.has(animalId)) {
+          animalsMap.set(animalId, {
+            id: animalId,
+            nombre: race.animal.name,
+            color: this.getColorForAnimal(race.animal.name)
+          });
+        }
+      }
+    });
+    
+    this.tiposAnimales = Array.from(animalsMap.values());
+  }
+
+  private getColorForAnimal(animalName: string): string {
+    const name = animalName.toLowerCase();
+    if (name.includes('pollo')) return '#f59e0b';
+    if (name.includes('chancho') || name.includes('cerdo')) return '#ec4899';
+    if (name.includes('pato')) return '#3b82f6';
+    return '#6b7280';
+  }
+
   checkDuplicateNameAndSubmit(): void {
     if (this.loteForm.valid) {
       this.loading = true;
@@ -230,7 +409,8 @@ export class LotesComponent implements OnInit {
   }
 
   private submitForm(): void {
-    const loteData = this.loteForm.value;
+    // Usar getRawValue() para obtener también los campos deshabilitados
+    const loteData = this.loteForm.getRawValue();
     const raceId = Number(loteData.raceId);
     
     const selectedRace = this.races.find(race => race.id === raceId);
@@ -244,6 +424,15 @@ export class LotesComponent implements OnInit {
       race: selectedRace,
       race_animal_id: selectedRace.animal.id
     };
+
+    if (this.showDistribucionChanchos) {
+      const male = Number(loteData.maleCount || 0);
+      const female = Number(loteData.femaleCount || 0);
+      loteToSave.maleCount = male;
+      loteToSave.femaleCount = female;
+      loteToSave.malePurpose = (loteData.malePurpose || '').toString();
+      loteToSave.femalePurpose = (loteData.femalePurpose || '').toString();
+    }
 
     if (this.isEditing && this.currentLoteId) {
       loteToSave.id = this.currentLoteId;
@@ -347,14 +536,36 @@ export class LotesComponent implements OnInit {
   }
 
   editLote(lote: Lote): void {
+    // Actualizar opciones de descripción según el animal del lote
+    const animalName = lote.race?.animal?.name?.toLowerCase() || '';
+    this.actualizarOpcionesDescripcion(animalName);
+    
+    // Determinar si es chancho para habilitar/deshabilitar cantidad
+    const esChancho = animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porc');
+    this.showDistribucionChanchos = esChancho;
+    
     this.loteForm.patchValue({
       name: lote.name,
       descripcion: (lote as any)?.descripcion || '',
       quantity: lote.quantity,
       birthdate: this.formatDate(lote.birthdate),
       cost: lote.cost,
-      raceId: lote.race.id
+      raceId: lote.race.id,
+      // Campos de distribución por sexo para chanchos
+      maleCount: lote.maleCount || null,
+      femaleCount: lote.femaleCount || null,
+      malePurpose: lote.malePurpose || '',
+      femalePurpose: lote.femalePurpose || ''
     });
+    
+    // Habilitar/deshabilitar campo cantidad según si es chancho
+    const quantityControl = this.loteForm.get('quantity');
+    if (this.showDistribucionChanchos) {
+      quantityControl?.disable({ emitEvent: false });
+    } else {
+      quantityControl?.enable({ emitEvent: false });
+    }
+    
     this.isEditing = true;
     this.currentLoteId = lote.id || null;
     this.showForm = true;
@@ -365,6 +576,12 @@ export class LotesComponent implements OnInit {
     this.isEditing = false;
     this.currentLoteId = null;
     this.errorMessage = '';
+    this.showDistribucionChanchos = false;
+    this.distribucionError = '';
+    this.opcionesDescripcion = [];
+    
+    // Habilitar el campo cantidad al resetear
+    this.loteForm.get('quantity')?.enable({ emitEvent: false });
   }
 
   private showFormErrors(): void {
@@ -387,13 +604,23 @@ export class LotesComponent implements OnInit {
   filtrarPorTipoAnimal(tipo: string): void {
     this.filtroAnimalActual = tipo;
     const base = this.lotes.filter(l => (Number(l.quantity) || 0) > 0);
+    
     if (tipo === 'all') {
       this.lotesFiltrados = base;
     } else {
-      this.lotesFiltrados = base.filter(lote => 
-        lote.race?.animal?.name?.toLowerCase() === tipo.toLowerCase()
-      );
+      // Filtrado flexible: busca coincidencias en el nombre del animal
+      this.lotesFiltrados = base.filter(lote => {
+        if (!lote.race?.animal?.name) return false;
+        
+        const animalName = lote.race.animal.name.toLowerCase();
+        const tipoLower = tipo.toLowerCase();
+        
+        // Coincidencia exacta o parcial
+        return animalName.includes(tipoLower) || tipoLower.includes(animalName);
+      });
     }
+    
+    console.log(`Filtrado por "${tipo}": ${this.lotesFiltrados.length} de ${base.length} lotes`);
   }
   
   // Método para identificar todos los tipos de animales en los lotes

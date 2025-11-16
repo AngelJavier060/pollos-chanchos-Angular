@@ -15,10 +15,11 @@ import com.wil.avicola_backend.model.Product;
 import com.wil.avicola_backend.repository.ProductRepository;
 
 /**
- * ✅ SERVICIO SIMPLIFICADO PARA PLAN ALIMENTACIÓN
- * Solo maneja movimientos_inventario_producto - Sin sistemas obsoletos
+ * ✅ SERVICIO FEFO ESTRICTO PARA PLAN ALIMENTACIÓN
+ * ÚNICA FUENTE DE VERDAD: inventario_entrada_producto (FEFO)
  * 
- * SOLUCIONA: Error 400 Bad Request en sanitizarInventario()
+ * CAMBIO PROFESIONAL: Todo el stock DEBE estar en entradas FEFO
+ * NO hay fallback a consolidado - Trazabilidad completa
  */
 @Service("planAlimentacionServiceSimplificado")
 public class PlanAlimentacionServiceSimplificado {
@@ -130,66 +131,20 @@ public class PlanAlimentacionServiceSimplificado {
                 ));
             }
 
-            // ⚠️ Compatibilidad: si no hay entradas, intentar consumo consolidado clásico
-            BigDecimal stockActual = inventarioSimplificadoService.obtenerStockActual(productId);
-            if (stockActual == null) stockActual = BigDecimal.ZERO;
-
-            // Auto-inicializar inventario si no existe o está en 0 y el producto tiene quantity > 0
-            if (stockActual.compareTo(BigDecimal.ZERO) <= 0) {
-                try {
-                    int qtyProducto = producto.getQuantity();
-                    if (qtyProducto > 0) {
-                        System.out.println("ℹ️ Inicializando inventario de producto " + productId + " con Product.quantity=" + qtyProducto);
-                        inventarioSimplificadoService.registrarEntradaStock(
-                            productId,
-                            new BigDecimal(qtyProducto),
-                            "Inicialización automática desde Product.quantity (modo estricto)",
-                            usuarioRegistro
-                        );
-                        stockActual = inventarioSimplificadoService.obtenerStockActual(productId);
-                        if (stockActual == null) stockActual = BigDecimal.ZERO;
-                    }
-                } catch (Exception initEx) {
-                    System.err.println("⚠️ Error intentando inicializar inventario: " + initEx.getMessage());
-                }
-            }
-
-            if (stockActual.compareTo(BigDecimal.ZERO) <= 0) {
-                return ResponseEntity.ok(Map.of(
-                    "success", false,
-                    "error", "Stock insuficiente para el producto ID: " + productId,
-                    "cantidadSolicitada", cantidadKg,
-                    "cantidadConsumida", java.math.BigDecimal.ZERO
-                ));
-            }
-
-            BigDecimal aConsumir = cantidadKg.min(stockActual);
-            ResponseEntity<?> r1 = inventarioSimplificadoService.registrarConsumoAlimento(
-                productId, aConsumir, loteId, usuarioRegistro, observaciones
-            );
-            try {
-                messagingTemplate.convertAndSend("/topic/inventory-update", "INVENTORY_CHANGED_PRODUCT");
-            } catch (Exception ignore) {}
-
-            BigDecimal restante = cantidadKg.subtract(aConsumir);
-            if (restante.compareTo(BigDecimal.ZERO) > 0) {
-                // Sin fallback por tipo en modo estricto
-                try {
-                    messagingTemplate.convertAndSend("/topic/inventory-update", "INVENTORY_CHANGED_PRODUCT");
-                } catch (Exception ignore) {}
-                return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Consumo parcial en producto (sin entradas registradas)",
-                    "productoId", productId,
-                    "cantidadSolicitada", cantidadKg,
-                    "cantidadConsumida", aConsumir,
-                    "cantidadPendiente", restante,
-                    "loteId", loteId
-                ));
-            }
-
-            System.out.println("✅ Consumo registrado (producto específico - consolidado)");
-            return r1;
+            // ❌ FEFO ESTRICTO: NO hay fallback a consolidado
+            // Si no hay entradas FEFO, el stock es realmente 0
+            System.out.println("❌ [FEFO ESTRICTO] No hay stock disponible en entradas FEFO para producto " + productId);
+            System.out.println("   Solución: Crear entradas en inventario con lote, vencimiento y trazabilidad");
+            
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "error", "Stock insuficiente en sistema FEFO para el producto ID: " + productId + 
+                        ". Debe registrar entradas con trazabilidad (lote, vencimiento, proveedor).",
+                "cantidadSolicitada", cantidadKg,
+                "cantidadConsumida", BigDecimal.ZERO,
+                "sugerencia", "Registre una entrada de inventario con código de lote y fecha de vencimiento",
+                "fefoEstricto", true
+            ));
 
         } catch (RuntimeException rex) {
             System.err.println("⚠️ Error de negocio en servicio simplificado: " + rex.getMessage());
@@ -281,67 +236,19 @@ public class PlanAlimentacionServiceSimplificado {
                 ));
             }
 
-            // Fallback: comportamiento consolidado clásico (FIFO por date_compra)
-            List<Product> productos = productRepository.findByTypeFood_Id(tipoAlimentoId);
-            if (productos != null && !productos.isEmpty()) {
-                productos = productos.stream()
-                    .filter(this::controlaStock)
-                    .collect(Collectors.toList());
-            }
-            if (productos == null || productos.isEmpty()) {
-                return ResponseEntity.ok(Map.of(
-                    "success", false,
-                    "error", "No existen productos asociados al tipo ID: " + tipoAlimentoId,
-                    "sugerencia", "Cree al menos un producto con ese tipo o registre entradas"
-                ));
-            }
-
-            productos.sort((p1, p2) -> {
-                java.util.Date d1 = p1.getDate_compra();
-                java.util.Date d2 = p2.getDate_compra();
-                if (d1 == null && d2 == null) return 0;
-                if (d1 == null) return 1;
-                if (d2 == null) return -1;
-                return d1.compareTo(d2);
-            });
-
-            BigDecimal restante = cantidadKg;
-            BigDecimal consumidoTotal = BigDecimal.ZERO;
-            for (Product p : productos) {
-                if (restante.compareTo(BigDecimal.ZERO) <= 0) break;
-                BigDecimal stockActual = inventarioSimplificadoService.obtenerStockActual(p.getId());
-                if (stockActual == null) stockActual = BigDecimal.ZERO;
-                if (stockActual.compareTo(BigDecimal.ZERO) <= 0) continue;
-                BigDecimal aConsumir = stockActual.min(restante);
-                inventarioSimplificadoService.registrarConsumoAlimento(
-                    p.getId(), aConsumir, loteId, usuarioRegistro, observaciones
-                );
-                consumidoTotal = consumidoTotal.add(aConsumir);
-                restante = restante.subtract(aConsumir);
-            }
-
-            if (consumidoTotal.compareTo(BigDecimal.ZERO) <= 0) {
-                return ResponseEntity.ok(Map.of(
-                    "success", false,
-                    "error", "Stock insuficiente para el tipo de alimento ID: " + tipoAlimentoId,
-                    "detalle", "No se encontró stock disponible en ningún producto del tipo",
-                    "cantidadConsumida", java.math.BigDecimal.ZERO
-                ));
-            }
-
-            boolean completo = restante.compareTo(BigDecimal.ZERO) == 0;
-            System.out.println("✅ Consumo por tipo registrado (fallback consolidado) consumido=" + consumidoTotal + ", pendiente=" + restante.max(BigDecimal.ZERO));
-            try {
-                messagingTemplate.convertAndSend("/topic/inventory-update", "INVENTORY_CHANGED_TYPE");
-            } catch (Exception ignore) {}
+            // ❌ FEFO ESTRICTO: NO hay fallback a consolidado
+            // Si no hay entradas FEFO para este tipo, el stock es realmente 0
+            System.out.println("❌ [FEFO ESTRICTO] No hay stock disponible en entradas FEFO para tipo " + tipoAlimentoId);
+            System.out.println("   Solución: Crear entradas de inventario para productos de este tipo con lote, vencimiento y trazabilidad");
+            
             return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", completo ? "Consumo registrado exitosamente" : "Consumo parcial registrado por stock insuficiente",
-                "tipoAlimentoId", tipoAlimentoId,
+                "success", false,
+                "error", "Stock insuficiente en sistema FEFO para el tipo de alimento ID: " + tipoAlimentoId + 
+                        ". Debe registrar entradas con trazabilidad (lote, vencimiento, proveedor) para productos de este tipo.",
                 "cantidadSolicitada", cantidadKg,
-                "cantidadConsumida", consumidoTotal,
-                "cantidadPendiente", restante.max(BigDecimal.ZERO),
-                "loteId", loteId
+                "cantidadConsumida", BigDecimal.ZERO,
+                "sugerencia", "Registre entradas de inventario con código de lote y fecha de vencimiento para productos de este tipo",
+                "fefoEstricto", true
             ));
 
         } catch (RuntimeException rex) {

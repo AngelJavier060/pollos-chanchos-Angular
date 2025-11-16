@@ -5,6 +5,17 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { CostosSanidadService } from '../inventario/services/costos-sanidad.service';
 import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/services/analisis-inventario.service';
+import { CostosIntegradosService } from '../../shared/services/costos-integrados.service';
+import { VentasService } from '../../shared/services/ventas.service';
+import { MortalidadBackendService } from '../../shared/services/mortalidad-backend.service';
+import {
+  MetodoProrrateo,
+  ConfiguracionProrrateo,
+  CostosIndirectosPeriodo,
+  ResultadoProrrateo,
+  AnalisisLoteCompleto,
+  ComparativoLotes
+} from '../../shared/models/analisis-financiero.model';
 
 @Component({
   selector: 'app-analisis-financiero',
@@ -36,10 +47,34 @@ export class AnalisisFinancieroComponent implements OnInit {
   costoInicialDetalleAbierto = false;
   loteCostoInicialDetalle: any | null = null;
 
-  constructor(private analisisService: AnalisisInventarioService, private cSanidad: CostosSanidadService) {}
+  // ===== NUEVAS PROPIEDADES: Análisis Financiero Completo =====
+  metodoProrrateo: MetodoProrrateo = 'dias-animal';
+  configuracionesProrrateo: ConfiguracionProrrateo[] = [
+    { metodo: 'dias-animal', descripcion: 'Días-Animal (Recomendado): Considera tiempo y cantidad de animales' },
+    { metodo: 'cantidad', descripcion: 'Por Cantidad: Reparte según número de animales' },
+    { metodo: 'biomasa', descripcion: 'Por Biomasa: Considera el peso total de cada lote' }
+  ];
+  costosIndirectosPeriodo: CostosIndirectosPeriodo | null = null;
+  resultadoProrrateo: ResultadoProrrateo | null = null;
+  analisisCompletoPorLote: Map<string, AnalisisLoteCompleto> = new Map();
+  loteDetalladoSeleccionado: AnalisisLoteCompleto | null = null;
+  modalDetalleAbierto = false;
+  periodoAnalisis = {
+    inicio: this.obtenerPrimerDiaMes(),
+    fin: this.obtenerUltimoDiaMes()
+  };
+
+  constructor(
+    private analisisService: AnalisisInventarioService,
+    private cSanidad: CostosSanidadService,
+    private costosIntegrados: CostosIntegradosService,
+    private ventasService: VentasService,
+    private mortalidadService: MortalidadBackendService
+  ) {}
 
   ngOnInit(): void {
     this.cargarAnalisisEspecies();
+    this.cargarCostosIndirectos();
   }
 
   // ===== SANIDAD: Carga y agregaciones =====
@@ -489,5 +524,394 @@ export class AnalisisFinancieroComponent implements OnInit {
 
   getTipoAnimalDeRow(row: any): string {
     return row?.lote?.race?.animal?.name || '-';
+  }
+
+  // ============================================================
+  // NUEVOS MÉTODOS: ANÁLISIS FINANCIERO COMPLETO
+  // ============================================================
+
+  /**
+   * Obtiene el primer día del mes actual
+   */
+  obtenerPrimerDiaMes(): Date {
+    const hoy = new Date();
+    return new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  }
+
+  /**
+   * Obtiene el último día del mes actual
+   */
+  obtenerUltimoDiaMes(): Date {
+    const hoy = new Date();
+    return new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  }
+
+  /**
+   * Carga los costos indirectos y calcula el prorrateo
+   */
+  cargarCostosIndirectos(): void {
+    const desde = this.periodoAnalisis.inicio;
+    const hasta = this.periodoAnalisis.fin;
+
+    this.costosIntegrados.obtenerCostosIndirectosPeriodo(desde, hasta).subscribe({
+      next: (costos) => {
+        this.costosIndirectosPeriodo = costos;
+        this.calcularProrrateo();
+      },
+      error: (error) => {
+        console.error('Error al cargar costos indirectos:', error);
+        // Inicializar con valores en cero
+        this.costosIndirectosPeriodo = {
+          operacion: [],
+          manoObra: [],
+          fijos: [],
+          logistica: [],
+          totalOperacion: 0,
+          totalManoObra: 0,
+          totalFijos: 0,
+          totalLogistica: 0,
+          totalGeneral: 0
+        };
+      }
+    });
+  }
+
+  /**
+   * Calcula el prorrateo de costos indirectos entre lotes
+   * ACTUALIZADO: Usa prorrateo detallado por tipo de costo
+   */
+  calcularProrrateo(): void {
+    if (!this.costosIndirectosPeriodo || !this.analisisActual) return;
+
+    const lotes = this.analisisActual.analisisPorLote.map(a => a.lote);
+    
+    // Mantener el prorrateo total para compatibilidad
+    this.resultadoProrrateo = this.costosIntegrados.prorratearCostos(
+      lotes,
+      this.costosIndirectosPeriodo,
+      this.metodoProrrateo,
+      this.periodoAnalisis.inicio,
+      this.periodoAnalisis.fin
+    );
+
+    // Calcular análisis completo por lote
+    this.calcularAnalisisCompletoPorLote();
+  }
+
+  /**
+   * Calcula el análisis completo para cada lote
+   * ACTUALIZADO: Usa desglose detallado de costos indirectos por tipo
+   */
+  calcularAnalisisCompletoPorLote(): void {
+    if (!this.analisisActual || !this.costosIndirectosPeriodo) return;
+
+    this.analisisCompletoPorLote.clear();
+
+    const lotes = this.analisisActual.analisisPorLote.map(a => a.lote);
+    
+    // Obtener prorrateo detallado por tipo de costo
+    const prorrateoPorTipo = this.costosIntegrados.prorratearCostosPorTipo(
+      lotes,
+      this.costosIndirectosPeriodo,
+      this.metodoProrrateo,
+      this.periodoAnalisis.inicio,
+      this.periodoAnalisis.fin
+    );
+
+    for (const analisisLote of this.analisisActual.analisisPorLote) {
+      const lote = analisisLote.lote;
+      const loteId = String(lote.id);
+
+      // Obtener costos indirectos desglosados para este lote
+      const costosIndirectosDesglosados = prorrateoPorTipo.get(loteId) || {
+        operacion: 0,
+        manoObra: 0,
+        fijos: 0,
+        logistica: 0,
+        total: 0
+      };
+
+      // Cargar ventas y mortalidad del lote
+      forkJoin({
+        ventas: this.ventasService.listarVentasAnimalesPorLoteEmitidas(loteId),
+        mortalidad: this.mortalidadService.obtenerRegistrosPorLote(loteId)
+      }).subscribe({
+        next: ({ ventas, mortalidad }) => {
+          const analisisCompleto = this.costosIntegrados.calcularAnalisisCompleto(
+            lote,
+            analisisLote.costoTotalLote,
+            analisisLote.detalleAlimentos || [],
+            this.sanidadRegistros,
+            [], // Morbilidad - por implementar
+            costosIndirectosDesglosados, // Ahora pasamos el desglose completo
+            ventas,
+            mortalidad,
+            this.periodoAnalisis.inicio,
+            this.periodoAnalisis.fin
+          );
+
+          this.analisisCompletoPorLote.set(loteId, analisisCompleto);
+        },
+        error: (error) => {
+          console.error(`Error al calcular análisis completo del lote ${loteId}:`, error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Cambia el método de prorrateo y recalcula
+   */
+  cambiarMetodoProrrateo(metodo: MetodoProrrateo): void {
+    this.metodoProrrateo = metodo;
+    this.calcularProrrateo();
+  }
+
+  /**
+   * Abre el modal de detalle completo de un lote
+   */
+  abrirDetalleCompleto(loteId: string): void {
+    const analisis = this.analisisCompletoPorLote.get(loteId);
+    if (analisis) {
+      this.loteDetalladoSeleccionado = analisis;
+      this.modalDetalleAbierto = true;
+    }
+  }
+
+  /**
+   * Cierra el modal de detalle completo
+   */
+  cerrarDetalleCompleto(): void {
+    this.modalDetalleAbierto = false;
+    this.loteDetalladoSeleccionado = null;
+  }
+
+  /**
+   * Obtiene el comparativo de lotes
+   */
+  obtenerComparativoLotes(): ComparativoLotes[] {
+    const comparativo: ComparativoLotes[] = [];
+
+    this.analisisCompletoPorLote.forEach((analisis, loteId) => {
+      const iniciales = analisis.animales.iniciales;
+      const vivos = analisis.animales.vivos;
+      const vendidos = analisis.animales.vendidos;
+
+      comparativo.push({
+        loteId,
+        loteCodigo: analisis.lote.codigo || `Lote ${loteId}`,
+        animalTipo: analisis.lote.race?.animal?.name || 'N/A',
+        animales: `${iniciales}→${vivos + vendidos}`,
+        costoAlimento: analisis.costosDirectos.alimentacion / Math.max(vivos + vendidos, 1),
+        costoSanidad: analisis.costosDirectos.sanidadPreventiva / Math.max(vivos + vendidos, 1),
+        costoMorbilidad: analisis.costosDirectos.morbilidad / Math.max(vivos + vendidos, 1),
+        costosIndirectos: analisis.costosIndirectos.total / Math.max(vivos + vendidos, 1),
+        costoUnitario: analisis.costos.unitarioVivo,
+        margen: analisis.rentabilidad.margen,
+        estado: analisis.rentabilidad.estado
+      });
+    });
+
+    return comparativo.sort((a, b) => b.margen - a.margen);
+  }
+
+  /**
+   * Obtiene la descripción del método de prorrateo actual
+   */
+  obtenerDescripcionMetodoProrrateo(): string {
+    const config = this.configuracionesProrrateo.find(c => c.metodo === this.metodoProrrateo);
+    return config?.descripcion || '';
+  }
+
+  /**
+   * Determina si un costo está implementado (tiene datos reales)
+   * ACTUALIZADO: Verifica si realmente hay datos registrados
+   */
+  esImplementado(concepto: 'morbilidad' | 'operacion' | 'manoObra' | 'fijos' | 'logistica'): boolean {
+    if (!this.costosIndirectosPeriodo) return false;
+
+    switch (concepto) {
+      case 'morbilidad':
+        return false; // Backend no tiene campo costo aún
+      case 'operacion':
+        return this.costosIndirectosPeriodo.totalOperacion > 0;
+      case 'manoObra':
+        return this.costosIndirectosPeriodo.totalManoObra > 0;
+      case 'fijos':
+        return this.costosIndirectosPeriodo.totalFijos > 0;
+      case 'logistica':
+        return this.costosIndirectosPeriodo.totalLogistica > 0;
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Obtiene el total de costos indirectos del período
+   */
+  getTotalCostosIndirectos(): number {
+    return this.costosIndirectosPeriodo?.totalGeneral || 0;
+  }
+
+  /**
+   * Obtiene el total de costos directos de todos los lotes
+   */
+  getTotalCostosDirectos(): number {
+    let total = 0;
+    this.analisisCompletoPorLote.forEach(analisis => {
+      total += analisis.costosDirectos.total;
+    });
+    return Math.round(total * 100) / 100;
+  }
+
+  /**
+   * Obtiene el total general (directos + indirectos)
+   */
+  getTotalGeneral(): number {
+    return this.getTotalCostosDirectos() + this.getTotalCostosIndirectos();
+  }
+
+  /**
+   * Obtiene el margen promedio de todos los lotes
+   */
+  getMargenPromedio(): number {
+    if (this.analisisCompletoPorLote.size === 0) return 0;
+    
+    let sumaMargen = 0;
+    this.analisisCompletoPorLote.forEach(analisis => {
+      sumaMargen += analisis.rentabilidad.margen;
+    });
+    
+    return Math.round((sumaMargen / this.analisisCompletoPorLote.size) * 100) / 100;
+  }
+
+  /**
+   * Obtiene el análisis completo de un lote específico
+   */
+  getAnalisisCompletoPorLoteId(loteId: string): AnalisisLoteCompleto | null {
+    return this.analisisCompletoPorLote.get(loteId) || null;
+  }
+
+  /**
+   * Actualiza el período de análisis y recarga datos
+   */
+  actualizarPeriodo(): void {
+    this.cargarAnalisisEspecies();
+  }
+
+  /**
+   * Override del método refrescar para incluir costos indirectos
+   */
+  refrescarCompleto(): void {
+    this.refrescar();
+    this.cargarCostosIndirectos();
+  }
+
+  /**
+   * NUEVO: Obtiene el costo por animal de un tipo específico de costo indirecto
+   */
+  getCostoIndirectoPorAnimal(tipoCosto: 'operacion' | 'manoObra' | 'fijos' | 'logistica'): number {
+    if (!this.costosIndirectosPeriodo || this.analisisCompletoPorLote.size === 0) return 0;
+
+    let totalCosto = 0;
+    let totalAnimales = 0;
+
+    this.analisisCompletoPorLote.forEach(analisis => {
+      const cantidad = analisis.animales.iniciales;
+      totalAnimales += cantidad;
+
+      switch (tipoCosto) {
+        case 'operacion':
+          totalCosto += analisis.costosIndirectos.operacion;
+          break;
+        case 'manoObra':
+          totalCosto += analisis.costosIndirectos.manoObra;
+          break;
+        case 'fijos':
+          totalCosto += analisis.costosIndirectos.fijos;
+          break;
+        case 'logistica':
+          totalCosto += analisis.costosIndirectos.logistica;
+          break;
+      }
+    });
+
+    return totalAnimales > 0 ? Math.round((totalCosto / totalAnimales) * 100) / 100 : 0;
+  }
+
+  /**
+   * NUEVO: Obtiene el total de costos indirectos por tipo
+   */
+  getTotalCostoIndirectoPorTipo(tipoCosto: 'operacion' | 'manoObra' | 'fijos' | 'logistica'): number {
+    if (!this.costosIndirectosPeriodo) return 0;
+
+    switch (tipoCosto) {
+      case 'operacion':
+        return this.costosIndirectosPeriodo.totalOperacion;
+      case 'manoObra':
+        return this.costosIndirectosPeriodo.totalManoObra;
+      case 'fijos':
+        return this.costosIndirectosPeriodo.totalFijos;
+      case 'logistica':
+        return this.costosIndirectosPeriodo.totalLogistica;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * NUEVO: Obtiene análisis por especie (pollos o chanchos)
+   */
+  obtenerAnalisisPorEspecie(animalId: number): {
+    lotes: AnalisisLoteCompleto[];
+    totalAnimales: number;
+    costosDirectos: number;
+    costosIndirectos: number;
+    costosIndirectosDetalle: { operacion: number; manoObra: number; fijos: number; logistica: number };
+    costoTotal: number;
+    costoPorAnimal: number;
+  } {
+    const lotesFiltrados: AnalisisLoteCompleto[] = [];
+    let totalAnimales = 0;
+    let costosDirectos = 0;
+    let costosIndirectosTotal = 0;
+    const costosIndirectosDetalle = {
+      operacion: 0,
+      manoObra: 0,
+      fijos: 0,
+      logistica: 0
+    };
+
+    this.analisisCompletoPorLote.forEach(analisis => {
+      const loteAnimalId = analisis.lote?.race?.animal?.id || 0;
+      if (loteAnimalId === animalId) {
+        lotesFiltrados.push(analisis);
+        totalAnimales += analisis.animales.iniciales;
+        costosDirectos += analisis.costosDirectos.total;
+        costosIndirectosTotal += analisis.costosIndirectos.total;
+        costosIndirectosDetalle.operacion += analisis.costosIndirectos.operacion;
+        costosIndirectosDetalle.manoObra += analisis.costosIndirectos.manoObra;
+        costosIndirectosDetalle.fijos += analisis.costosIndirectos.fijos;
+        costosIndirectosDetalle.logistica += analisis.costosIndirectos.logistica;
+      }
+    });
+
+    const costoTotal = costosDirectos + costosIndirectosTotal;
+    const costoPorAnimal = totalAnimales > 0 ? Math.round((costoTotal / totalAnimales) * 100) / 100 : 0;
+
+    return {
+      lotes: lotesFiltrados,
+      totalAnimales,
+      costosDirectos: Math.round(costosDirectos * 100) / 100,
+      costosIndirectos: Math.round(costosIndirectosTotal * 100) / 100,
+      costosIndirectosDetalle: {
+        operacion: Math.round(costosIndirectosDetalle.operacion * 100) / 100,
+        manoObra: Math.round(costosIndirectosDetalle.manoObra * 100) / 100,
+        fijos: Math.round(costosIndirectosDetalle.fijos * 100) / 100,
+        logistica: Math.round(costosIndirectosDetalle.logistica * 100) / 100
+      },
+      costoTotal: Math.round(costoTotal * 100) / 100,
+      costoPorAnimal
+    };
   }
 }

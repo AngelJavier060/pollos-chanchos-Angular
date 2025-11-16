@@ -53,6 +53,15 @@ export class MortalidadBackendService {
   }
 
   /**
+   * ✅ REGISTRAR MORTALIDAD USANDO causaId (endpoint dedicado en backend)
+   * Mantiene el payload ligero y deja que el backend resuelva la causa y actualice el lote.
+   */
+  registrarMortalidadConCausa(registro: RegistroMortalidadRequest): Observable<any> {
+    console.log('🔄 Registrando mortalidad (con causaId) en backend:', registro);
+    return this.http.post(`${this.apiUrl}/registrar-con-causa`, registro);
+  }
+
+  /**
    * ✅ OBTENER TODOS LOS REGISTROS
    */
   obtenerRegistros(): Observable<RegistroMortalidadResponse[]> {

@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { AlimentacionService, PlanEjecucionHistorial, EstadisticasLoteHistorial, ResumenHistorialGeneral } from './services/alimentacion.service';
+import { Lote } from '../lotes/interfaces/lote.interface';
+import { LoteService } from '../lotes/services/lote.service';
 
 // Interface mejorada para registros de alimentación históricos  
 interface RegistroHistorico {
@@ -11,7 +13,6 @@ interface RegistroHistorico {
   codigoLote: string;
   loteDescripcion: string;
   cantidadAplicada: number;
-  cantidad?: number; // Alias para cantidadAplicada
   animalesVivos?: number;
   animalesMuertos?: number;
   observaciones: string;
@@ -72,9 +73,18 @@ export class PollosHistoricoComponent implements OnInit {
   // Vista actual (registros individuales o estadísticas por lote)
   vistaActual: 'registros' | 'estadisticas' = 'registros';
 
+  // Opciones de visualización
+  stickyHeader = false;
+  modoCompacto = false;
+
+  lotesPollos: Lote[] = [];
+  mostrarDetalleAlimento = false;
+  detalleAlimentos: { nombre: string; total: number }[] = [];
+
   constructor(
     private authService: AuthDirectService,
-    private alimentacionService: AlimentacionService
+    private alimentacionService: AlimentacionService,
+    private loteService: LoteService
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -82,6 +92,7 @@ export class PollosHistoricoComponent implements OnInit {
   ngOnInit(): void {
     this.inicializarFechas();
     this.cargarDatosHistoricos();
+    this.cargarLotesPollos();
   }
 
   /**
@@ -104,7 +115,7 @@ export class PollosHistoricoComponent implements OnInit {
     this.cargandoEstadisticas = true;
     this.errorCarga = '';
 
-    console.log('📚 Cargando historial de alimentación con rango:', {
+    console.log(' Cargando historial de alimentación con rango:', {
       fechaInicio: this.fechaInicio,
       fechaFin: this.fechaFin
     });
@@ -113,12 +124,13 @@ export class PollosHistoricoComponent implements OnInit {
     this.alimentacionService.getHistorialConRango(this.fechaInicio, this.fechaFin)
       .subscribe({
         next: (registros) => {
-          console.log('✅ Registros históricos obtenidos:', registros);
+          console.log(' Registros históricos obtenidos:', registros);
           this.procesarRegistrosDelBackend(registros);
+          this.enriquecerRegistrosConLote();
           this.cargandoRegistros = false;
         },
         error: (error) => {
-          console.error('❌ Error al cargar registros históricos:', error);
+          console.error(' Error al cargar registros históricos:', error);
           this.errorCarga = 'Error al cargar los registros del historial';
           this.cargandoRegistros = false;
           
@@ -131,12 +143,12 @@ export class PollosHistoricoComponent implements OnInit {
     this.alimentacionService.getEstadisticasPorLote()
       .subscribe({
         next: (estadisticas) => {
-          console.log('✅ Estadísticas por lote obtenidas:', estadisticas);
+          console.log(' Estadísticas por lote obtenidas:', estadisticas);
           this.procesarEstadisticasDelBackend(estadisticas);
           this.cargandoEstadisticas = false;
         },
         error: (error) => {
-          console.error('❌ Error al cargar estadísticas:', error);
+          console.error(' Error al cargar estadísticas:', error);
           this.cargandoEstadisticas = false;
         }
       });
@@ -145,11 +157,11 @@ export class PollosHistoricoComponent implements OnInit {
     this.alimentacionService.getResumenHistorialGeneral()
       .subscribe({
         next: (resumen) => {
-          console.log('✅ Resumen general obtenido:', resumen);
+          console.log(' Resumen general obtenido:', resumen);
           this.resumenGeneral = resumen;
         },
         error: (error) => {
-          console.error('❌ Error al cargar resumen general:', error);
+          console.error(' Error al cargar resumen general:', error);
         }
       });
   }
@@ -158,23 +170,235 @@ export class PollosHistoricoComponent implements OnInit {
    * Procesar registros del backend y convertirlos al formato del componente
    */
   procesarRegistrosDelBackend(registros: PlanEjecucionHistorial[]): void {
-    this.registrosHistoricos = registros.map(registro => ({
-      id: registro.id,
-      fecha: registro.executionDate,
-      loteId: registro.loteId || 'N/A',
-      codigoLote: registro.loteCodigo || registro.loteId || 'N/A',
-      loteDescripcion: registro.loteDescripcion || 'Lote sin descripción',
-      cantidadAplicada: registro.quantityApplied,
-      animalesVivos: registro.animalesVivos,
-      animalesMuertos: registro.animalesMuertos,
-      observaciones: registro.observations || '',
-      status: registro.status,
-      dayNumber: registro.dayNumber,
-      fechaCreacion: registro.createDate
-    }));
+    this.registrosHistoricos = registros.map(registro => {
+      const m: RegistroHistorico = {
+        id: registro.id,
+        fecha: registro.executionDate,
+        loteId: registro.loteId || 'N/A',
+        codigoLote: registro.loteCodigo || registro.loteId || 'N/A',
+        loteDescripcion: registro.loteDescripcion || 'Lote sin descripción',
+        cantidadAplicada: registro.quantityApplied,
+        animalesVivos: registro.animalesVivos,
+        animalesMuertos: registro.animalesMuertos,
+        observaciones: registro.observations || '',
+        status: registro.status,
+        dayNumber: registro.dayNumber,
+        fechaCreacion: registro.createDate
+      };
+
+      const a = this.parseAnimales(m.observaciones);
+      if (a.vivos != null && (m.animalesVivos == null || isNaN(m.animalesVivos as any))) m.animalesVivos = a.vivos;
+      if (a.muertos != null && (m.animalesMuertos == null || isNaN(m.animalesMuertos as any))) m.animalesMuertos = a.muertos;
+
+      if ((!m.loteId || m.loteId === 'LOT-MANUAL' || m.codigoLote === 'MANUAL')) {
+        const lid = this.parseLoteDesdeObservaciones(m.observaciones);
+        if (lid) m.loteId = lid;
+      }
+      return m;
+    });
 
     // Generar estadísticas por lote basadas en los registros reales
     this.generarEstadisticasPorLote();
+  }
+
+  private cargarLotesPollos(): void {
+    this.loteService.getLotes().subscribe({
+      next: (lotes) => {
+        try {
+          this.lotesPollos = this.loteService.filterLotesByAnimalType(lotes, 'pollo');
+        } catch {
+          this.lotesPollos = lotes.filter(l => (l.race?.animal?.name || '').toLowerCase().includes('pollo'));
+        }
+        this.enriquecerRegistrosConLote();
+      },
+      error: () => {}
+    });
+  }
+
+  private enriquecerRegistrosConLote(): void {
+    if (!this.registrosHistoricos?.length || !this.lotesPollos?.length) return;
+    this.registrosHistoricos = this.registrosHistoricos.map(r => {
+      const rid = String(r.loteId || '');
+      const rcod = String(r.codigoLote || '');
+      const digRid = (rid.match(/\d+/g) || []).join('');
+      const digCod = (rcod.match(/\d+/g) || []).join('');
+      let lote = this.lotesPollos.find(l => {
+        const lc = String(l.codigo || '');
+        const digLc = (lc.match(/\d+/g) || []).join('');
+        if (String(l.id) === rid || lc === rcod) return true;
+        if (digLc) {
+          if (digLc === digRid || digLc === digCod) return true;
+          const nLc = parseInt(digLc, 10);
+          const nRid = digRid ? parseInt(digRid, 10) : NaN;
+          const nCod = digCod ? parseInt(digCod, 10) : NaN;
+          if (!isNaN(nLc) && (!isNaN(nRid) && nLc === nRid || !isNaN(nCod) && nLc === nCod)) return true;
+          if (digRid && (digRid.endsWith(digLc) || digLc.endsWith(digRid))) return true;
+          if (digCod && (digCod.endsWith(digLc) || digLc.endsWith(digCod))) return true;
+        }
+        return false;
+      });
+      if (!lote) {
+        const lidObs = this.parseLoteDesdeObservaciones(r.observaciones || '');
+        const dObs = (String(lidObs || '').match(/\d+/g) || []).join('');
+        lote = this.lotesPollos.find(l => {
+          const lc = String(l.codigo || '');
+          const digLc = (lc.match(/\d+/g) || []).join('');
+          if (String(l.id) === lidObs || lc === lidObs) return true;
+          if (dObs && digLc) {
+            if (digLc === dObs) return true;
+            const nLc = parseInt(digLc, 10);
+            const nObs = parseInt(dObs, 10);
+            if (!isNaN(nLc) && !isNaN(nObs) && nLc === nObs) return true;
+            if (dObs.endsWith(digLc) || digLc.endsWith(dObs)) return true;
+          }
+          return false;
+        });
+        if (lote && (!r.loteId || r.loteId === 'LOT-MANUAL')) r.loteId = String(lote.id);
+      }
+      if (lote) {
+        return { ...r, loteDescripcion: lote.name, codigoLote: lote.codigo || r.codigoLote };
+      }
+      return r;
+    });
+  }
+
+  private parseAnimales(obs: string): { vivos?: number; muertos?: number } {
+    const res: { vivos?: number; muertos?: number } = {};
+    const mv = /Animales\s+vivos:\s*(\d+)/i.exec(obs || '');
+    const mm = /Mortalidad\s+registrada:\s*(\d+)/i.exec(obs || '');
+    if (mv && mv[1]) res.vivos = parseInt(mv[1], 10);
+    if (mm && mm[1]) res.muertos = parseInt(mm[1], 10);
+    return res;
+  }
+
+  private parseLoteDesdeObservaciones(obs: string): string | null {
+    const m = /Lote:\s*([^|]+)/i.exec(obs || '');
+    if (m && m[1]) return m[1].trim();
+    return null;
+  }
+
+  private parseProductoDesdeObservaciones(obs: string): { nombre?: string; porAnimal?: number; vivos?: number; total?: number } {
+    const o = obs || '';
+    const nombre = (/Producto:\s*([^|]+)/i.exec(o) || [])[1]?.trim();
+    const porAnimalS = (/porAnimal:\s*([0-9.,]+)/i.exec(o) || [])[1];
+    const vivosS = (/vivos:\s*(\d+)/i.exec(o) || [])[1];
+    const totalS = (/total:\s*([0-9.,]+)/i.exec(o) || [])[1];
+    const toNum = (s?: string) => (s ? parseFloat(s.replace(',', '.')) : undefined);
+    return { nombre, porAnimal: toNum(porAnimalS), vivos: vivosS ? parseInt(vivosS, 10) : undefined, total: toNum(totalS) };
+  }
+
+abrirDetalleAlimento(registro: RegistroHistorico): void {
+  // Seleccionar SOLO registros de la MAÑANA del mismo lote y la misma fecha
+  const mismos = this.registrosHistoricos.filter(r => this.esMismoLote(r, registro) && this.esMismaFecha(r, registro));
+  const maniana = mismos.filter(r => this.getJornada(r) === 'Mañana');
+  // Agrupar por nombre de producto y sumar cantidad aplicada
+  const mapa = new Map<string, number>();
+  maniana.forEach(r => {
+    const p = this.parseProductoDesdeObservaciones(r.observaciones || '');
+    const nombre = (p.nombre || this.inferirProducto(r.observaciones || '') || '').trim();
+    if (!this.esAlimento(nombre)) return;
+    if (!nombre) return; // si no hay nombre, lo omitimos
+    const totalActual = mapa.get(nombre) || 0;
+    mapa.set(nombre, totalActual + (r.cantidadAplicada || 0));
+  });
+
+  // Convertir a array para el modal
+  this.detalleAlimentos = Array.from(mapa.entries())
+    .map(([nombre, total]) => ({ nombre, total }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  this.mostrarDetalleAlimento = true;
+}
+
+cerrarDetalleAlimento(): void {
+  this.mostrarDetalleAlimento = false;
+  this.detalleAlimentos = [];
+}
+
+getTotalManiana(base: RegistroHistorico): number {
+  const mismos = this.registrosHistoricos.filter(r => this.esMismoLote(r, base) && this.esMismaFecha(r, base));
+  const maniana = mismos.filter(r => this.getJornada(r) === 'Mañana');
+  let total = 0;
+  maniana.forEach(r => {
+    const p = this.parseProductoDesdeObservaciones(r.observaciones || '');
+    const nombre = (p.nombre || this.inferirProducto(r.observaciones || '') || '').trim();
+    if (!this.esAlimento(nombre)) return;
+    total += r.cantidadAplicada || 0;
+  });
+  return Number(total.toFixed(2));
+}
+
+// Utilidades para filtro por fecha y lote
+private esMismaFecha(a: RegistroHistorico, b: RegistroHistorico): boolean {
+  return (a?.fecha || '').slice(0, 10) === (b?.fecha || '').slice(0, 10);
+}
+
+  private esMismoLote(a: RegistroHistorico, b: RegistroHistorico): boolean {
+    return String(a?.loteId || '') === String(b?.loteId || '');
+  }
+
+  // Inferencia de producto cuando no viene explícito
+  private inferirProducto(texto: string): string | undefined {
+    const t = (texto || '').toLowerCase();
+    if (/ma[ií]z|corn/.test(t)) return 'Maíz';
+    if (/trigo|wheat/.test(t)) return 'Trigo';
+    if (/soya|soja/.test(t)) return 'Soya';
+    if (/vitam/.test(t)) return 'Vitaminas';
+    if (/insumo|medic|antibi/.test(t)) return 'Insumo';
+    return undefined;
+  }
+
+  // Determina si un nombre corresponde a alimento (excluye vitaminas/insumos)
+  private esAlimento(nombre?: string): boolean {
+    const n = (nombre || '').toLowerCase();
+    if (!n) return false;
+    if (/(vitam|insumo|medic|antibi)/.test(n)) return false;
+    return true;
+  }
+
+  // Obtener animales VIVOS del día (prioriza registro de la mañana)
+  getVivosDelDia(base: RegistroHistorico): number | undefined {
+    const mismos = this.registrosHistoricos.filter(r => this.esMismoLote(r, base) && this.esMismaFecha(r, base));
+    const maniana = mismos.filter(r => this.getJornada(r) === 'Mañana');
+    const fuente = (maniana.find(r => r.animalesVivos !== undefined)
+      || mismos.find(r => r.animalesVivos !== undefined)
+      || maniana.find(r => this.parseAnimales(r.observaciones || '').vivos !== undefined)
+      || mismos.find(r => this.parseAnimales(r.observaciones || '').vivos !== undefined));
+    if (!fuente) return undefined;
+    const parsed = this.parseAnimales(fuente.observaciones || '');
+    return fuente.animalesVivos ?? parsed.vivos ?? undefined;
+  }
+
+  getMuertosDelDia(base: RegistroHistorico): number | undefined {
+    const mismos = this.registrosHistoricos.filter(r => this.esMismoLote(r, base) && this.esMismaFecha(r, base));
+    const maniana = mismos.filter(r => this.getJornada(r) === 'Mañana');
+    const fuente = (maniana.find(r => r.animalesMuertos !== undefined)
+      || mismos.find(r => r.animalesMuertos !== undefined)
+      || maniana.find(r => this.parseAnimales(r.observaciones || '').muertos !== undefined)
+      || mismos.find(r => this.parseAnimales(r.observaciones || '').muertos !== undefined));
+    if (!fuente) return 0; // si no hay registro, mostrar 0
+    const parsed = this.parseAnimales(fuente.observaciones || '');
+    return fuente.animalesMuertos ?? parsed.muertos ?? 0;
+  }
+
+  getEtiquetaTipoConsumo(registro: any): string {
+    const obs = (registro?.observaciones || '').toLowerCase();
+    if (obs.includes('vitam')) return 'Vitaminas';
+    if (obs.includes('insumo') || obs.includes('medic') || obs.includes('antibi')) return 'Insumo';
+    return 'Alimento';
+  }
+
+  getIconoTipoConsumo(registro: any): string {
+    const label = this.getEtiquetaTipoConsumo(registro);
+    if (label === 'Vitaminas') return 'fas fa-capsules text-purple-600';
+    if (label === 'Insumo') return 'fas fa-box-open text-amber-600';
+    return 'fas fa-seedling text-green-600';
+  }
+
+  getJornada(registro: any): string {
+    const f = registro?.fechaCreacion || registro?.fecha;
+    const d = f ? new Date(f) : new Date();
+    const h = d.getHours();
+    return h < 12 ? 'Mañana' : 'Tarde';
   }
 
   /**
@@ -601,7 +825,6 @@ export class PollosHistoricoComponent implements OnInit {
     const registro = this.registrosHistoricos.find(r => r.id === datosCorreccion.registroId);
     if (registro) {
       registro.cantidadAplicada = datosCorreccion.cantidadNueva;
-      registro.cantidad = datosCorreccion.cantidadNueva; // Alias
       registro.observaciones = datosCorreccion.observacionesNuevas;
       registro.fechaUltimaModificacion = new Date().toISOString();
       registro.usuarioUltimaModificacion = datosCorreccion.usuarioCorreccion;

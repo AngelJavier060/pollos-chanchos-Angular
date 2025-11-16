@@ -14,12 +14,13 @@ import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { ProductService } from '../../shared/services/product.service';
 import { Product, TypeFood } from '../../shared/models/product.model';
 import { environment } from '../../../environments/environment';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-plan-nutricional',
   templateUrl: './plan-nutricional.component.html',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule]
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, DragDropModule]
 })
 export class PlanNutricionalComponent implements OnInit {
   
@@ -61,6 +62,13 @@ export class PlanNutricionalComponent implements OnInit {
   // Variables para funcionalidades adicionales
   busquedaTermino: string = '';
   filtroTipoAnimal: string = '';
+  // Modal de guía para chanchos
+  showGuiaChanchos: boolean = false;
+  // Panel lateral de guía en formulario de etapa
+  showGuiaChanchosForm: boolean = false;
+  // Paneles de guía para pollos
+  showGuiaPollosEngordeForm: boolean = false;
+  showGuiaGallinasForm: boolean = false;
   
   constructor(
     private fb: FormBuilder,
@@ -114,8 +122,8 @@ export class PlanNutricionalComponent implements OnInit {
     });
     
     this.detalleForm = this.fb.group({
-      dayStart: ['', [Validators.required, Validators.min(1)]],
-      dayEnd: ['', [Validators.required, Validators.min(1)]],
+      dayStart: ['', [Validators.required, Validators.min(1), Validators.max(365)]],
+      dayEnd: ['', [Validators.required, Validators.min(1), Validators.max(365)]],
       animalId: ['', Validators.required],
       productId: ['', Validators.required],
       quantityPerAnimal: ['', [Validators.required, Validators.min(0.001)]],
@@ -1061,6 +1069,9 @@ export class PlanNutricionalComponent implements OnInit {
 
   closeDetalleForm(): void {
     this.showEtapaForm = false;
+    this.showGuiaChanchosForm = false;
+    this.showGuiaPollosEngordeForm = false;
+    this.showGuiaGallinasForm = false;
     this.editingEtapa = null;
     this.detalleForm.reset();
     
@@ -1069,6 +1080,18 @@ export class PlanNutricionalComponent implements OnInit {
     
     // 🔓 HABILITAR ANIMAL: Restaurar estado editable para futuras etapas
     this.detalleForm.get('animalId')?.enable();
+  }
+
+  toggleGuiaChanchosForm(): void {
+    this.showGuiaChanchosForm = !this.showGuiaChanchosForm;
+  }
+
+  toggleGuiaPollosEngordeForm(): void {
+    this.showGuiaPollosEngordeForm = !this.showGuiaPollosEngordeForm;
+  }
+
+  toggleGuiaGallinasForm(): void {
+    this.showGuiaGallinasForm = !this.showGuiaGallinasForm;
   }
 
   // ========== MÉTODOS PARA ETAPAS DE CRECIMIENTO ==========
@@ -1158,6 +1181,7 @@ export class PlanNutricionalComponent implements OnInit {
     }
     
     this.showEtapaForm = true;
+    this.showGuiaChanchosForm = false;
     this.editingEtapa = null;
     
     // 🎯 CONFIGURACIÓN MEJORADA: Animal predefinido y bloqueado usando métodos correctos
@@ -1168,7 +1192,12 @@ export class PlanNutricionalComponent implements OnInit {
     // Calcular rango por defecto: rango principal del plan si existe; de lo contrario, siguiente semana sugerida
     const rango = this.getAllowedRangeFromPlanName();
     const defaultStart = rango ? rango.min : this.calcularSiguienteRangoDisponible();
-    const defaultEnd = rango ? rango.max : defaultStart + 6; // 7 días por defecto
+    // Ajustar duración según el animal
+    let duracionDefault = 6; // 7 días por defecto para pollos
+    if (animalName?.toLowerCase().includes('chancho') || animalName?.toLowerCase().includes('cerdo')) {
+      duracionDefault = 184; // 185 días (6 meses) para chanchos
+    }
+    const defaultEnd = rango ? rango.max : defaultStart + duracionDefault;
     
     console.log('🎯 PRECARGAR ANIMAL EN NUEVA ETAPA');
     console.log('Plan seleccionado:', this.selectedPlan.name);
@@ -1199,10 +1228,16 @@ export class PlanNutricionalComponent implements OnInit {
   
   /**
    * ✅ NUEVO: Calcular el siguiente rango de días disponible
+   * Considera el tipo de animal para sugerir rangos apropiados
    */
   private calcularSiguienteRangoDisponible(): number {
     if (!this.selectedPlan?.detalles || this.selectedPlan.detalles.length === 0) {
-      return 1; // Primer día si no hay etapas
+      // Sugerir día inicial según el animal
+      const animalName = this.getAnimalNameFromPlan(this.selectedPlan!)?.toLowerCase() || '';
+      if (animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porcino')) {
+        return 180; // Chanchos: iniciar en día 180 (6 meses)
+      }
+      return 1; // Pollos y otros: iniciar en día 1
     }
     
     // Encontrar el día máximo de finalización + 1

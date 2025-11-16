@@ -9,6 +9,7 @@ import { MorbilidadBackendService, RegistroMorbilidadRequest } from './morbilida
 
 export interface RegistroDiarioCompleto {
   loteId: string;
+  loteCodigo?: string;
   fecha: Date;
   animalesMuertos: number;
   animalesEnfermos: number;
@@ -70,27 +71,49 @@ export class RegistroDiarioService {
         usuarioRegistro: registro.usuario,
         confirmado: true
       };
-      operaciones.push(this.mortalidadService.registrarMortalidad(registroMortalidad));
+      // Usar endpoint compatible con causaId
+      operaciones.push(this.mortalidadService.registrarMortalidadConCausa(registroMortalidad));
     }
 
     // 2. REGISTRAR MORBILIDAD (no altera stock)
     if (registro.animalesEnfermos > 0) {
-      const registroMorbilidad: RegistroMorbilidadRequest = {
-        loteId: registro.loteId,
-        fecha: registro.fecha.toISOString().split('T')[0],
-        hora: new Date().toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-        cantidadEnfermos: registro.animalesEnfermos,
-        enfermedadId: 8, // "Problemas Respiratorios" por defecto
-        sintomasObservados: 'No especificados',
-        gravedad: 'leve',
-        estadoTratamiento: 'en_observacion',
-        observacionesVeterinario: registro.observaciones || 'Registro desde formulario diario',
-        requiereAislamiento: false,
-        contagioso: false,
-        usuarioRegistro: registro.usuario,
-        animalesTratados: registro.animalesEnfermos
-      };
-      operaciones.push(this.morbilidadService.registrarMorbilidad(registroMorbilidad));
+      // Derivar loteId numérico desde el código del lote (backend espera Long)
+      const codigo = (registro.loteCodigo || '').toString();
+      let loteIdNumerico = Number(((codigo.match(/\d+/g) || []).join('')) || 0) || 0;
+      if (!loteIdNumerico) {
+        // Fallback: extraer dígitos del UUID si existen
+        const fromUuid = (registro.loteId || '').toString();
+        loteIdNumerico = Number(((fromUuid.match(/\d+/g) || []).join('')) || 0) || 0;
+      }
+
+      const enfermedad$ = this.morbilidadService.obtenerEnfermedades().pipe(
+        map((lista: any[]) => {
+          // Elegir una enfermedad válida (primera activa); fallback id 1
+          const id = Number(lista?.[0]?.id || 1);
+          return Number.isFinite(id) && id > 0 ? id : 1;
+        }),
+        switchMap((enfermedadId: number) => {
+          // Construir payload compatible con la entidad del backend
+          const payloadMorbilidad: any = {
+            loteId: loteIdNumerico > 0 ? loteIdNumerico : 0,
+            fecha: registro.fecha.toISOString().split('T')[0],
+            hora: new Date().toTimeString().slice(0, 8),
+            cantidadEnfermos: registro.animalesEnfermos,
+            enfermedad: { id: enfermedadId },
+            sintomasObservados: 'No especificados',
+            gravedad: 'LEVE',
+            estadoTratamiento: 'EN_OBSERVACION',
+            observacionesVeterinario: registro.observaciones || 'Registro desde formulario diario',
+            requiereAislamiento: false,
+            contagioso: false,
+            usuarioRegistro: registro.usuario,
+            animalesTratados: registro.animalesEnfermos
+          };
+          return this.morbilidadService.registrarMorbilidad(payloadMorbilidad as any);
+        })
+      );
+
+      operaciones.push(enfermedad$);
     }
 
     // 3. DESCONTAR INVENTARIO

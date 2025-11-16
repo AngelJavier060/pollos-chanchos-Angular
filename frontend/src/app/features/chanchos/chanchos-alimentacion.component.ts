@@ -1,10 +1,16 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { PlanAlimentacionService, PlanDetalle } from '../plan-nutricional/services/plan-alimentacion.service';
+import { AlimentacionService, RegistroAlimentacionRequest } from '../pollos/services/alimentacion.service';
 import { PlanNutricionalIntegradoService } from '../../shared/services/plan-nutricional-integrado.service';
+import { RegistroDiarioService, RegistroDiarioCompleto } from '../../shared/services/registro-diario.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
+import { ProductService } from '../../shared/services/product.service';
+import { InventarioService } from '../pollos/services/inventario.service';
+import { InventarioEntradasService } from '../../shared/services/inventario-entradas.service';
 
 // Interface completa para el registro de alimentación
 interface RegistroAlimentacionCompleto {
@@ -20,6 +26,8 @@ interface RegistroAlimentacionCompleto {
   animalesVivos: number;
   animalesMuertos: number;
   animalesEnfermos: number;
+  // Peso promedio del animal (kg)
+  pesoAnimal: number;
   
   // Ventas de animales
   fechaVenta: string;
@@ -59,6 +67,7 @@ interface EtapaAlimento {
   productosDetalle: ProductoDetalle[];
   dayStart: number;
   dayEnd: number;
+  productoId?: number;
 }
 
 // Interface para el historial de registros
@@ -126,10 +135,24 @@ export class ChanchosAlimentacionComponent implements OnInit {
   planPrincipalNombre: string | null = null;
   planPrincipalRango: { min: number | null, max: number | null } = { min: null, max: null };
   etapaActualChanchos: EtapaAlimento | null = null;
+  // Mapas auxiliares para estadísticas rápidas (paridad visual con Pollos)
+  private estadisticasLotes: Map<string, {
+    chanchosRegistrados: number;
+    chanchosVivos: number;
+    mortalidadTotal: number;
+    porcentajeMortalidad: number;
+    tieneDatos: boolean;
+  }> = new Map();
+  private morbilidadPorLote: Map<string, number> = new Map();
   
   // Modal de alimentación completo
   modalAbierto = false;
   loteSeleccionado: Lote | null = null;
+  inventarioAutomaticoActivado = true;
+  
+  // Mensajes de UI para validación de stock
+  uiMessageError: string = '';
+  uiMessageSuccess: string = '';
   
   // Registro completo
   registroCompleto: RegistroAlimentacionCompleto = {
@@ -140,6 +163,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
     animalesVivos: 0,
     animalesMuertos: 0,
     animalesEnfermos: 0,
+    pesoAnimal: 0,
     fechaVenta: '',
     animalesVendidos: 0,
     precioUnitario: 0,
@@ -196,7 +220,13 @@ export class ChanchosAlimentacionComponent implements OnInit {
     private authService: AuthDirectService,
     private loteService: LoteService,
     private planService: PlanAlimentacionService,
-    private planNutricionalService: PlanNutricionalIntegradoService
+    private planNutricionalService: PlanNutricionalIntegradoService,
+    private registroDiarioService: RegistroDiarioService,
+    private productService: ProductService,
+    private inventarioService: InventarioService,
+    private router: Router,
+    private alimentacionService: AlimentacionService,
+    private invEntradasService: InventarioEntradasService
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -259,6 +289,64 @@ export class ChanchosAlimentacionComponent implements OnInit {
     const fechaNac = new Date(fechaNacimiento);
     const diffTime = Math.abs(hoy.getTime() - fechaNac.getTime());
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  // ===== Helpers de formato y estadísticas para UI tipo Pollos =====
+  formatLoteCodigo(valor: any): string {
+    if (valor == null) return 'Lote001';
+    const raw = String(valor).trim();
+    const digits = (raw.match(/\d+/g) || []).join('');
+    const last3 = (digits || '1').slice(-3);
+    const num = Number(last3) || 1;
+    return `Lote${num.toString().padStart(3, '0')}`;
+  }
+
+  private calcularMesesYDiasDesde(fecha: Date | string): { meses: number; dias: number } {
+    const fechaObj = typeof fecha === 'string' ? new Date(fecha) : fecha;
+    const hoy = new Date();
+    let meses = (hoy.getFullYear() - fechaObj.getFullYear()) * 12 + (hoy.getMonth() - fechaObj.getMonth());
+    const ajusteDia = hoy.getDate() - fechaObj.getDate();
+    if (ajusteDia < 0) meses -= 1;
+    const ref = new Date(hoy.getFullYear(), hoy.getMonth() - meses, fechaObj.getDate());
+    const diffTime = Math.abs(hoy.getTime() - ref.getTime());
+    const dias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return { meses: Math.max(0, meses), dias: Math.max(0, dias) };
+  }
+
+  getEdadEnMesesTexto(lote: Lote | null): string {
+    if (!lote || !lote.birthdate) return '0 meses';
+    const { meses, dias } = this.calcularMesesYDiasDesde(lote.birthdate);
+    const mesesTxt = meses === 1 ? '1 mes' : `${meses} meses`;
+    const diasTxt = dias === 1 ? '1 día' : `${dias} días`;
+    return `${mesesTxt} y ${diasTxt}`;
+  }
+
+  getChanchosRegistrados(lote: Lote): number {
+    return lote.quantityOriginal || lote.quantity || 0;
+  }
+
+  getEstadisticasLote(lote: Lote): {
+    chanchosRegistrados: number;
+    chanchosVivos: number;
+    mortalidadTotal: number;
+    porcentajeMortalidad: number;
+    tieneDatos: boolean;
+  } {
+    if (lote.id && this.estadisticasLotes.has(String(lote.id))) {
+      return this.estadisticasLotes.get(String(lote.id))!;
+    }
+    const chanchosRegistrados = lote.quantityOriginal || lote.quantity || 0;
+    const chanchosVivos = lote.quantity || 0;
+    const mortalidadTotal = lote.quantityOriginal ? Math.max(0, chanchosRegistrados - chanchosVivos) : 0;
+    const porcentajeMortalidad = chanchosRegistrados > 0 ? (mortalidadTotal / chanchosRegistrados) * 100 : 0;
+    const tieneDatos = !!lote.quantityOriginal;
+    const info = { chanchosRegistrados, chanchosVivos, mortalidadTotal, porcentajeMortalidad, tieneDatos };
+    if (lote.id) this.estadisticasLotes.set(String(lote.id), info);
+    return info;
+  }
+
+  calcularMorbilidadActual(lote: Lote): number {
+    return this.morbilidadPorLote.get(String(lote.id || '')) || 0;
   }
 
   /**
@@ -345,7 +433,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
               alimentoRecomendado: etapa.producto?.name || etapa.tipoAlimento,
               quantityPerAnimal: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
               unidad: 'kg',
-              seleccionado: diasVida >= (etapa.diasEdad?.min || 0) && diasVida <= (etapa.diasEdad?.max || 0),
+              seleccionado: true,
               productosDetalle: [
                 {
                   nombre: etapa.producto?.name || etapa.tipoAlimento,
@@ -354,7 +442,8 @@ export class ChanchosAlimentacionComponent implements OnInit {
                 }
               ],
               dayStart: etapa.diasEdad?.min,
-              dayEnd: etapa.diasEdad?.max
+              dayEnd: etapa.diasEdad?.max,
+              productoId: etapa.producto?.id
             }));
 
             // Establecer etapa actual visible en el cintillo (la que contiene el día actual)
@@ -418,6 +507,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
       animalesVivos: this.loteSeleccionado?.quantity || 0,
       animalesMuertos: 0,
       animalesEnfermos: 0,
+      pesoAnimal: 0,
       fechaVenta: '',
       animalesVendidos: 0,
       precioUnitario: 0,
@@ -446,6 +536,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
       animalesVivos: 0,
       animalesMuertos: 0,
       animalesEnfermos: 0,
+      pesoAnimal: 0,
       fechaVenta: '',
       animalesVendidos: 0,
       precioUnitario: 0,
@@ -509,6 +600,8 @@ export class ChanchosAlimentacionComponent implements OnInit {
   // ================= CHECKLIST DE ALIMENTOS (CHANCHOS) =================
   actualizarAlimentosSeleccionados(): void {
     this.alimentosSeleccionados = this.etapasDisponiblesLote.filter(e => e.seleccionado);
+    // Sincronizar cantidad aplicada con el total calculado
+    this.registroCompleto.cantidadAplicada = this.getCantidadTotalAlimentosSeleccionados();
   }
 
   removerAlimento(nombreAlimento: string): void {
@@ -534,6 +627,16 @@ export class ChanchosAlimentacionComponent implements OnInit {
   getCantidadTotalAlimentosSeleccionados(): number {
     const animales = this.loteSeleccionado?.quantity || 0;
     const total = this.alimentosSeleccionados.reduce((acc, a) => acc + (a.quantityPerAnimal || 0) * animales, 0);
+    return Number(total.toFixed(2));
+  }
+
+  /**
+   * Cantidad sugerida según la etapa actual del plan
+   */
+  getCantidadSugeridaEtapaActual(): number {
+    if (!this.etapaActualChanchos) return 0;
+    const animales = this.loteSeleccionado?.quantity || 0;
+    const total = (this.etapaActualChanchos.quantityPerAnimal || 0) * animales;
     return Number(total.toFixed(2));
   }
 
@@ -596,4 +699,309 @@ export class ChanchosAlimentacionComponent implements OnInit {
       console.error('❌ Error al cargar etapas de alimentación:', error);
     }
   }
-} 
+
+  /**
+   * Registrar con inventario automático usando el servicio integrado
+   */
+  /**
+   * ✅ Validar stock disponible ANTES de registrar consumo (FEFO Estricto - Chanchos)
+   * Consulta directamente entradas FEFO vigentes en lugar de inventario consolidado
+   */
+  private async validarStockAntesDeRegistrar(): Promise<{ ok: boolean; faltantes: Array<{ nombre: string; requerido: number; disponible: number }> }> {
+    const faltantes: Array<{ nombre: string; requerido: number; disponible: number }> = [];
+    const animales = this.loteSeleccionado?.quantity || 0;
+
+    // Obtener stock válido por PRODUCTO desde entradas FEFO vigentes
+    let stockValido: Record<string, number> = {};
+    try {
+      stockValido = await this.invEntradasService.stockValidoAgrupado().toPromise() || {};
+      console.log('🔎 [Chanchos] stockValidoAgrupado keys:', Object.keys(stockValido || {}));
+    } catch (e) {
+      console.error('❌ Error obteniendo stock válido agrupado:', e);
+      stockValido = {};
+    }
+
+    // Obtener lista de productos para matching por nombre
+    let productosCache: any[] = [];
+    try {
+      productosCache = await this.productService.getProducts({} as any).toPromise() || [];
+    } catch (e) {
+      console.warn('⚠️ No se pudo cargar cache de productos:', e);
+      productosCache = [];
+    }
+
+    // Función para normalizar texto
+    const normalizarTexto = (v: any): string => {
+      return (v ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    };
+
+    // Función para buscar candidatos por nombre
+    const candidatosPorNombre = (nombre: string): any[] => {
+      const n = normalizarTexto(nombre);
+      const exactos = (productosCache || []).filter(p => normalizarTexto(p?.name) === n);
+      if (exactos.length > 0) {
+        return exactos;
+      }
+      // Búsqueda parcial
+      return (productosCache || []).filter(p => {
+        const pn = normalizarTexto(p?.name);
+        return pn.includes(n) || n.includes(pn);
+      });
+    };
+
+    // Validar cada alimento seleccionado
+    for (const al of this.alimentosSeleccionados) {
+      const cantidadRequerida = parseFloat(((al.quantityPerAnimal || 0) * animales).toFixed(3));
+      if (cantidadRequerida <= 0) continue;
+
+      let disponible = 0;
+      const productoId = al.productoId;
+      const nombreProducto = al.alimentoRecomendado;
+
+      // 1. Buscar por ID primero en stock válido
+      if (Number.isFinite(Number(productoId))) {
+        disponible = Number(stockValido[String(productoId)] || 0);
+        console.log(`🔍 [Chanchos] Stock por ID ${productoId} (${nombreProducto}):`, disponible);
+      }
+
+      // 2. Fallback: buscar por nombre si no hay ID o no hay stock
+      if (disponible <= 0 && nombreProducto) {
+        const candidatos = candidatosPorNombre(nombreProducto);
+        console.log(`🔍 [Chanchos] Candidatos para "${nombreProducto}":`, candidatos.map(c => ({ id: c?.id, name: c?.name })));
+        
+        for (const candidato of candidatos) {
+          const pid = Number(candidato?.id);
+          if (Number.isFinite(pid)) {
+            const stockCandidato = Number(stockValido[String(pid)] || 0);
+            disponible += stockCandidato;
+            console.log(`  ➡️ Candidato ID ${pid}: ${stockCandidato} kg`);
+          }
+        }
+      }
+
+      // 3. Último recurso: consultar entradas directamente
+      if (disponible <= 0 && Number.isFinite(Number(productoId))) {
+        try {
+          const entradas = await this.invEntradasService.listarPorProducto(Number(productoId)).toPromise();
+          const total = (entradas || []).reduce((sum, e: any) => sum + Number(e?.stockBaseRestante || 0), 0);
+          if (Number.isFinite(total)) disponible = total;
+          console.log(`🔁 [Chanchos] Fallback entradas[pid=${productoId}] total=`, total);
+        } catch (e) {
+          console.warn('No se pudo consultar entradas para pid', productoId, e);
+        }
+      }
+
+      // Comparar: si lo requerido es mayor que lo disponible, agregar a faltantes
+      console.log(`📊 [Chanchos] "${nombreProducto}": requerido ${cantidadRequerida} kg, disponible ${disponible} kg`);
+      if (cantidadRequerida > disponible + 1e-6) {
+        faltantes.push({
+          nombre: nombreProducto || `Producto ID ${productoId}`,
+          requerido: cantidadRequerida,
+          disponible: disponible
+        });
+      }
+    }
+
+    console.log('🧪 [Chanchos] Validación stock - faltantes:', faltantes);
+    return { ok: faltantes.length === 0, faltantes };
+  }
+
+  /**
+   * ✅ Registrar solicitudes de recarga en localStorage para que el Admin lo vea en Inventario
+   */
+  private async registrarSolicitudesRecarga(faltantes: Array<{ nombre: string; requerido: number; disponible: number }>): Promise<void> {
+    try {
+      const key = 'pc_recharge_requests';
+      const ahora = new Date().toISOString();
+      const raw = localStorage.getItem(key) || '[]';
+      const lista = JSON.parse(raw);
+      const nuevos = faltantes.map(f => ({
+        productName: f.nombre,
+        name: f.nombre,
+        requestedAt: ahora,
+        loteCodigo: this.loteSeleccionado?.codigo || '',
+        cantidadRequerida: f.requerido,
+        cantidadDisponible: f.disponible,
+        tipoAnimal: 'Chanchos'
+      }));
+      const merged = Array.isArray(lista) ? [...lista, ...nuevos] : nuevos;
+      localStorage.setItem(key, JSON.stringify(merged));
+      console.log('✅ Solicitudes de recarga registradas para chanchos:', nuevos);
+    } catch (e) {
+      console.error('❌ Error registrando solicitudes de recarga:', e);
+    }
+  }
+
+  async registrarConInventarioAutomatico(): Promise<void> {
+    // Limpiar mensajes previos
+    this.uiMessageError = '';
+    this.uiMessageSuccess = '';
+
+    if (!this.loteSeleccionado) {
+      this.uiMessageError = '⚠️ Seleccione un lote válido.';
+      return;
+    }
+
+    // Validación mínima del peso
+    if (this.registroCompleto.pesoAnimal == null || this.registroCompleto.pesoAnimal <= 0) {
+      const continuar = confirm('No ingresó un peso válido para el animal. ¿Desea continuar sin este dato?');
+      if (!continuar) return;
+    }
+
+    // ✅ VALIDAR STOCK ANTES DE CONTINUAR
+    const validacion = await this.validarStockAntesDeRegistrar();
+    if (!validacion.ok) {
+      const detalle = validacion.faltantes
+        .map(f => `• ${f.nombre}: requerido ${f.requerido.toFixed(2)} kg, disponible ${f.disponible.toFixed(2)} kg`)
+        .join('\n');
+      
+      await this.registrarSolicitudesRecarga(validacion.faltantes);
+      
+      this.uiMessageError = `❌ No hay suficiente stock para completar el registro.\n\n${detalle}\n\n` +
+        `Se notificó al administrador para recargar los productos. ` +
+        `Por favor, vuelva a intentar cuando el stock esté disponible.`;
+      
+      // Scroll al mensaje de error
+      setTimeout(() => {
+        const errorElement = document.querySelector('.alert-error');
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+      
+      return;
+    }
+
+    // Determinar alimento y cantidad
+    const tipoAlimento = (this.alimentosSeleccionados[0]?.alimentoRecomendado
+      || this.etapaActualChanchos?.alimentoRecomendado
+      || this.registroCompleto.tipoAlimento
+      || '').toString();
+
+    const cantidadTotal = Number(this.registroCompleto.cantidadAplicada || this.getCantidadSugeridaEtapaActual() || 0);
+
+    const registro: RegistroDiarioCompleto = {
+      loteId: String(this.loteSeleccionado.id || this.registroCompleto.loteId),
+      loteCodigo: String(this.loteSeleccionado.codigo || ''),
+      fecha: this.registroCompleto.fecha ? new Date(this.registroCompleto.fecha) : new Date(),
+      animalesMuertos: Number(this.registroCompleto.animalesMuertos || 0),
+      animalesEnfermos: Number(this.registroCompleto.animalesEnfermos || 0),
+      // No enviar tipoAlimento/cantidadAlimento aquí para evitar doble descuento
+      observaciones: `Peso animal promedio: ${Number(this.registroCompleto.pesoAnimal || 0)} kg. ${this.registroCompleto.observacionesGenerales || ''}`.trim(),
+      usuario: this.user?.username || 'Sistema'
+    };
+
+    this.registroDiarioService.procesarRegistroDiarioCompleto(registro).subscribe({
+      next: async (res) => {
+        console.log('✅ Registro procesado:', res);
+        // Descontar inventario por cada alimento seleccionado (similar a Pollos)
+        try {
+          const loteIdStr = String(this.loteSeleccionado?.id || this.loteSeleccionado?.codigo || '');
+          const llamadas = this.alimentosSeleccionados.map(async (al) => {
+            // Cantidad por este alimento = cantidadPorAnimal * animales del lote
+            const cantidad = parseFloat(((al.quantityPerAnimal || 0) * (this.loteSeleccionado?.quantity || 0)).toFixed(3));
+            if (cantidad <= 0) return null;
+
+            // Obtener producto para extraer typeFoodId (si tenemos productoId es directo)
+            let tipoAlimentoId: number | null = null;
+            let productId: number | null = al.productoId || null;
+            if (productId) {
+              try {
+                const prod = await this.productService.getProductById(productId).toPromise();
+                tipoAlimentoId = (prod as any)?.typeFood?.id || (prod as any)?.typeFood_id || null;
+                productId = (prod as any)?.id ?? productId;
+              } catch (e) {
+                console.warn('⚠️ No se pudo obtener product por ID', al.productoId, e);
+              }
+            }
+
+            // Fallback: buscar por nombre si no tuvimos productId o fallo anterior
+            if (!tipoAlimentoId && al.alimentoRecomendado) {
+              try {
+                const lista = await this.productService.getProducts({ name: al.alimentoRecomendado } as any).toPromise();
+                const prod: any = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
+                tipoAlimentoId = (prod as any)?.typeFood?.id || (prod as any)?.typeFood_id || null;
+              } catch (e) {
+                console.warn('⚠️ No se pudo buscar producto por nombre', al.alimentoRecomendado, e);
+              }
+            }
+
+            const payload: any = {
+              loteId: loteIdStr,
+              cantidadKg: cantidad,
+              observaciones: `Alimentación diaria - ${al.alimentoRecomendado}`,
+              nombreProducto: al.alimentoRecomendado
+            };
+            if (productId) payload.productId = productId;
+            const tipoNum = Number(tipoAlimentoId);
+            if (Number.isFinite(tipoNum)) payload.tipoAlimentoId = tipoNum;
+            if ((!payload.nombreProducto || payload.nombreProducto.trim() === '') &&
+                (payload.tipoAlimentoId === undefined || payload.tipoAlimentoId === null)) {
+              console.warn('⏭️ Saltando consumo: falta nombreProducto y tipoAlimentoId para', al);
+              return null;
+            }
+            console.log('📦 Registrando consumo en inventario (chanchos):', payload);
+            try {
+              const resp: any = await this.inventarioService.registrarConsumoAlimento(payload).toPromise();
+              return { alimento: al.alimentoRecomendado, solicitado: cantidad, resp };
+            } catch (err: any) {
+              console.error('❌ Error registrando consumo para', al.alimentoRecomendado, err);
+              return { alimento: al.alimentoRecomendado, solicitado: cantidad, error: err };
+            }
+          });
+          const respuestas: any[] = (await Promise.all(llamadas))?.filter(Boolean) as any[];
+          console.log('✅ Resultados de consumos (chanchos):', respuestas);
+
+          // Fallback: si no hubo consumos efectivos y el usuario ingresó manualmente un tipo y cantidad, registrar por nombre
+          if ((!respuestas || respuestas.length === 0) && tipoAlimento && cantidadTotal > 0) {
+            const payloadManual: any = {
+              loteId: loteIdStr,
+              cantidadKg: cantidadTotal,
+              observaciones: `Alimentación diaria (manual) - ${tipoAlimento}`,
+              nombreProducto: tipoAlimento
+            };
+            console.log('📦 Fallback consumo manual (chanchos):', payloadManual);
+            try {
+              const resp: any = await this.inventarioService.registrarConsumoAlimento(payloadManual).toPromise();
+              console.log('✅ Consumo manual registrado', resp);
+            } catch (err) {
+              console.error('❌ Error en consumo manual de inventario:', err);
+            }
+          }
+        } catch (e) {
+          console.error('❌ Error descontando inventario por alimento(s) (chanchos):', e);
+        }
+        // Guardar en historial de alimentación (plan-ejecucion DEBUG)
+        try {
+          const req: RegistroAlimentacionRequest = {
+            loteId: String(this.loteSeleccionado?.id || this.registroCompleto.loteId),
+            fecha: this.registroCompleto.fecha || new Date().toISOString().split('T')[0],
+            cantidadAplicada: Number(this.registroCompleto.cantidadAplicada || this.getCantidadSugeridaEtapaActual() || 0),
+            animalesVivos: Number(this.loteSeleccionado?.quantity || this.registroCompleto.animalesVivos || 0),
+            animalesMuertos: Number(this.registroCompleto.animalesMuertos || 0),
+            observaciones: (`Peso animal promedio: ${Number(this.registroCompleto.pesoAnimal || 0)} kg. ` + (this.registroCompleto.observacionesGenerales || '')).trim()
+          };
+          await this.alimentacionService.registrarAlimentacion(req).toPromise();
+          console.log('📚 Histórico de alimentación actualizado (plan-ejecucion DEBUG).');
+        } catch (err) {
+          console.warn('⚠️ No se pudo registrar en histórico de alimentación (plan-ejecucion DEBUG):', err);
+        }
+
+        alert('Registro de alimentación guardado y consumo descontado del inventario.');
+        const muertos = Number(this.registroCompleto.animalesMuertos || 0);
+        const enfermos = Number(this.registroCompleto.animalesEnfermos || 0);
+        if (muertos > 0) {
+          this.router.navigate(['/chanchos/mortalidad'], { queryParams: { loteId: this.loteSeleccionado?.id || this.registroCompleto.loteId, cantidad: muertos } });
+        } else if (enfermos > 0) {
+          this.router.navigate(['/chanchos/morbilidad'], { queryParams: { loteId: this.loteSeleccionado?.id || this.registroCompleto.loteId, cantidad: enfermos } });
+        } else {
+          this.cerrarModal();
+        }
+      },
+      error: (err) => {
+        console.error('❌ Error al procesar registro diario:', err);
+        alert('Ocurrió un error al guardar el registro.');
+      }
+    });
+  }
+}

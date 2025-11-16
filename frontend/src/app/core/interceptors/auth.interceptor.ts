@@ -42,13 +42,13 @@ export class AuthInterceptor implements HttpInterceptor {
       '/api/public/',
       '/health',
       '/uploads/',
-      '/api/plan-ejecucion/', // 🔥 AGREGAR: Todas las rutas de plan-ejecucion son públicas
+      // '/api/plan-ejecucion/', // ⛔ Ya no tratamos plan-ejecucion como público: requiere JWT para dashboards
       '/api/mortalidad/', // 🔥 AGREGAR: Todas las rutas de mortalidad son públicas
       '/api/lote/', // 🔥 AGREGAR: Todas las rutas de lote son públicas
       '/debug/' // 🔥 AGREGAR: Todas las rutas de debug son públicas
     ];
     
-    // ✅ CORREGIDO: TODAS las rutas de plan-alimentacion son públicas (GET, POST, PUT, DELETE)
+    // ✅ Todas las rutas de plan-alimentacion siguen siendo públicas (GET, POST, PUT, DELETE)
     const isPublicPlanPath = request.url.includes('/api/plan-alimentacion/');
     
     // Verificar si es una ruta pública

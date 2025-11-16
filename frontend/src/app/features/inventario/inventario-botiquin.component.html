@@ -1,0 +1,421 @@
+<div class="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 p-6">
+  <!-- Header Principal Botiquín -->
+  <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
+          <span class="text-4xl md:text-5xl">🏥</span>
+          Botiquín Veterinario
+        </h1>
+        <p class="text-gray-600 mt-3 text-lg">Control de medicamentos e insumos de emergencia</p>
+      </div>
+      <button (click)="openForm(false)" class="px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold text-white transition-all hover:-translate-y-1 hover:shadow-2xl text-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <span class="text-xl">+</span> Agregar Producto
+      </button>
+    </div>
+  </div>
+
+  <!-- Estadísticas del Botiquín -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
+    <!-- Total -->
+    <div class="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:scale-105">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Total Productos</p>
+          <p class="text-3xl md:text-4xl font-bold text-gray-800 mt-1">{{ getBotStats().total }}</p>
+        </div>
+        <div class="text-3xl md:text-5xl">📦</div>
+      </div>
+    </div>
+
+    <!-- Disponibles -->
+    <div class="bg-green-50 rounded-xl shadow-lg p-6 border-2 border-green-300 transform transition-all hover:scale-105">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-green-700 text-sm font-bold">Disponibles</p>
+          <p class="text-3xl md:text-4xl font-bold text-green-600 mt-1">{{ getBotStats().ok }}</p>
+        </div>
+        <div class="text-3xl md:text-5xl">✅</div>
+      </div>
+    </div>
+
+    <!-- Alerta -->
+    <div class="bg-yellow-50 rounded-xl shadow-lg p-6 border-2 border-yellow-300 transform transition-all hover:scale-105">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-yellow-700 text-sm font-bold">En Alerta</p>
+          <p class="text-3xl md:text-4xl font-bold text-yellow-600 mt-1">{{ getBotStats().alerta }}</p>
+        </div>
+        <div class="text-3xl md:text-5xl">⚡</div>
+      </div>
+    </div>
+
+    <!-- Bajo Stock -->
+    <div class="bg-orange-50 rounded-xl shadow-lg p-6 border-2 border-orange-300 transform transition-all hover:scale-105">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-orange-700 text-sm font-bold">Bajo Stock</p>
+          <p class="text-3xl md:text-4xl font-bold text-orange-600 mt-1">{{ getBotStats().bajo }}</p>
+        </div>
+        <div class="text-3xl md:text-5xl">⚠️</div>
+      </div>
+    </div>
+
+    <!-- Agotados -->
+    <div class="bg-red-50 rounded-xl shadow-lg p-6 border-2 border-red-300 transform transition-all hover:scale-105">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-red-700 text-sm font-bold">Agotados</p>
+          <p class="text-3xl md:text-4xl font-bold text-red-600 mt-1">{{ getBotStats().agotado }}</p>
+        </div>
+        <div class="text-3xl md:text-5xl">🔴</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de Filtros -->
+  <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+    <div class="flex flex-col gap-5">
+      <!-- Búsqueda -->
+      <div class="relative">
+        <input 
+          type="text" 
+          [(ngModel)]="botSearch" 
+          placeholder="🔍 Buscar por nombre, uso principal, dosis recomendada..." 
+          class="w-full px-6 py-4 pl-14 border-2 border-gray-300 rounded-xl text-base focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all shadow-sm">
+        <span class="absolute left-5 top-1/2 transform -translate-y-1/2 text-2xl">🔍</span>
+      </div>
+
+      <!-- Filtros -->
+      <div class="flex gap-4 items-center flex-wrap">
+        <span class="text-gray-700 font-bold text-lg">Filtrar por:</span>
+        
+        <select 
+          [(ngModel)]="botFiltroCategoria" 
+          class="px-5 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all shadow-sm font-medium">
+          <option value="todos">📋 Todas las categorías</option>
+          <option *ngFor="let type of typeFoods" [value]="type.name">{{ type.name }}</option>
+        </select>
+
+        <select 
+          [(ngModel)]="botFiltroEstado" 
+          class="px-5 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all shadow-sm font-medium">
+          <option value="todos">🎯 Todos los estados</option>
+          <option value="ok">✅ Disponibles</option>
+          <option value="alerta">⚡ En Alerta</option>
+          <option value="bajo">⚠️ Bajo Stock</option>
+          <option value="agotado">🔴 Agotados</option>
+        </select>
+
+        <div class="ml-auto text-sm text-gray-600 bg-gray-100 px-4 py-2 rounded-lg font-medium">
+          Mostrando <span class="font-bold text-purple-600">{{ getProductosBotiquinFiltrados().length }}</span> de <span class="font-bold">{{ getProductosBotiquin().length }}</span> productos
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de Productos del Botiquín -->
+  <div class="bg-white rounded-xl shadow-2xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 text-white">
+          <tr>
+            <th class="px-6 py-5 text-left text-sm font-bold uppercase tracking-wider">Estado</th>
+            <th class="px-6 py-5 text-left text-sm font-bold uppercase tracking-wider">Producto</th>
+            <th class="px-6 py-5 text-left text-sm font-bold uppercase tracking-wider">Categoría</th>
+            <th class="px-6 py-5 text-left text-sm font-bold uppercase tracking-wider">Animal</th>
+            <th class="px-6 py-5 text-center text-sm font-bold uppercase tracking-wider">Stock Actual</th>
+            <th class="px-6 py-5 text-center text-sm font-bold uppercase tracking-wider">Nivel Mínimo</th>
+            <th class="px-6 py-5 text-left text-sm font-bold uppercase tracking-wider">Uso Principal</th>
+            <th class="px-6 py-5 text-center text-sm font-bold uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr *ngFor="let p of getProductosBotiquinFiltrados()" class="hover:bg-purple-50 transition-colors">
+            <!-- Estado -->
+            <td class="px-6 py-5">
+              <div class="flex flex-col items-center">
+                <span class="text-3xl">{{ getBotEstadoMeta(p).icon }}</span>
+                <span class="text-xs font-bold mt-1 px-2 py-1 rounded-full" [ngClass]="getBotEstadoMeta(p).colorClass">
+                  {{ getBotEstadoMeta(p).texto }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Producto -->
+            <td class="px-6 py-5">
+              <div class="font-bold text-gray-800 text-base">{{ p.name }}</div>
+              <div class="text-xs text-gray-500 mt-1" *ngIf="p.description">{{ p.description }}</div>
+            </td>
+
+            <!-- Categoría -->
+            <td class="px-6 py-5">
+              <div class="text-sm font-semibold text-gray-800">{{ p.typeFood?.name || getTypeFoodName(p.typeFood_id) }}</div>
+              <div class="text-xs text-gray-500 mt-1">{{ $any(p)?.subcategory?.name || '-' }}</div>
+            </td>
+
+            <!-- Animal -->
+            <td class="px-6 py-5 text-center">
+              <span class="text-2xl">{{ p.animal?.name || '-' }}</span>
+            </td>
+
+            <!-- Stock Actual -->
+            <td class="px-6 py-5 text-center">
+              <div class="text-xl font-bold" [ngClass]="getBotEstadoMeta(p).colorClass">
+                {{ getCantidadRealProducto(p) | number:'1.0-2' }}
+              </div>
+              <div class="text-xs text-gray-500 mt-1 font-medium">
+                {{ p.unitMeasurement?.name || getUnitMeasurementName(p.unitMeasurement_id) }}
+              </div>
+            </td>
+
+            <!-- Nivel Mínimo -->
+            <td class="px-6 py-5 text-center">
+              <div class="text-base font-semibold text-gray-700">{{ p.level_min }}</div>
+              <div class="text-xs text-gray-400 mt-1">
+                {{ p.unitMeasurement?.name || getUnitMeasurementName(p.unitMeasurement_id) }}
+              </div>
+            </td>
+
+            <!-- Uso Principal -->
+            <td class="px-6 py-5">
+              <div class="text-sm text-gray-700 max-w-xs">{{ $any(p)?.usoPrincipal || '-' }}</div>
+              <div *ngIf="$any(p)?.dosisRecomendada" class="text-xs text-purple-600 font-semibold mt-2 flex items-center gap-1">
+                <span>💉</span>
+                <span>{{ $any(p)?.dosisRecomendada }}</span>
+              </div>
+            </td>
+
+            <!-- Acciones -->
+            <td class="px-6 py-5">
+              <div class="flex justify-center gap-3">
+                <button 
+                  (click)="openForm(true, p)" 
+                  class="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-all hover:shadow-lg transform hover:-translate-y-0.5">
+                  ✏️ Editar
+                </button>
+                <button 
+                  *ngIf="getBotEstado(p) !== 'ok'" 
+                  (click)="reponerProducto(p)" 
+                  class="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-all hover:shadow-lg transform hover:-translate-y-0.5">
+                  🛒 Reabastecer
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Sin resultados -->
+          <tr *ngIf="getProductosBotiquinFiltrados().length === 0">
+            <td colspan="8" class="px-6 py-12 text-center">
+              <div class="text-gray-400 text-6xl mb-4">🔍</div>
+              <p class="text-gray-600 text-lg font-medium">No se encontraron productos</p>
+              <p class="text-gray-500 text-sm mt-2">Intenta ajustar los filtros de búsqueda</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal de Formulario de Producto -->
+  <div *ngIf="showForm" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" cdkDrag>
+      <div class="sticky top-0 bg-white z-10 p-6 border-b border-gray-200" cdkDragHandle>
+        <div class="flex justify-between items-center cursor-move">
+          <h3 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <span class="text-3xl">{{ isEditMode ? '✏️' : '➕' }}</span>
+            <span *ngIf="isEditMode">Editar Producto</span>
+            <span *ngIf="!isEditMode">Nuevo Producto</span>
+          </h3>
+          <button (click)="closeForm()" class="text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-2 rounded-full transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <form [formGroup]="productForm" (ngSubmit)="saveProduct()" class="p-6 space-y-6">
+        
+        <!-- SECCIÓN 1: INFORMACIÓN BÁSICA -->
+        <div class="bg-white border-l-4 border-purple-500 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-2xl">📋</span>
+            <h3 class="text-lg font-semibold text-purple-700">INFORMACIÓN BÁSICA</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Nombre del Producto -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Nombre del Producto <span class="text-red-500">*</span></label>
+              <input type="text" formControlName="name" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Ej: Ivermectina 1%">
+              <div *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Animal -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Animal <span class="text-red-500">*</span></label>
+              <select formControlName="animal_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                <option value="">Seleccione un animal</option>
+                <option *ngFor="let animal of animals" [value]="animal.id">{{ animal.name }}</option>
+              </select>
+              <div *ngIf="productForm.get('animal_id')?.invalid && productForm.get('animal_id')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Descripción -->
+            <div class="space-y-1 md:col-span-2">
+              <label class="text-sm font-medium text-gray-700">Descripción</label>
+              <textarea formControlName="description" rows="3" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Descripción breve del producto..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: CLASIFICACIÓN DEL PRODUCTO -->
+        <div class="bg-white border-l-4 border-yellow-500 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-2xl">🏷️</span>
+            <h3 class="text-lg font-semibold text-yellow-700">CLASIFICACIÓN DEL PRODUCTO</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Categoría Principal -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Categoría Principal <span class="text-red-500">*</span></label>
+              <select formControlName="typeFood_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                <option value="">Seleccione una categoría</option>
+                <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
+              </select>
+              <div *ngIf="productForm.get('typeFood_id')?.invalid && productForm.get('typeFood_id')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+
+            <!-- Subcategoría -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Subcategoría <span class="text-red-500">*</span></label>
+              <select formControlName="subcategory_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                <option value="">Primero seleccione una categoría</option>
+                <option *ngFor="let sc of subcategories" [value]="sc.id">{{ sc.name }}</option>
+              </select>
+              <div *ngIf="subcategoryInfo" class="text-xs text-gray-600 italic mt-1">{{ subcategoryInfo }}</div>
+            </div>
+            
+            <!-- Etapa -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Etapa <span class="text-red-500">*</span></label>
+              <select formControlName="stage_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                <option value="">Seleccione una etapa</option>
+                <option *ngFor="let stage of stages" [value]="stage.id">{{ stage.name }}</option>
+              </select>
+              <div *ngIf="productForm.get('stage_id')?.invalid && productForm.get('stage_id')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 3: CONTROL DE INVENTARIO -->
+        <div class="bg-white border-l-4 border-orange-500 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-2xl">📦</span>
+            <h3 class="text-lg font-semibold text-orange-700">CONTROL DE INVENTARIO</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Unidad de Medida -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Unidad de Medida <span class="text-red-500">*</span></label>
+              <select formControlName="unitMeasurement_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                <option value="">Seleccione una unidad</option>
+                <option *ngFor="let unit of unitMeasurements" [value]="unit.id">{{ unit.name }}</option>
+              </select>
+              <div *ngIf="productForm.get('unitMeasurement_id')?.invalid && productForm.get('unitMeasurement_id')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Cantidad Actual -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Cantidad Actual <span class="text-red-500">*</span></label>
+              <input type="number" formControlName="quantity" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+              <div *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Nivel Mínimo (Alerta) -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Nivel Mínimo (Alerta) <span class="text-red-500">*</span></label>
+              <input type="number" step="0.01" formControlName="level_min" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+              <div class="flex items-center gap-1 mt-1 text-xs text-orange-600">
+                <span>⚠️</span>
+                <span>Se alertará cuando llegue a este nivel</span>
+              </div>
+            </div>
+            
+            <!-- Nivel Máximo -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Nivel Máximo</label>
+              <input type="number" step="0.01" formControlName="level_max" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+              <div class="text-xs text-gray-500 mt-1">Capacidad máxima de almacenamiento</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 4: INFORMACIÓN DE COMPRA -->
+        <div class="bg-white border-l-4 border-green-600 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-2xl">💰</span>
+            <h3 class="text-lg font-semibold text-green-700">INFORMACIÓN DE COMPRA</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Precio Unitario -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Precio Unitario <span class="text-red-500">*</span></label>
+              <input type="number" step="0.01" formControlName="price_unit" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="0.00">
+              <div *ngIf="productForm.get('price_unit')?.invalid && productForm.get('price_unit')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Proveedor -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Proveedor <span class="text-red-500">*</span></label>
+              <select formControlName="provider_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                <option value="">Seleccione un proveedor</option>
+                <option *ngFor="let provider of providers" [value]="provider.id">{{ provider.name }}</option>
+              </select>
+              <div *ngIf="productForm.get('provider_id')?.invalid && productForm.get('provider_id')?.touched" class="text-sm text-red-600">
+                Este campo es requerido
+              </div>
+            </div>
+            
+            <!-- Fecha de Compra -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Fecha de Compra <span class="text-red-500">*</span></label>
+              <input type="date" formControlName="date_compra" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+            
+            <!-- Número de Factura -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium text-gray-700">Número de Factura</label>
+              <input type="text" formControlName="number_facture" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="FAC-12345">
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+          <button type="button" (click)="closeForm()" class="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium shadow-md">
+            Cancelar
+          </button>
+          <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-md flex items-center gap-2">
+            <span>💾</span>
+            <span>Guardar Producto</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,27 +1,272 @@
+// ========== PALETA DE COLORES PROFESIONAL ==========
+// Color superior (beige claro / arena): #E8E3CC
+// Color central (verde agua suave): #A7BFBD
+// Color inferior (azul grisáceo): #5E8B9C
+
+:host {
+  --color-primary: #5E8B9C;
+  --color-secondary: #A7BFBD;
+  --color-accent: #E8E3CC;
+  --color-bg-light: #FFFFFF;
+  --color-bg-dark: #1a1a1a;
+  --color-text-light: #2d3748;
+  --color-text-dark: #f7fafc;
+  --color-border-light: #e2e8f0;
+  --color-border-dark: #2d3748;
+  --sidebar-bg-light: linear-gradient(180deg, var(--color-accent) 0%, #f8f9fa 100%);
+  --sidebar-bg-dark: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+}
+
+// ========== TEMA CLARO ==========
+.chanchos-dashboard-layout {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--color-bg-light);
+  color: var(--color-text-light);
+  transition: all 0.3s ease;
+
+  // Sidebar
+  .sidebar {
+    background: var(--sidebar-bg-light);
+    border-right: 1px solid var(--color-border-light);
+    transition: all 0.3s ease;
+
+    // Estado colapsado
+    &.collapsed {
+      width: 5rem !important; // 80px - w-20
+      
+      .nav-item {
+        justify-content: center;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        
+        span { 
+          display: none; 
+        }
+        
+        i { 
+          margin-right: 0 !important; 
+        }
+      }
+      
+      .profile-card {
+        .info { 
+          display: none; 
+        }
+        .divider { 
+          display: none; 
+        }
+        .avatar {
+          width: 56px;
+          height: 56px;
+        }
+      }
+    }
+
+    .profile-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--color-border-light);
+
+      .avatar {
+        border: 3px solid var(--color-primary);
+        box-shadow: 0 4px 12px rgba(94, 139, 156, 0.2);
+      }
+
+      .name {
+        color: var(--color-primary);
+      }
+
+      .role {
+        color: var(--color-secondary);
+      }
+    }
+
+    .nav-item {
+      color: var(--color-text-light);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(94, 139, 156, 0.1);
+        color: var(--color-primary);
+      }
+
+      &.active {
+        background: var(--color-primary);
+        color: white;
+        box-shadow: 0 2px 8px rgba(94, 139, 156, 0.3);
+      }
+
+      i {
+        color: var(--color-secondary);
+      }
+
+      &.active i {
+        color: white;
+      }
+    }
+  }
+
+  // Contenido principal
+  main {
+    background: #f8f9fa;
+
+    header {
+      background: white;
+      border-bottom: 1px solid var(--color-border-light);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+      h1 {
+        color: var(--color-primary);
+      }
+    }
+  }
+}
+
+// ========== TEMA OSCURO ==========
+.chanchos-dashboard-layout.dark-mode {
+  background: var(--color-bg-dark);
+  color: var(--color-text-dark);
+
+  .sidebar {
+    background: var(--sidebar-bg-dark);
+    border-right: 1px solid var(--color-border-dark);
+
+    .profile-card {
+      background: rgba(45, 55, 72, 0.7);
+      border-bottom: 1px solid var(--color-border-dark);
+
+      .name {
+        color: var(--color-accent);
+      }
+
+      .role {
+        color: var(--color-secondary);
+      }
+    }
+
+    .nav-item {
+      color: var(--color-text-dark);
+
+      &:hover {
+        background: rgba(167, 191, 189, 0.15);
+        color: var(--color-accent);
+      }
+
+      &.active {
+        background: var(--color-primary);
+        color: white;
+      }
+
+      i {
+        color: var(--color-secondary);
+      }
+    }
+  }
+
+  main {
+    background: #0f1419;
+
+    header {
+      background: #1a202c;
+      border-bottom: 1px solid var(--color-border-dark);
+
+      h1 {
+        color: var(--color-accent);
+      }
+    }
+  }
+}
+
+// ========== BOTÓN DE TEMA ==========
+.theme-toggle {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: white;
+  border: 3px solid white;
+  box-shadow: 0 6px 20px rgba(94, 139, 156, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  transition: all 0.3s ease;
+  z-index: 9999;
+
+  &:hover {
+    transform: scale(1.15) rotate(15deg);
+    box-shadow: 0 8px 24px rgba(94, 139, 156, 0.6);
+  }
+
+  &:active {
+    transform: scale(1.05);
+  }
+
+  i {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  }
+}
+
+// ========== ESTILOS LEGACY (compatibilidad) ==========
 .chanchos-dashboard {
   h1 {
-    color: #ad1457;
+    color: var(--color-primary);
     margin-bottom: 1rem;
   }
 }
 
 .chanchos-dashboard-dashboard {
   font-family: 'Inter', sans-serif;
+  
   .dashboard-header {
-    border-bottom: 2px solid #f48fb1;
+    border-bottom: 2px solid var(--color-secondary);
     margin-bottom: 2rem;
   }
+  
   .summary-card {
     transition: box-shadow 0.2s;
+    background: white;
+    border: 1px solid var(--color-border-light);
+    
     &:hover {
-      box-shadow: 0 4px 24px 0 #f48fb133;
+      box-shadow: 0 4px 24px rgba(94, 139, 156, 0.15);
+      border-color: var(--color-secondary);
     }
   }
+  
   table th {
     font-weight: 700;
-    border-bottom: 2px solid #f48fb1;
+    border-bottom: 2px solid var(--color-secondary);
+    color: var(--color-primary);
   }
+  
   table td {
-    border-bottom: 1px solid #fce4ec;
+    border-bottom: 1px solid var(--color-border-light);
   }
-} 
+}
+
+// Modo oscuro para tarjetas
+.dark-mode {
+  .summary-card {
+    background: #1a202c;
+    border-color: var(--color-border-dark);
+    
+    &:hover {
+      box-shadow: 0 4px 24px rgba(167, 191, 189, 0.2);
+    }
+  }
+
+  table th {
+    color: var(--color-accent);
+    border-bottom-color: var(--color-secondary);
+  }
+
+  table td {
+    border-bottom-color: var(--color-border-dark);
+    color: var(--color-text-dark);
+  }
+}

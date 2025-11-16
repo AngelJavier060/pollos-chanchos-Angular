@@ -1,18 +1,135 @@
-<!-- Header de la página -->
-<div class="dashboard-header flex items-center mb-6">
-  <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="h-14 w-14 rounded-full border-4 border-pink-400 mr-4">
-  <div>
-    <h1 class="text-2xl font-bold text-pink-700">Alimentación Diaria - Chanchos</h1>
-    <p class="text-gray-600">Registro y control nutricional de cerdos por lote</p>
-  </div>
-</div>
 
 <!-- Indicador de carga -->
 <div *ngIf="loading" class="flex justify-center items-center py-8">
   <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
 </div>
 
+<!-- Vista alineada con Pollos -->
 <ng-container *ngIf="!loading">
+  <!-- Header Minimalista -->
+  <div class="header-section mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Alimentación Diaria</h1>
+        <p class="text-gray-600">Gestión simplificada de alimentación</p>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="date-selector bg-white rounded-lg border border-gray-200 px-4 py-2 shadow-sm">
+          <input type="date" [value]="getSelectedDateString()" (change)="updateSelectedDate($event)" class="border-none outline-none bg-transparent text-gray-700 font-medium">
+        </div>
+        <button (click)="cargarDatosIniciales()" class="refresh-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+    <!-- Fecha e Información del Día -->
+    <div class="date-info mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-blue-100 rounded-lg">
+          <i class="fas fa-calendar-day text-blue-600"></i>
+        </div>
+        <div>
+          <p class="font-semibold text-blue-900">{{ formatearFecha(selectedDate) }}</p>
+          <p class="text-sm text-blue-700">{{ lotesActivos.length }} lotes activos • {{ getTotalAnimales() }} chanchos total</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lotes de Alimentación - Tarjetas -->
+  <div class="lotes-grid">
+    <div *ngIf="lotesActivos.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div *ngFor="let lote of lotesActivos; trackBy: trackByLote" class="lote-card">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6">
+          <!-- Header del Lote -->
+          <div class="lote-header mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xl font-bold text-gray-900">{{ formatLoteCodigo(lote.codigo) }}</h3>
+              <span class="status-badge bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Activo</span>
+            </div>
+            <p class="text-gray-600 font-medium uppercase tracking-wide text-sm">{{ lote.race?.animal?.name || 'CHANCHOS' }}</p>
+          </div>
+
+          <!-- Información Principal -->
+          <div class="lote-info space-y-3 mb-4">
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Edad:</span>
+              <span class="text-gray-900 font-bold">{{ calcularDiasDeVida(lote.birthdate) }} días</span>
+            </div>
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Meses:</span>
+              <span class="text-gray-900 font-bold">{{ getEdadEnMesesTexto(lote) }}</span>
+            </div>
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Chanchos Registrados</span>
+              <span class="text-gray-900 font-bold">{{ getChanchosRegistrados(lote) }}</span>
+            </div>
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Chanchos vivos:</span>
+              <span class="text-blue-700 font-bold">{{ lote.quantity }} chanchos</span>
+            </div>
+            <!-- Distribución por sexo -->
+            <div class="info-item flex items-center justify-between" *ngIf="lote.femaleCount != null || lote.maleCount != null">
+              <span class="text-gray-600 font-medium">Distribución:</span>
+              <div class="flex items-center gap-2 text-xs font-semibold">
+                <span *ngIf="lote.femaleCount != null" class="inline-flex items-center px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200">
+                  <i class="fas fa-venus mr-1"></i>
+                  Hembras: {{ lote.femaleCount || 0 }}
+                </span>
+                <span *ngIf="lote.maleCount != null" class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  <i class="fas fa-mars mr-1"></i>
+                  Machos: {{ lote.maleCount || 0 }}
+                </span>
+              </div>
+            </div>
+            <div class="info-item flex items-center justify-between">
+              <span class="text-gray-600 font-medium">Morbilidad</span>
+              <span class="text-gray-900 font-bold">{{ calcularMorbilidadActual(lote) }}</span>
+            </div>
+            <ng-container *ngIf="getEstadisticasLote(lote).tieneDatos && getEstadisticasLote(lote).mortalidadTotal > 0">
+              <div class="info-item flex items-center justify-between">
+                <span class="text-gray-600 font-medium">Mortalidad</span>
+                <span class="text-red-600 font-bold">{{ getEstadisticasLote(lote).mortalidadTotal }}</span>
+              </div>
+            </ng-container>
+            <div class="info-item flex items-center justify-between" *ngIf="lote.race?.name">
+              <span class="text-gray-600 font-medium">Raza:</span>
+              <span class="text-gray-900 font-semibold text-sm">{{ lote.race.name }}</span>
+            </div>
+          </div>
+
+          <!-- Acción principal -->
+          <div class="action-section">
+            <button (click)="abrirModalAlimentacion(lote)"
+                    class="action-btn w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105">
+              <i class="fas fa-utensils mr-2"></i>
+              Ingresar Alimentos Diarios
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado Vacío -->
+    <div *ngIf="lotesActivos.length === 0" class="empty-state text-center py-16">
+      <div class="max-w-md mx-auto">
+        <div class="empty-icon mb-6">
+          <i class="fas fa-drumstick-bite text-gray-300 text-6xl"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-700 mb-3">No hay lotes activos</h3>
+        <p class="text-gray-500 mb-6">No se encontraron lotes de chanchos activos para registrar alimentación hoy.</p>
+        <button (click)="cargarDatosIniciales()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
+          <i class="fas fa-sync mr-2"></i>
+          Actualizar datos
+        </button>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<!-- Ocultamos la vista anterior para evitar duplicados -->
+<ng-container *ngIf="false">
   <!-- Selector de fecha y controles -->
   <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
     <div class="flex justify-between items-center mb-6">
@@ -211,101 +328,175 @@
 
 <!-- MODAL DE ALIMENTACIÓN COMPLETO -->
 <div *ngIf="modalAbierto" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+  <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
     <!-- Header del Modal -->
-    <div class="bg-gradient-to-r from-pink-500 to-pink-600 text-white p-6">
-      <div class="flex justify-between items-center">
-        <div>
-          <h3 class="text-2xl font-bold">
-            <i class="fas fa-pig mr-2"></i>
-            Registro de Alimentación - Chanchos
-          </h3>
-          <p class="text-pink-100 mt-1" *ngIf="loteSeleccionado">
-            {{ loteSeleccionado.codigo }} - {{ loteSeleccionado.name }}
-          </p>
+    <div class="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <i class="fas fa-lock text-2xl"></i>
+          <div>
+            <h2 class="text-2xl font-bold">Registro de Alimentación</h2>
+            <div class="flex items-center space-x-4 text-green-100" *ngIf="loteSeleccionado">
+              <span>Lote: {{ formatLoteCodigo(loteSeleccionado?.codigo) }}</span>
+              <span class="border-l border-green-400 pl-4">
+                <i class="fas fa-lock mr-1"></i> Con Inventario Automático
+              </span>
+            </div>
+          </div>
         </div>
-        <button 
-          (click)="cerrarModal()"
-          class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg p-2 transition-all">
-          <i class="fas fa-times text-xl"></i>
+        <button (click)="cerrarModal()" class="text-white hover:text-red-200 transition-colors">
+          <i class="fas fa-times text-2xl"></i>
         </button>
+      </div>
+
+      <!-- Resumen superior del lote -->
+      <div class="mt-4 bg-green-500 bg-opacity-20 rounded-lg p-4" *ngIf="loteSeleccionado">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div class="bg-green-100 border border-green-300 rounded-lg p-3">
+            <p class="text-green-700 font-medium">Edad de Lote</p>
+            <p class="font-bold text-green-900 text-lg">{{ calcularDiasDeVida(loteSeleccionado.birthdate) }} días</p>
+            <p class="text-green-700 text-sm">Meses: <span class="font-semibold">{{ getEdadEnMesesTexto(loteSeleccionado) }}</span></p>
+          </div>
+          <div class="bg-blue-100 border border-blue-300 rounded-lg p-3">
+            <p class="text-blue-700 font-medium">Chanchos en el Lote</p>
+            <p class="font-bold text-blue-900 text-lg">{{ loteSeleccionado?.quantity || 0 }} chanchos vivos</p>
+            <p class="text-blue-500 text-xs">Raza: {{ loteSeleccionado?.race?.name || 'No definida' }}</p>
+            <p class="text-blue-400 text-xs">Código: {{ formatLoteCodigo(loteSeleccionado?.codigo) }}</p>
+          </div>
+          <div class="bg-gray-100 border border-gray-300 rounded-lg p-3">
+            <p class="text-gray-700 font-medium">Fecha del Registro</p>
+            <p class="font-bold text-gray-900">{{ formatearFecha(selectedDate) }}</p>
+            <p class="text-gray-600 text-xs">Fecha de nacimiento:</p>
+            <p class="text-gray-500 text-xs">{{ formatearFecha(loteSeleccionado?.birthdate || null) }}</p>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Contenido del Modal -->
-    <div class="modal-body p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        <!-- Columna Izquierda: Formulario Básico -->
-        <div class="form-column space-y-6">
-          
-          <!-- Información del Lote (Solo Lectura) -->
-          <div class="form-section">
-            <h4 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <i class="fas fa-info-circle text-pink-600 mr-2"></i>
-              🐷 Información del Lote
-            </h4>
-            
-            <div class="bg-pink-50 border border-pink-200 rounded-lg p-4">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4" *ngIf="loteSeleccionado">
-                <div>
-                  <label class="block text-sm font-medium text-pink-800 mb-1">📅 Días de vida</label>
-                  <div class="text-xl font-bold text-pink-900">
-                    {{ calcularDiasDeVida(loteSeleccionado.birthdate) }} días
-                  </div>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-pink-800 mb-1">🏷️ Etapa estimada</label>
-                  <div class="text-lg font-semibold text-pink-900">
-                    {{ modalData.etapaNombre }}
-                  </div>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-pink-800 mb-1">🐷 Chanchos vivos</label>
-                  <div class="text-xl font-bold text-pink-900">
-                    {{ loteSeleccionado.quantity }}
-                  </div>
-                </div>
+    <div class="modal-body p-6">
+      <!-- ✅ Mensaje de Error (Stock Insuficiente) -->
+      <div *ngIf="uiMessageError" class="alert-error bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-lg mb-6 shadow-md">
+        <div class="flex items-start">
+          <svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+          </svg>
+          <div class="flex-1">
+            <h3 class="font-bold text-lg mb-2">⚠️ Stock Insuficiente</h3>
+            <pre class="whitespace-pre-wrap text-sm leading-relaxed font-mono">{{ uiMessageError }}</pre>
+          </div>
+          <button (click)="uiMessageError = ''" class="text-red-500 hover:text-red-700 ml-2">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ✅ Mensaje de Éxito -->
+      <div *ngIf="uiMessageSuccess" class="bg-green-50 border-l-4 border-green-500 text-green-800 p-4 rounded-lg mb-6 shadow-md">
+        <div class="flex items-start">
+          <svg class="w-6 h-6 text-green-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          <div class="flex-1">
+            <pre class="whitespace-pre-wrap text-sm font-medium">{{ uiMessageSuccess }}</pre>
+          </div>
+          <button (click)="uiMessageSuccess = ''" class="text-green-500 hover:text-green-700 ml-2">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Etapa Actual del Plan Nutricional -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center space-x-3 mb-3">
+          <i class="fas fa-chart-line text-blue-600"></i>
+          <h3 class="font-semibold text-blue-900">Etapa Actual del Plan Nutricional</h3>
+        </div>
+        <div *ngIf="etapaActualChanchos; else sinEtapaChanchos">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
+            <div>
+              <p class="text-blue-700 font-medium">Etapa:</p>
+              <p class="font-bold text-blue-900">{{ planPrincipalNombre || 'Etapa detectada' }}</p>
+            </div>
+            <div>
+              <p class="text-blue-700 font-medium">Rango de días:</p>
+              <p class="font-bold text-blue-900">
+                <ng-container *ngIf="planPrincipalRango.min && planPrincipalRango.max; else rangoNoDisp">
+                  {{ planPrincipalRango.min }} - {{ planPrincipalRango.max }} días
+                </ng-container>
+                <ng-template #rangoNoDisp>Sin rango</ng-template>
+              </p>
+            </div>
+            <div>
+              <p class="text-blue-700 font-medium">Días actuales:</p>
+              <p class="font-bold text-green-700">{{ calcularDiasDeVida(loteSeleccionado?.birthdate || null) }} días</p>
+            </div>
+            <div>
+              <p class="text-blue-700 font-medium">Alimento recomendado:</p>
+              <p class="font-bold text-green-800">{{ etapaActualChanchos.alimentoRecomendado }}</p>
+            </div>
+          </div>
+          <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-green-700 font-medium">Cantidad por animal:</p>
+                <p class="font-bold text-green-900">{{ formatearCantidad(etapaActualChanchos.quantityPerAnimal) }} kg/animal/día</p>
+              </div>
+              <div class="text-right">
+                <p class="text-green-600 text-sm">Total sugerido:</p>
+                <p class="font-bold text-green-800">{{ formatearCantidad(getCantidadSugeridaEtapaActual()) }} kg</p>
               </div>
             </div>
           </div>
-
+        </div>
+        <ng-template #sinEtapaChanchos>
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div class="flex items-center space-x-2">
+              <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+              <p class="text-yellow-800 text-sm font-medium">Sin etapa definida para {{ calcularDiasDeVida(loteSeleccionado?.birthdate || null) }} días</p>
+            </div>
+          </div>
+        </ng-template>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Columna Izquierda: Formulario Básico -->
+        <div class="form-column space-y-6 lg:col-span-2">
+          
           <!-- Formulario de Registro -->
           <div class="form-section">
             <h4 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <i class="fas fa-edit text-green-600 mr-2"></i>
-              📝 Registro de Alimentación
+              <i class="fas fa-drumstick-bite text-pink-600 mr-2"></i>
+              Registro de Alimentación
             </h4>
             
             <div class="space-y-4">
-              <!-- Fecha y hora -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
-                  <input 
-                    type="date" 
-                    [(ngModel)]="registroCompleto.fecha"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Hora *</label>
-                  <input 
-                    type="time" 
-                    [(ngModel)]="registroCompleto.hora"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
+              <!-- Cantidad total (arriba) -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad Total (kg)</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="registroCompleto.cantidadAplicada"
+                  step="0.1"
+                  min="0"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                <div *ngIf="etapaActualChanchos" class="mt-1 text-xs text-gray-600">
+                  {{ formatearCantidad(etapaActualChanchos.quantityPerAnimal) }} kg/animal × {{ loteSeleccionado?.quantity }} animales =
+                  <span class="font-semibold text-green-600">{{ formatearCantidad(getCantidadSugeridaEtapaActual()) }} kg total</span>
                 </div>
               </div>
 
-              <!-- Alimentación -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-3">
-                  <label class="block text-sm font-medium text-gray-700">Tipo de Alimento</label>
+              <!-- Tipo de Alimento (ancho completo) -->
+              <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">Tipo de Alimento</label>
 
                   <!-- Dinámico por plan nutricional -->
                   <div *ngIf="etapasDisponiblesLote && etapasDisponiblesLote.length > 0; else selectFallback" class="mb-2">
-                    <div class="text-xs text-pink-700 mb-2 font-medium">
+                    <div class="text-xs text-blue-700 mb-2 font-medium">
                       <i class="fas fa-clipboard-list mr-1"></i>
                       Alimentos recomendados del plan nutricional ({{ etapasDisponiblesLote.length }} opciones)
                       <span class="text-green-700 font-semibold">
@@ -324,31 +515,30 @@
 
                     <div class="space-y-2">
                       <label *ngFor="let etapa of etapasDisponiblesLote; let i = index"
-                             class="flex items-center p-3 border border-pink-200 rounded-lg bg-pink-50 hover:bg-pink-100 cursor-pointer transition-colors"
-                             [class.border-pink-400]="etapa.seleccionado"
-                             [class.bg-pink-100]="etapa.seleccionado">
+                             class="flex items-center p-3 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors"
+                             [class.border-blue-400]="etapa.seleccionado"
+                             [class.bg-blue-100]="etapa.seleccionado">
                         <input type="checkbox" 
                                [(ngModel)]="etapa.seleccionado"
                                (change)="actualizarAlimentosSeleccionados()"
-                               class="mr-3 text-pink-600">
+                               class="mr-3 text-blue-600">
                         <div class="flex-1">
                           <div class="flex items-center justify-between">
-                            <span class="font-semibold text-pink-900">{{ etapa.alimentoRecomendado }}</span>
+                            <span class="font-semibold text-blue-900">{{ etapa.alimentoRecomendado }}</span>
                             <div class="flex items-center space-x-2">
                               <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs" *ngIf="etapa.dayStart && etapa.dayEnd">
                                 {{ etapa.dayStart }}-{{ etapa.dayEnd }} días
                               </span>
-                              <span class="bg-pink-100 text-pink-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
+                              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Opción {{ i + 1 }}</span>
                             </div>
                           </div>
-                          <div class="text-pink-700 text-sm mt-1">
+                          <div class="text-blue-700 text-sm mt-1">
                             <i class="fas fa-weight mr-1"></i>
                             {{ formatearCantidad(etapa.quantityPerAnimal) }} kg/animal/día
                           </div>
 
-                          <!-- Detalles por producto -->
                           <div *ngIf="etapa.productosDetalle && etapa.productosDetalle.length > 0" 
-                               class="text-pink-700 text-xs mt-2 pl-4 border-l-2 border-pink-200">
+                               class="text-blue-700 text-xs mt-2 pl-4 border-l-2 border-blue-200">
                             <div class="font-medium mb-1">Detalles por producto:</div>
                             <div *ngFor="let producto of etapa.productosDetalle" class="flex justify-between">
                               <span>• {{ producto.nombre }}:</span>
@@ -406,52 +596,11 @@
                       <option value="otro">Otro</option>
                     </select>
                   </ng-template>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad aplicada (kg) *</label>
-                  <input 
-                    type="number" 
-                    [(ngModel)]="registroCompleto.cantidadAplicada"
-                    step="0.1"
-                    min="0"
-                    placeholder="0.0"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                </div>
-              </div>
-
-              <!-- Estado de los animales -->
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Animales vivos *</label>
-                  <input 
-                    type="number" 
-                    [(ngModel)]="registroCompleto.animalesVivos"
-                    min="0"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Animales muertos</label>
-                  <input 
-                    type="number" 
-                    [(ngModel)]="registroCompleto.animalesMuertos"
-                    min="0"
-                    placeholder="0"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Animales enfermos</label>
-                  <input 
-                    type="number" 
-                    [(ngModel)]="registroCompleto.animalesEnfermos"
-                    min="0"
-                    placeholder="0"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-                </div>
               </div>
 
               <!-- Observaciones -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones generales</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
                 <textarea 
                   [(ngModel)]="registroCompleto.observacionesGenerales"
                   rows="3"
@@ -462,36 +611,58 @@
           </div>
         </div>
 
-        <!-- Columna Derecha: Información Adicional -->
-        <div class="info-column space-y-6">
-          <!-- Información nutricional placeholder -->
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h5 class="font-semibold text-gray-800 mb-3">
-              <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-              Información Nutricional
-            </h5>
-            <div class="text-sm text-gray-600 space-y-2">
-              <p><strong>Etapa:</strong> {{ modalData.etapaNombre }}</p>
-              <p><strong>Animales:</strong> {{ modalData.animalesVivos }} chanchos</p>
-              <p class="text-orange-600 italic">Sistema de planes nutricionales en desarrollo...</p>
-            </div>
+        <div class="space-y-4 lg:col-span-1">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fas fa-check-circle text-green-600 mr-1"></i>
+              Chanchos Vivos Actuales
+            </label>
+              <input 
+                type="number" 
+                [value]="loteSeleccionado?.quantity"
+                readonly
+                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-green-50 text-green-700 font-semibold focus:outline-none">
+            <p class="mt-1 text-xs text-green-700">Este valor se actualiza automáticamente al registrar mortalidad</p>
           </div>
-
-          <!-- Historial placeholder -->
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h5 class="font-semibold text-gray-800 mb-3">
-              <i class="fas fa-history text-green-600 mr-2"></i>
-              Últimos Registros
-            </h5>
-            <div class="text-sm text-gray-600">
-              <p class="italic">Historial de alimentación se mostrará aquí...</p>
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-red-600 mb-1">
+              <i class="fas fa-circle text-red-500 text-xs mr-1"></i>
+              Animales Muertos Hoy
+            </label>
+              <input 
+                type="number" 
+                [(ngModel)]="registroCompleto.animalesMuertos"
+                min="0"
+                placeholder="0"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Animales Enfermos</label>
+              <input 
+                type="number" 
+                [(ngModel)]="registroCompleto.animalesEnfermos"
+                min="0"
+                placeholder="0"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Peso promedio Animal (kg)</label>
+              <input 
+                type="number" 
+                [(ngModel)]="registroCompleto.pesoAnimal"
+                step="0.1"
+                min="0"
+                placeholder="Ej: 25.5"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            <p class="mt-1 text-xs text-gray-500">Dato clave para evaluar crecimiento y eficacia del plan.</p>
           </div>
         </div>
       </div>
 
+      
+
       <!-- Botones de acción -->
-      <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+      <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end space-x-4">
         <button 
           (click)="cerrarModal()"
           class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
@@ -499,9 +670,10 @@
           Cancelar
         </button>
         <button 
-          class="bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-6 py-2 rounded-lg font-semibold transition-all">
-          <i class="fas fa-save mr-2"></i>
-          Guardar Registro
+          (click)="registrarConInventarioAutomatico()"
+          class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-2 rounded-lg font-semibold transition-all">
+          <i class="fas fa-lock mr-2"></i>
+          Registrar con Inventario Automático
         </button>
       </div>
     </div>

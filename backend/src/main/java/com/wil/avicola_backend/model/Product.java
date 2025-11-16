@@ -76,4 +76,18 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ManyToOne
+    @JoinColumn(name = "subcategory_id")
+    private Subcategory subcategory;
+
+    private Boolean incluirEnBotiquin;
+    private String usoPrincipal;
+    private String dosisRecomendada;
+    private String viaAdministracion;
+    private Integer tiempoRetiro;
+    private Date fechaVencimiento;
+    private String observacionesMedicas;
+    private String presentacion;
+    private String infoNutricional;
+
 }

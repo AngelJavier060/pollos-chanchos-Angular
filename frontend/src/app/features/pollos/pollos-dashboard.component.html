@@ -1,4 +1,4 @@
-<div class="pollos-dashboard-layout flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+<div class="pollos-dashboard-layout flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" [class.dark-mode]="isDarkMode">
   <!-- SIDEBAR PROFESIONAL -->
   <aside class="sidebar bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col border-r border-gray-200 relative overflow-hidden"
          [ngClass]="{ 'collapsed': isSidebarCollapsed }"
@@ -79,29 +79,59 @@
 
   <!-- CONTENIDO PRINCIPAL -->
   <main class="flex-1 flex flex-col min-h-screen bg-white">
+    <!-- Barra Superior Mejorada -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <!-- Breadcrumb -->
+        <div class="flex items-center space-x-3">
+          <h1 class="text-xl font-bold text-gray-800">Panel de Control</h1>
+          <span class="text-gray-400">/</span>
+          <span class="text-sm text-gray-600">Pollos</span>
+          <span class="text-gray-400">/</span>
+          <span class="text-sm text-green-600 font-medium">{{ pageTitle || 'Dashboard' }}</span>
+        </div>
+        
+        <!-- Acciones Rápidas -->
+        <div class="flex items-center space-x-4">
           <!-- Toggle Sidebar -->
-          <div class="mb-4">
-            <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" (click)="toggleSidebarCollapse()">
-              <i class="fas text-gray-600" [ngClass]="{ 'fa-bars': !isSidebarCollapsed, 'fa-times': isSidebarCollapsed }"></i>
-            </button>
-          </div>
+          <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" (click)="toggleSidebarCollapse()" title="Colapsar/Expandir menú">
+            <i class="fas text-gray-600" [ngClass]="{ 'fa-bars': isSidebarCollapsed, 'fa-chevron-left': !isSidebarCollapsed }"></i>
+          </button>
+          
+          <!-- Notificaciones -->
+          <button class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <i class="fas fa-bell text-gray-600"></i>
+            <span class="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+          </button>
+          
           <!-- Búsqueda Rápida -->
           <div class="relative">
             <input type="text" 
                    placeholder="Buscar lotes..." 
-                   class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-64">
+                   class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-64">
             <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
           </div>
-          <!-- Fin cabecera -->
-
-          <!-- Título del módulo -->
-          <div class="page-header mt-4 mb-2">
-            <h1 class="page-title">{{ pageTitle | uppercase }}</h1>
+          
+          <!-- Perfil de Usuario -->
+          <div class="flex items-center space-x-3">
+            <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="h-10 w-10 rounded-full border-2 border-green-400">
+            <div class="hidden md:block">
+              <div class="text-sm font-semibold text-gray-800">{{ user?.name || user?.username }}</div>
+              <div class="text-xs text-gray-500">{{ (user?.roles?.[0] || 'Usuario') | titlecase }}</div>
+            </div>
           </div>
-
+        </div>
+      </div>
+    </header>
+    
     <!-- Contenido Dinámico -->
     <div class="flex-1 p-6 bg-gray-50">
       <router-outlet></router-outlet>
     </div>
   </main>
+
+  <!-- Botón flotante para cambiar tema -->
+  <button class="theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
+    <i [class]="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+  </button>
 </div>

@@ -1,12 +1,267 @@
 <div class="p-6 bg-white rounded-lg shadow-md">
   <!-- Encabezado -->
-  <div class="text-center mb-6">
+  <div class="text-center mb-6" *ngIf="!botiquinOnly">
     <h1 class="text-3xl font-bold text-blue-800">Gestión de Inventario</h1>
     <p class="text-gray-600 mt-2">Administra los productos e insumos del sistema avícola</p>
   </div>
+  
+  <!-- Vista de Botiquín -->
+  <div *ngIf="vistaActual === 'productos' && botiquinOnly">
+    <!-- Header Botiquín -->
+    <div class="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-3">
+            <span class="text-3xl md:text-4xl">🏥</span>
+            Botiquín Veterinario
+          </h1>
+          <p class="text-gray-600 mt-2">Control de medicamentos e insumos de emergencia</p>
+        </div>
+        <button (click)="openForm(false)" class="px-4 md:px-6 py-2 md:py-3 rounded-lg font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          + Agregar Producto
+        </button>
+      </div>
+    </div>
+
+    <!-- Entradas vigentes del producto -->
+    <div class="bg-white border border-green-200 rounded-lg p-6 shadow-sm mt-4" *ngIf="selectedProductIdEntradas">
+      <h3 class="text-lg font-semibold text-green-800 mb-3">
+        <i class="fas fa-check-circle mr-2"></i>Entradas vigentes del producto
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingreso</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vence</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Stock base</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unidades</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad ctrl</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let e of getEntradasVigentesSeleccionado()">
+              <td class="px-4 py-2">{{ e.codigoLote || '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaIngreso ? (toDate(e.fechaIngreso) | date:'dd/MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaVencimiento ? (toDate(e.fechaVencimiento) | date:'MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2 text-right">{{ (e.stockBaseRestante || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2 text-right">{{ (e.stockUnidadesRestantes || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">{{ e.unidadControl || '-' }}</td>
+            </tr>
+            <tr *ngIf="getEntradasVigentesSeleccionado().length === 0">
+              <td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">Sin entradas vigentes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Histórico de entradas del producto -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-4" *ngIf="selectedProductIdEntradas">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">
+        <i class="fas fa-archive mr-2"></i>Histórico de entradas (cerradas / vencidas / agotadas)
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingreso</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Restante</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let e of getEntradasHistoricoSeleccionado()">
+              <td class="px-4 py-2">{{ e.codigoLote || '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaIngreso ? (toDate(e.fechaIngreso) | date:'dd/MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2">{{ e.fechaVencimiento ? (toDate(e.fechaVencimiento) | date:'MM/yyyy') : '-' }}</td>
+              <td class="px-4 py-2 text-right">{{ (e.stockBaseRestante || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">
+                <span class="px-2 py-1 rounded text-xs font-medium" [ngClass]="(e?.activo === false) ? 'bg-gray-200 text-gray-700' : 'bg-yellow-100 text-yellow-700'">
+                  {{ (e?.activo === false) ? 'Cerrada' : 'No vigente' }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="getEntradasHistoricoSeleccionado().length === 0">
+              <td colspan="5" class="px-4 py-3 text-center text-sm text-gray-500">Sin histórico de entradas</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Movimientos del producto seleccionado -->
+    <div class="bg-white border border-blue-200 rounded-lg p-6 shadow-sm mt-4" *ngIf="selectedProductIdEntradas">
+      <h3 class="text-lg font-semibold text-blue-800 mb-3">
+        <i class="fas fa-history mr-2"></i>Movimientos del producto
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Stock anterior</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Stock nuevo</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let m of movimientosProducto">
+              <td class="px-4 py-2">{{ m.fechaMovimiento ? (toDate(m.fechaMovimiento) | date:'dd/MM/yyyy HH:mm') : '-' }}</td>
+              <td class="px-4 py-2">{{ m.tipoMovimiento }}</td>
+              <td class="px-4 py-2 text-right">{{ (m.cantidad || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2 text-right">{{ (m.stockAnterior || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2 text-right">{{ (m.stockNuevo || 0) | number:'1.0-2' }}</td>
+            </tr>
+            <tr *ngIf="movimientosProducto.length === 0">
+              <td colspan="5" class="px-4 py-3 text-center text-sm text-gray-500">Sin movimientos</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div class="bg-white rounded-xl shadow-lg p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm">Total</p>
+            <p class="text-2xl md:text-3xl font-bold text-gray-800">{{ getBotStats().total }}</p>
+          </div>
+          <div class="text-2xl md:text-4xl">📦</div>
+        </div>
+      </div>
+      <div class="bg-green-50 rounded-xl shadow-lg p-4 border-2 border-green-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-green-700 text-sm font-medium">Disponibles</p>
+            <p class="text-2xl md:text-3xl font-bold text-green-600">{{ getBotStats().ok }}</p>
+          </div>
+          <div class="text-2xl md:text-4xl">✅</div>
+        </div>
+      </div>
+      <div class="bg-yellow-50 rounded-xl shadow-lg p-4 border-2 border-yellow-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-yellow-700 text-sm font-medium">Alerta</p>
+            <p class="text-2xl md:text-3xl font-bold text-yellow-600">{{ getBotStats().alerta }}</p>
+          </div>
+          <div class="text-2xl md:text-4xl">⚡</div>
+        </div>
+      </div>
+      <div class="bg-orange-50 rounded-xl shadow-lg p-4 border-2 border-orange-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-orange-700 text-sm font-medium">Bajo Stock</p>
+            <p class="text-2xl md:text-3xl font-bold text-orange-600">{{ getBotStats().bajo }}</p>
+          </div>
+          <div class="text-2xl md:text-4xl">⚠️</div>
+        </div>
+      </div>
+      <div class="bg-red-50 rounded-xl shadow-lg p-4 border-2 border-red-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-red-700 text-sm font-medium">Agotados</p>
+            <p class="text-2xl md:text-3xl font-bold text-red-600">{{ getBotStats().agotado }}</p>
+          </div>
+          <div class="text-2xl md:text-4xl">🔴</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
+      <div class="flex flex-col gap-4">
+        <div class="relative">
+          <input type="text" [(ngModel)]="botSearch" placeholder="🔍 Buscar por nombre, uso, dosis..." class="w-full px-5 py-3 pl-12 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all">
+          <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl">🔍</span>
+        </div>
+        <div class="flex gap-4 items-center flex-wrap">
+          <span class="text-gray-700 font-medium">Filtrar por:</span>
+          <select [(ngModel)]="botFiltroCategoria" class="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500">
+            <option value="todos">Todas las categorías</option>
+            <option *ngFor="let type of typeFoods" [value]="type.name">{{ type.name }}</option>
+          </select>
+          <select [(ngModel)]="botFiltroEstado" class="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500">
+            <option value="todos">Todos los estados</option>
+            <option value="ok">✅ Disponibles</option>
+            <option value="alerta">⚡ En Alerta</option>
+            <option value="bajo">⚠️ Bajo Stock</option>
+            <option value="agotado">🔴 Agotados</option>
+          </select>
+          <div class="ml-auto text-sm text-gray-600">
+            Mostrando {{ getProductosBotiquinFiltrados().length }} de {{ getProductosBotiquin().length }} productos
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de productos Botiquín -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+            <tr>
+              <th class="px-4 py-4 text-left text-sm font-semibold">Estado</th>
+              <th class="px-4 py-4 text-left text-sm font-semibold">Producto</th>
+              <th class="px-4 py-4 text-left text-sm font-semibold">Categoría</th>
+              <th class="px-4 py-4 text-left text-sm font-semibold">Animal</th>
+              <th class="px-4 py-4 text-center text-sm font-semibold">Stock</th>
+              <th class="px-4 py-4 text-center text-sm font-semibold">Nivel Mín.</th>
+              <th class="px-4 py-4 text-left text-sm font-semibold">Uso Principal</th>
+              <th class="px-4 py-4 text-center text-sm font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr *ngFor="let p of getProductosBotiquinFiltrados(); trackBy: trackByProductId" class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-4">
+                <div class="flex flex-col items-center">
+                  <span class="text-2xl">{{ getBotEstadoMeta(p).icon }}</span>
+                  <span class="text-xs font-semibold" [ngClass]="getBotEstadoMeta(p).colorClass">{{ getBotEstadoMeta(p).texto }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-4">
+                <div class="font-semibold text-gray-800">{{ p.name }}</div>
+              </td>
+              <td class="px-4 py-4">
+                <div class="text-sm text-gray-800">{{ p.typeFood?.name || getTypeFoodName(p.typeFood_id) }}</div>
+                <div class="text-xs text-gray-500">{{ $any(p)?.subcategory?.name || '-' }}</div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <span class="text-lg">{{ p.animal?.name || '-' }}</span>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="text-lg font-bold" [ngClass]="getBotEstadoMeta(p).colorClass">{{ getCantidadRealProducto(p) | number:'1.0-2' }}</div>
+                <div class="text-xs text-gray-500">{{ p.unitMeasurement?.name || getUnitMeasurementName(p.unitMeasurement_id) }}</div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="text-sm text-gray-600">{{ p.level_min }}</div>
+                <div class="text-xs text-gray-400">{{ p.unitMeasurement?.name || getUnitMeasurementName(p.unitMeasurement_id) }}</div>
+              </td>
+              <td class="px-4 py-4">
+                <div class="text-sm text-gray-700 max-w-xs">{{ $any(p)?.usoPrincipal || '-' }}</div>
+                <div *ngIf="$any(p)?.dosisRecomendada" class="text-xs text-purple-600 mt-1">💉 {{ $any(p)?.dosisRecomendada }}</div>
+              </td>
+              <td class="px-4 py-4">
+                <div class="flex justify-center gap-2">
+                  <button (click)="openForm(true, p)" class="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">✏️ Editar</button>
+                  <button *ngIf="getBotEstado(p) !== 'ok'" (click)="reponerProducto(p)" class="px-3 py-1 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 transition-colors">🛒 Reabastecer</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 <!-- Vista de Alertas -->
-<div *ngIf="vistaActual === 'alertas'" class="space-y-6">
+<div *ngIf="vistaActual === 'alertas' && !botiquinOnly" class="space-y-6">
   <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-xl font-semibold text-gray-800">
@@ -42,7 +297,7 @@
                 <td class="px-3 py-2">{{ e.product?.name || 'Producto' }}</td>
                 <td class="px-3 py-2">{{ e.codigoLote || '-' }}</td>
                 <td class="px-3 py-2">{{ e.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
-                <td class="px-3 py-2 text-right">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
+                <td class="px-3 py-2 text-right">{{ (e.stockBaseRestante || 0) | number:'1.0-2' }}</td>
               </tr>
               <tr *ngIf="alertasPorVencer.length === 0">
                 <td colspan="4" class="px-3 py-3 text-center text-sm text-gray-500">Sin alertas por vencer</td>
@@ -72,7 +327,7 @@
                 <td class="px-3 py-2">{{ e.product?.name || 'Producto' }}</td>
                 <td class="px-3 py-2">{{ e.codigoLote || '-' }}</td>
                 <td class="px-3 py-2">{{ e.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
-                <td class="px-3 py-2 text-right">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
+                <td class="px-3 py-2 text-right">{{ (e.stockBaseRestante || 0) | number:'1.0-2' }}</td>
               </tr>
               <tr *ngIf="alertasVencidas.length === 0">
                 <td colspan="4" class="px-3 py-3 text-center text-sm text-gray-500">Sin entradas vencidas</td>
@@ -123,29 +378,29 @@
 </div>
   
   <!-- Navegación entre vistas -->
-  <div class="flex justify-center mb-6">
+  <div class="flex justify-center mb-6" *ngIf="!botiquinOnly">
     <div class="bg-gray-100 rounded-lg p-1">
       <button 
         (click)="cambiarVista('productos')" 
-        [class]="vistaActual === 'productos' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        [ngClass]="vistaActual === 'productos' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
         <i class="fas fa-boxes mr-2"></i>Productos
       </button>
       <button 
         (click)="cambiarVista('inventario-automatico')" 
-        [class]="vistaActual === 'inventario-automatico' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        [ngClass]="vistaActual === 'inventario-automatico' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
         <i class="fas fa-warehouse mr-2"></i>Inventario Automático
       </button>
       <button 
         (click)="cambiarVista('entradas')" 
-        [class]="vistaActual === 'entradas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        [ngClass]="vistaActual === 'entradas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
         <i class="fas fa-inbox mr-2"></i>Entradas
       </button>
       <button 
         (click)="cambiarVista('alertas')" 
-        [class]="vistaActual === 'alertas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
+        [ngClass]="vistaActual === 'alertas' ? 'bg-blue-500 text-white' : 'text-gray-600'"
         class="px-4 py-2 rounded-md transition-colors duration-200 font-medium">
         <i class="fas fa-bell mr-2"></i>Alertas
       </button>
@@ -157,7 +412,7 @@
  
 
   <!-- Vista de Productos (existente) -->
-  <div *ngIf="vistaActual === 'productos'">
+  <div *ngIf="vistaActual === 'productos' && !botiquinOnly">
   
   <!-- Indicador de carga -->
   <div *ngIf="isLoading" class="flex justify-center my-4">
@@ -176,7 +431,7 @@
       <div class="space-y-1">
         <label class="text-sm font-medium text-gray-700">Proveedor</label>
         <select formControlName="providerId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-          <option [ngValue]="null">Todos</option>
+          <option value="">Todos</option>
           <option *ngFor="let provider of providers" [value]="provider.id">{{ provider.name }}</option>
         </select>
       </div>
@@ -184,7 +439,7 @@
       <div class="space-y-1">
         <label class="text-sm font-medium text-gray-700">Tipo de Alimento</label>
         <select formControlName="typeFoodId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-          <option [ngValue]="null">Todos</option>
+          <option value="">Todos</option>
           <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
         </select>
       </div>
@@ -192,7 +447,7 @@
       <div class="space-y-1">
         <label class="text-sm font-medium text-gray-700">Animal</label>
         <select formControlName="animalId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-          <option [ngValue]="null">Todos</option>
+          <option value="">Todos</option>
           <option *ngFor="let animal of animals" [value]="animal.id">{{ animal.name }}</option>
         </select>
       </div>
@@ -200,7 +455,7 @@
       <div class="space-y-1">
         <label class="text-sm font-medium text-gray-700">Etapa</label>
         <select formControlName="stageId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-          <option [ngValue]="null">Todos</option>
+          <option value="">Todos</option>
           <option *ngFor="let stage of stages" [value]="stage.id">{{ stage.name }}</option>
         </select>
       </div>
@@ -239,6 +494,40 @@
       </div>
     </div>
     
+    <!-- Solicitudes de recarga pendientes -->
+    <div *ngIf="pendingRechargeRequests?.length > 0" class="mb-4">
+      <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded p-4">
+        <div class="flex items-center mb-2">
+          <span class="text-yellow-600 mr-2">⚡</span>
+          <h4 class="text-sm font-semibold text-yellow-800">Solicitudes de recarga pendientes ({{ pendingRechargeRequests.length }})</h4>
+        </div>
+        <ul class="list-disc pl-6 text-sm text-yellow-900 space-y-1">
+          <li *ngFor="let r of pendingRechargeRequests">
+            <span class="font-medium">{{ r.name }}</span>
+            <span class="opacity-80"> — requerido {{ (r.cantidadRequerida || 0) | number:'1.0-2' }} vs disponible {{ (r.cantidadDisponible || 0) | number:'1.0-2' }}</span>
+            <span *ngIf="r.loteCodigo" class="opacity-60"> • Lote: {{ r.loteCodigo }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Solicitudes atendidas (recarga realizada) -->
+    <div *ngIf="resolvedRechargeRequests?.length > 0" class="mb-4">
+      <div class="bg-green-50 border-l-4 border-green-400 rounded p-4">
+        <div class="flex items-center mb-2">
+          <span class="text-green-600 mr-2">✅</span>
+          <h4 class="text-sm font-semibold text-green-800">Solicitudes atendidas ({{ resolvedRechargeRequests.length }})</h4>
+        </div>
+        <ul class="list-disc pl-6 text-sm text-green-900 space-y-1">
+          <li *ngFor="let r of resolvedRechargeRequests">
+            <span class="font-medium">{{ r.name }}</span>
+            <span class="opacity-80"> — requerido {{ (r.cantidadRequerida || 0) | number:'1.0-2' }}</span>
+            <span *ngIf="r.loteCodigo" class="opacity-60"> • Lote: {{ r.loteCodigo }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Tabla de productos -->
     <div class="overflow-x-auto bg-white rounded-lg shadow">
       <table class="min-w-full divide-y divide-gray-200">
@@ -260,10 +549,38 @@
             <td colspan="9" class="px-4 py-4 text-center text-sm text-gray-500">No se encontraron productos</td>
           </tr>
           <tr *ngFor="let product of filteredProducts" class="hover:bg-gray-50">
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ product.name }}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+              <div class="flex items-center gap-2">
+                <span [ngClass]="{'font-bold': getCantidadRealProducto(product) === 0 || esStockBajo(product)}">{{ product.name }}</span>
+                <!-- Badge de stock agotado -->
+                <span *ngIf="getCantidadRealProducto(product) === 0"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-400 animate-pulse">
+                  ⛔ AGOTADO
+                </span>
+                <!-- Badge de stock bajo -->
+                <span *ngIf="esStockBajo(product) && getCantidadRealProducto(product) > 0"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800 border border-orange-300">
+                  ⚠️ BAJO
+                </span>
+                <!-- Badge de solicitud de recarga pendiente -->
+                <span *ngIf="hasRechargeRequest(product)" [title]="getRechargeTooltip(product)"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300">
+                  📋 Solicitado
+                </span>
+              </div>
+            </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ getStockTotalProducto(product) | number:'1.0-2' }}</td>
             <!-- Cantidad Real (proporcional por tipo) -->
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold" [ngClass]="{'text-green-700': getCantidadRealProducto(product) > 0, 'text-red-700': getCantidadRealProducto(product) === 0}">{{ getCantidadRealProducto(product) | number:'1.0-2' }}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold" [ngClass]="{'text-green-700': getCantidadRealProducto(product) > 0 && !esStockBajo(product), 'text-orange-600': esStockBajo(product) && getCantidadRealProducto(product) > 0, 'text-red-700': getCantidadRealProducto(product) === 0}">
+              <div class="flex items-center gap-2">
+                <span>{{ getCantidadRealProducto(product) | number:'1.0-2' }}</span>
+                <span *ngIf="hasStockMismatch(product)" [title]="getStockMismatchTooltip(product)" class="text-yellow-600" aria-label="Desfase de stock">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.591c.75 1.333-.213 2.987-1.742 2.987H3.48c-1.53 0-2.492-1.654-1.743-2.987L8.257 3.1zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v3a1 1 0 01-1 1z" clip-rule="evenodd" />
+                  </svg>
+                </span>
+              </div>
+            </td>
             <!-- Disminución real -->
             <td class="px-4 py-3 whitespace-nowrap text-sm text-orange-700 font-semibold">
               {{ getDisminucionProducto(product) | number:'1.0-2' }}
@@ -281,14 +598,36 @@
               {{ product.animal?.name || getAnimalName(product.animal_id) }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
-              <div class="flex justify-center space-x-2">
+              <div class="flex justify-center items-center space-x-2">
+                <!-- Botón de REPONER prominente para stock agotado -->
                 <button *ngIf="getCantidadRealProducto(product) === 0"
                   (click)="reponerProducto(product)" 
-                  class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                  title="Crear entrada vigente (FEFO)">
+                  class="px-3 py-1.5 text-xs font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md hover:shadow-lg transition-all flex items-center gap-1 animate-pulse"
+                  title="⚠️ URGENTE: Reponer stock FEFO">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd" />
+                  </svg>
+                  Reponer Ahora
+                </button>
+                <!-- Botón de REPONER para stock bajo (menos urgente) -->
+                <button *ngIf="esStockBajo(product) && getCantidadRealProducto(product) > 0"
+                  (click)="reponerProducto(product)" 
+                  class="px-2 py-1 text-xs font-medium bg-orange-500 text-white rounded hover:bg-orange-600 shadow transition-all flex items-center gap-1"
+                  title="Stock bajo - Recomendar reposición">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                  </svg>
                   Reponer
                 </button>
-                <button 
+                <!-- Icono de alerta de solicitud pendiente -->
+                <span *ngIf="hasRechargeRequest(product)" [title]="getRechargeTooltip(product)" class="text-yellow-600 animate-bounce" aria-label="Recarga solicitada">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z" />
+                    <path d="M10 18a2 2 0 002-2H8a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <!-- Botón de editar (solo si no hay alerta crítica) -->
+                <button *ngIf="getCantidadRealProducto(product) > 0 && !esStockBajo(product)"
                   (click)="openForm(true, product)" 
                   class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -312,11 +651,12 @@
   
   <!-- Modal de formulario -->
   <div *ngIf="showForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto" cdkDrag>
+      <div class="p-6" cdkDragHandle>
+        <div class="flex justify-between items-center mb-4 cursor-move">
           <h3 class="text-xl font-semibold text-gray-900">
-            {{ isEditMode ? 'Editar Producto' : 'Nuevo Producto' }}
+            <span *ngIf="isEditMode">Editar Producto</span>
+            <span *ngIf="!isEditMode">Nuevo Producto</span>
           </h3>
           <button (click)="closeForm()" class="text-gray-500 hover:text-gray-700">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -324,79 +664,30 @@
             </svg>
           </button>
         </div>
-        
-        <form [formGroup]="productForm" (ngSubmit)="saveProduct()" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- COLUMNA 1 - Según la imagen -->
-            <div class="space-y-4">
-              <!-- Nombre -->
+
+        <form [formGroup]="productForm" (ngSubmit)="saveProduct()" class="space-y-6">
+          
+          <!-- SECCIÓN 1: INFORMACIÓN BÁSICA -->
+          <div class="bg-white border-l-4 border-purple-500 rounded-lg p-6 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-2xl">📋</span>
+              <h3 class="text-lg font-semibold text-purple-700">INFORMACIÓN BÁSICA</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Nombre del Producto -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Nombre *</label>
-                <select formControlName="name" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="''">Seleccione un nombre</option>
-                  <option *ngFor="let np of nombreProductos" [value]="np.nombre">
-                    {{ np.nombre }}
-                  </option>
-                </select>
+                <label class="text-sm font-medium text-gray-700">Nombre del Producto <span class="text-red-500">*</span></label>
+                <input type="text" formControlName="name" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Ej: Maíz amarillo">
                 <div *ngIf="productForm.get('name')?.invalid && productForm.get('name')?.touched" class="text-sm text-red-600">
                   Este campo es requerido
                 </div>
               </div>
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Descripción</label>
-                <textarea formControlName="description" rows="2" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Descripción del producto"></textarea>
-              </div>
               
-              <!-- Tipo de Alimento -->
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Tipo de Alimento *</label>
-                <select formControlName="typeFood_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="null">Seleccione un tipo</option>
-                  <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
-                </select>
-                <div *ngIf="productForm.get('typeFood_id')?.invalid && productForm.get('typeFood_id')?.touched" class="text-sm text-red-600">
-                  Este campo es requerido
-                </div>
-              </div>
-              
-              <!-- Cantidad -->
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Cantidad *</label>
-                <input type="number" formControlName="quantity" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Cantidad">
-                <div *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" class="text-sm text-red-600">
-                  Este campo es requerido
-                </div>
-              </div>
-              
-              <!-- Precio Unitario -->
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Precio Unitario *</label>
-                <input type="number" step="0.01" formControlName="price_unit" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Precio unitario">
-                <div *ngIf="productForm.get('price_unit')?.invalid && productForm.get('price_unit')?.touched" class="text-sm text-red-600">
-                  Este campo es requerido
-                </div>
-              </div>
-              
-              <!-- Fecha de Compra -->
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Fecha de Compra</label>
-                <input type="date" formControlName="date_compra" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-              </div>
-              
-              <!-- Nivel Mínimo -->
-              <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Nivel Mínimo</label>
-                <input type="number" step="0.01" formControlName="level_min" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Nivel mínimo">
-              </div>
-            </div>
-            
-            <!-- COLUMNA 2 - Según la imagen -->
-            <div class="space-y-4">
               <!-- Animal -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Animal *</label>
-                <select formControlName="animal_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="null">Seleccione un animal</option>
+                <label class="text-sm font-medium text-gray-700">Animal <span class="text-red-500">*</span></label>
+                <select formControlName="animal_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                  <option value="">Seleccione un animal</option>
                   <option *ngFor="let animal of animals" [value]="animal.id">{{ animal.name }}</option>
                 </select>
                 <div *ngIf="productForm.get('animal_id')?.invalid && productForm.get('animal_id')?.touched" class="text-sm text-red-600">
@@ -404,23 +695,69 @@
                 </div>
               </div>
               
+              <!-- Descripción -->
+              <div class="space-y-1 md:col-span-2">
+                <label class="text-sm font-medium text-gray-700">Descripción</label>
+                <textarea formControlName="description" rows="3" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Descripción breve del producto..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 2: CLASIFICACIÓN DEL PRODUCTO -->
+          <div class="bg-white border-l-4 border-yellow-500 rounded-lg p-6 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-2xl">🏷️</span>
+              <h3 class="text-lg font-semibold text-yellow-700">CLASIFICACIÓN DEL PRODUCTO</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Categoría Principal -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Categoría Principal <span class="text-red-500">*</span></label>
+                <select formControlName="typeFood_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                  <option value="">Seleccione una categoría</option>
+                  <option *ngFor="let typeFood of typeFoods" [value]="typeFood.id">{{ typeFood.name }}</option>
+                </select>
+                <div *ngIf="productForm.get('typeFood_id')?.invalid && productForm.get('typeFood_id')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+
+              <!-- Subcategoría -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Subcategoría <span class="text-red-500">*</span></label>
+                <select formControlName="subcategory_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                  <option value="">Primero seleccione una categoría</option>
+                  <option *ngFor="let sc of subcategories" [value]="sc.id">{{ sc.name }}</option>
+                </select>
+                <div *ngIf="subcategoryInfo" class="text-xs text-gray-600 italic mt-1">{{ subcategoryInfo }}</div>
+              </div>
+              
               <!-- Etapa -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Etapa *</label>
-                <select formControlName="stage_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="null">Seleccione una etapa</option>
+                <label class="text-sm font-medium text-gray-700">Etapa <span class="text-red-500">*</span></label>
+                <select formControlName="stage_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                  <option value="">Seleccione una etapa</option>
                   <option *ngFor="let stage of stages" [value]="stage.id">{{ stage.name }}</option>
                 </select>
                 <div *ngIf="productForm.get('stage_id')?.invalid && productForm.get('stage_id')?.touched" class="text-sm text-red-600">
                   Este campo es requerido
                 </div>
               </div>
-              
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: CONTROL DE INVENTARIO -->
+          <div class="bg-white border-l-4 border-orange-500 rounded-lg p-6 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-2xl">📦</span>
+              <h3 class="text-lg font-semibold text-orange-700">CONTROL DE INVENTARIO</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- Unidad de Medida -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Unidad de Medida *</label>
-                <select formControlName="unitMeasurement_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="null">Seleccione una unidad</option>
+                <label class="text-sm font-medium text-gray-700">Unidad de Medida <span class="text-red-500">*</span></label>
+                <select formControlName="unitMeasurement_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                  <option value="">Seleccione una unidad</option>
                   <option *ngFor="let unit of unitMeasurements" [value]="unit.id">{{ unit.name }}</option>
                 </select>
                 <div *ngIf="productForm.get('unitMeasurement_id')?.invalid && productForm.get('unitMeasurement_id')?.touched" class="text-sm text-red-600">
@@ -428,17 +765,55 @@
                 </div>
               </div>
               
-              <!-- Número de Factura -->
+              <!-- Cantidad Actual -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Número de Factura</label>
-                <input type="number" formControlName="number_facture" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Número de factura">
+                <label class="text-sm font-medium text-gray-700">Cantidad Actual <span class="text-red-500">*</span></label>
+                <input type="number" formControlName="quantity" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+                <div *ngIf="productForm.get('quantity')?.invalid && productForm.get('quantity')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
+              </div>
+              
+              <!-- Nivel Mínimo (Alerta) -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Nivel Mínimo (Alerta) <span class="text-red-500">*</span></label>
+                <input type="number" step="0.01" formControlName="level_min" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+                <div class="flex items-center gap-1 mt-1 text-xs text-orange-600">
+                  <span>⚠️</span>
+                  <span>Se alertará cuando llegue a este nivel</span>
+                </div>
+              </div>
+              
+              <!-- Nivel Máximo -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Nivel Máximo</label>
+                <input type="number" step="0.01" formControlName="level_max" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0">
+                <div class="text-xs text-gray-500 mt-1">Capacidad máxima de almacenamiento</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 4: INFORMACIÓN DE COMPRA -->
+          <div class="bg-white border-l-4 border-green-600 rounded-lg p-6 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-2xl">💰</span>
+              <h3 class="text-lg font-semibold text-green-700">INFORMACIÓN DE COMPRA</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Precio Unitario -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Precio Unitario <span class="text-red-500">*</span></label>
+                <input type="number" step="0.01" formControlName="price_unit" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="0.00">
+                <div *ngIf="productForm.get('price_unit')?.invalid && productForm.get('price_unit')?.touched" class="text-sm text-red-600">
+                  Este campo es requerido
+                </div>
               </div>
               
               <!-- Proveedor -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Proveedor *</label>
-                <select formControlName="provider_id" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  <option [ngValue]="null">Seleccione un proveedor</option>
+                <label class="text-sm font-medium text-gray-700">Proveedor <span class="text-red-500">*</span></label>
+                <select formControlName="provider_id" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                  <option value="">Seleccione un proveedor</option>
                   <option *ngFor="let provider of providers" [value]="provider.id">{{ provider.name }}</option>
                 </select>
                 <div *ngIf="productForm.get('provider_id')?.invalid && productForm.get('provider_id')?.touched" class="text-sm text-red-600">
@@ -446,32 +821,110 @@
                 </div>
               </div>
               
-              <!-- Nivel Máximo -->
+              <!-- Fecha de Compra -->
               <div class="space-y-1">
-                <label class="text-sm font-medium text-gray-700">Nivel Máximo</label>
-                <input type="number" step="0.01" formControlName="level_max" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Nivel máximo">
+                <label class="text-sm font-medium text-gray-700">Fecha de Compra <span class="text-red-500">*</span></label>
+                <input type="date" formControlName="date_compra" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              </div>
+              
+              <!-- Número de Factura -->
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Número de Factura</label>
+                <input type="text" formControlName="number_facture" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="FAC-12345">
               </div>
             </div>
           </div>
           
-          <div class="flex justify-end space-x-3 mt-6">
-            <button type="button" (click)="closeForm()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+          <!-- Sección específica para Medicamentos -->
+          <div *ngIf="showMedicamentos" class="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-600 space-y-4">
+            <div class="text-purple-700 font-semibold flex items-center gap-2">
+              <span class="text-xl">💊</span>
+              <span>Datos de Medicamento</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Uso Principal *</label>
+                <input type="text" formControlName="usoPrincipal" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" placeholder="Ej: Infecciones respiratorias">
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Dosis Recomendada *</label>
+                <input type="text" formControlName="dosisRecomendada" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" placeholder="Ej: 1 ml/10 kg">
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Vía de Administración *</label>
+                <select formControlName="viaAdministracion" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                  <option value="">Seleccione una vía</option>
+                  <option value="im">Intramuscular (IM)</option>
+                  <option value="iv">Intravenosa (IV)</option>
+                  <option value="sc">Subcutánea (SC)</option>
+                  <option value="oral">Oral</option>
+                  <option value="topica">Tópica</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Tiempo de Retiro (días) *</label>
+                <input type="number" formControlName="tiempoRetiro" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" min="0">
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Fecha de Vencimiento *</label>
+                <input type="date" formControlName="fechaVencimiento" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+              </div>
+              <div class="space-y-1 md:col-span-2">
+                <label class="text-sm font-medium text-gray-700">Observaciones Médicas</label>
+                <textarea rows="2" formControlName="observacionesMedicas" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" placeholder="Notas u observaciones..."></textarea>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="incluirEnBotiquin" formControlName="incluirEnBotiquin" class="w-5 h-5 text-green-600 border-2 border-gray-300 rounded focus:ring-2 focus:ring-green-500 cursor-pointer">
+              <label for="incluirEnBotiquin" class="text-sm font-medium text-gray-800 cursor-pointer">Incluir en Botiquín</label>
+            </div>
+          </div>
+
+          <!-- Sección específica para Alimentos (opcional) -->
+          <div *ngIf="showAlimentos" class="p-4 bg-green-50 rounded-lg border-l-4 border-green-600 space-y-4">
+            <div class="text-green-700 font-semibold flex items-center gap-2">
+              <span class="text-xl">🌾</span>
+              <span>Información Nutricional</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Presentación</label>
+                <select formControlName="presentacion" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                  <option value="">Seleccione</option>
+                  <option value="entero">Entero</option>
+                  <option value="molido">Molido</option>
+                  <option value="picado">Picado</option>
+                  <option value="liquido">Líquido</option>
+                  <option value="pellet">Pellet</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-sm font-medium text-gray-700">Información Nutricional</label>
+                <input type="text" formControlName="infoNutricional" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" placeholder="Ej: Proteína 18%, Grasa 4%">
+              </div>
+            </div>
+          </div>
+
+          <!-- Botones de acción -->
+          <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+            <button type="button" (click)="closeForm()" class="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium shadow-md">
               Cancelar
             </button>
-            <button type="submit" [disabled]="productForm.invalid" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
-              {{ isEditMode ? 'Actualizar' : 'Guardar' }}
+            <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-md flex items-center gap-2">
+              <span>💾</span>
+              <span>Guardar Producto</span>
             </button>
           </div>
         </form>
       </div>
     </div>
   </div>
-</div>
+
 
 </div> <!-- Fin de la vista de productos -->
 
 <!-- Vista de Entradas -->
-<div *ngIf="vistaActual === 'entradas'">
+<div *ngIf="vistaActual === 'entradas' && !botiquinOnly">
   <div class="space-y-6">
     <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">
@@ -492,19 +945,45 @@
           </div>
         </div>
       </div>
+      <!-- Alerta cuando el producto está bloqueado (modo Reponer) -->
+      <div *ngIf="productoEntradasBloqueado && invProductoSeleccionado" class="mb-4 p-4 rounded-lg bg-blue-50 border-l-4 border-blue-500">
+        <div class="flex items-start">
+          <svg class="w-6 h-6 text-blue-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <div class="flex-1">
+            <h3 class="font-bold text-blue-900 mb-1">📦 Reposición de Producto</h3>
+            <p class="text-sm text-blue-800">
+              Estás registrando entrada para: <strong class="font-bold">{{ invProductoSeleccionado.product?.name }}</strong>
+            </p>
+            <p class="text-xs text-blue-700 mt-1">El producto está preseleccionado desde la alerta de inventario.</p>
+          </div>
+          <button (click)="productoEntradasBloqueado = false" 
+                  class="text-blue-600 hover:text-blue-800 text-xs font-medium underline ml-2"
+                  title="Cambiar producto">
+            Cambiar producto
+          </button>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label class="text-sm font-medium text-gray-700">Producto</label>
-          <select class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                  [ngModel]="selectedProductIdEntradas" 
-                  (ngModelChange)="onProductoEntradasChange($event)">
-            <option [ngValue]="null">Seleccione un producto</option>
-            <option *ngFor="let p of products" [ngValue]="p.id">{{ p.name }}</option>
+          <select #productoEntrada class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  [class.bg-gray-100]="productoEntradasBloqueado"
+                  [class.cursor-not-allowed]="productoEntradasBloqueado"
+                  [disabled]="productoEntradasBloqueado"
+                  name="productoEntrada" (change)="onProductoEntradasChange(productoEntrada.value)">
+            <option value="">Seleccione un producto</option>
+            <option *ngFor="let p of products" [value]="p.id" [selected]="p.id === selectedProductIdEntradas">{{ p.name }}</option>
           </select>
+          <p *ngIf="productoEntradasBloqueado" class="text-xs text-gray-500 mt-1">
+            🔒 Producto bloqueado para reposición
+          </p>
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700">Unidad de control</label>
-          <input type="text" list="unidadesControlLista" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" [formControl]="entradaForm.get('unidadControl')" placeholder="Ej.: saco, frasco, caja">
+          <input type="text" list="unidadesControlLista" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" [formControl]="entradaForm.controls['unidadControl']" placeholder="Ej.: saco, frasco, caja">
           <datalist id="unidadesControlLista">
             <option value="saco"></option>
             <option value="bolsa"></option>
@@ -519,7 +998,10 @@
           </datalist>
         </div>
         <div class="flex items-end">
-          <button (click)="selectedProductIdEntradas && cargarEntradasPorProducto(selectedProductIdEntradas)" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Refrescar</button>
+          <button (click)="onProductoEntradasChange(productoEntrada.value || ''); productoEntradasBloqueado = false" 
+                  class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+            Refrescar
+          </button>
         </div>
       </div>
 
@@ -540,7 +1022,7 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
           <div class="p-3 bg-white rounded border">
             <p class="text-xs text-gray-500">Stock actual</p>
-            <p class="text-lg font-semibold">{{ invProductoSeleccionado.cantidadStock || 0 | number:'1.0-2' }} {{ invProductoSeleccionado.unidadMedida }}</p>
+            <p class="text-lg font-semibold">{{ (invProductoSeleccionado.cantidadStock || 0) | number:'1.0-2' }} {{ invProductoSeleccionado.unidadMedida }}</p>
           </div>
           <div class="p-3 bg-white rounded border">
             <p class="text-xs text-gray-500">Stock mínimo</p>
@@ -548,7 +1030,7 @@
           </div>
           <div class="p-3 bg-white rounded border">
             <p class="text-xs text-gray-500">Costo unitario promedio</p>
-            <p class="text-lg">{{ invProductoSeleccionado.costoUnitarioPromedio || 0 | number:'1.2-4' }}</p>
+            <p class="text-lg">{{ (invProductoSeleccionado.costoUnitarioPromedio || 0) | number:'1.2-4' }}</p>
           </div>
           <div class="p-3 bg-white rounded border">
             <p class="text-xs text-gray-500">Actualizado</p>
@@ -592,8 +1074,8 @@
         <div>
           <label class="text-sm font-medium text-gray-700">Proveedor</label>
           <select formControlName="providerId" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-            <option [ngValue]="null">Seleccione un proveedor</option>
-            <option *ngFor="let prov of providers" [ngValue]="prov.id">{{ prov.name }}</option>
+            <option value="">Seleccione un proveedor</option>
+            <option *ngFor="let prov of providers" [value]="prov.id">{{ prov.name }}</option>
           </select>
         </div>
         <div>
@@ -610,6 +1092,68 @@
           </button>
         </div>
       </form>
+    </div>
+
+    <!-- Listados globales: Productos Activos / Histórico -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <!-- Activos -->
+      <div class="bg-white border border-green-200 rounded-lg p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-green-800 mb-3">
+          <i class="fas fa-box-open mr-2"></i>Productos activos (con stock vigente)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Real</th>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let p of getProductosActivosEntradas()">
+                <td class="px-3 py-2">{{ p.name }}</td>
+                <td class="px-3 py-2 text-right">{{ getCantidadRealProducto(p) | number:'1.0-2' }}</td>
+                <td class="px-3 py-2 text-center">
+                  <button (click)="seleccionarProductoEntradas(p)" class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Ver</button>
+                </td>
+              </tr>
+              <tr *ngIf="getProductosActivosEntradas().length === 0">
+                <td colspan="3" class="px-3 py-3 text-center text-sm text-gray-500">Sin productos activos</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Histórico -->
+      <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">
+          <i class="fas fa-archive mr-2"></i>Productos en histórico (agotados)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Real</th>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let p of getProductosHistoricoEntradas()">
+                <td class="px-3 py-2">{{ p.name }}</td>
+                <td class="px-3 py-2 text-right">{{ getCantidadRealProducto(p) | number:'1.0-2' }}</td>
+                <td class="px-3 py-2 text-center">
+                  <button (click)="seleccionarProductoEntradas(p)" class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Ver</button>
+                </td>
+              </tr>
+              <tr *ngIf="getProductosHistoricoEntradas().length === 0">
+                <td colspan="3" class="px-3 py-3 text-center text-sm text-gray-500">Sin productos en histórico</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm" *ngIf="selectedProductIdEntradas">
@@ -638,12 +1182,12 @@
               <td class="px-4 py-2">{{ e.codigoLote || '-' }}</td>
               <td class="px-4 py-2">{{ e.fechaIngreso ? (toDate(e.fechaIngreso) | date:'dd/MM/yyyy') : '-' }}</td>
               <td class="px-4 py-2">{{ e.fechaVencimiento ? (toDate(e.fechaVencimiento) | date:'MM/yyyy') : '-' }}</td>
-              <td class="px-4 py-2">{{ e.stockBaseRestante || 0 | number:'1.0-2' }}</td>
-              <td class="px-4 py-2">{{ e.stockUnidadesRestantes || 0 | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">{{ (e.stockBaseRestante || 0) | number:'1.0-2' }}</td>
+              <td class="px-4 py-2">{{ (e.stockUnidadesRestantes || 0) | number:'1.0-2' }}</td>
               <td class="px-4 py-2">{{ e.unidadControl || '-' }}</td>
               <td class="px-4 py-2">{{ e.provider?.name || '-' }}</td>
-              <td class="px-4 py-2 text-right">{{ e.costoUnitarioBase || 0 | number:'1.2-4' }}</td>
-              <td class="px-4 py-2 text-right">{{ e.costoPorUnidadControl || 0 | number:'1.2-4' }}</td>
+              <td class="px-4 py-2 text-right">{{ (e.costoUnitarioBase || 0) | number:'1.2-4' }}</td>
+              <td class="px-4 py-2 text-right">{{ (e.costoPorUnidadControl || 0) | number:'1.2-4' }}</td>
               <td class="px-4 py-2">
                 <span class="px-2 py-1 rounded-full text-xs font-semibold" [ngClass]="e.activo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'">
                   {{ e.activo ? 'Vigente' : 'Cerrada' }}
@@ -671,7 +1215,7 @@
 </div>
 
 <!-- Modal edición de entrada -->
-<div *ngIf="showEditEntradaModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+<div *ngIf="showEditEntradaModal && !botiquinOnly" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
   <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
     <div class="p-6">
       <div class="flex justify-between items-center mb-4">
@@ -714,8 +1258,8 @@
         <div>
           <label class="text-sm font-medium text-gray-700">Proveedor</label>
           <select formControlName="providerId" class="w-full p-2 border rounded-md">
-            <option [ngValue]="null">Sin proveedor</option>
-            <option *ngFor="let prov of providers" [ngValue]="prov.id">{{ prov.name }}</option>
+            <option value="">Sin proveedor</option>
+            <option *ngFor="let prov of providers" [value]="prov.id">{{ prov.name }}</option>
           </select>
         </div>
         <div>
@@ -736,7 +1280,7 @@
 </div>
 
 <!-- Vista de Inventario Automático - NUEVA FUNCIONALIDAD -->
-<div *ngIf="vistaActual === 'inventario-automatico'">
+<div *ngIf="vistaActual === 'inventario-automatico' && !botiquinOnly">
   <div class="space-y-6">
     <!-- Título de la sección -->
     <div class="text-center">
@@ -948,7 +1492,7 @@
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
                   <div class="h-2.5 rounded-full transition-all duration-300"
                        [ngClass]="getColorStock(inventario)"
-                       [style.width.%]="calcularPorcentajeStock(inventario)">
+                       [style.width]="calcularPorcentajeStock(inventario) + '%'">
                   </div>
                 </div>
                 <div class="text-xs text-gray-500 mt-1">
@@ -980,9 +1524,8 @@
         Actualizar Inventario
       </button>
       
-      <!-- Botón de datos de ejemplo (solo visible cuando hay pocos inventarios) -->
+      <!-- Botón de datos de ejemplo -->
       <button 
-        *ngIf="inventarioAlimentos.length < 3"
         (click)="crearDatosEjemplo()" 
         class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md">
         <i class="fas fa-plus mr-2"></i>

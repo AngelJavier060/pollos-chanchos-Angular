@@ -126,7 +126,16 @@
 
   <!-- Vista de Registros Individuales -->
   <div *ngIf="vistaActual === 'registros'" class="vista-registros">
-    
+    <!-- Opciones de visualización -->
+    <div class="opciones-visualizacion" style="display:flex; gap:12px; align-items:center; margin-bottom:10px;">
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#475569;">
+        <input type="checkbox" [(ngModel)]="stickyHeader"> Encabezado fijo
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#475569;">
+        <input type="checkbox" [(ngModel)]="modoCompacto"> Modo compacto
+      </label>
+    </div>
+
     <!-- Filtros para Registros -->
     <div class="filtros-container">
       <div class="filtros-grid">
@@ -170,7 +179,7 @@
     </div>
 
     <!-- Tabla de Registros -->
-    <div class="tabla-registros">
+    <div class="tabla-registros" [class.sticky-head]="stickyHeader" [class.modo-compacto]="modoCompacto">
       <div class="table-header">
         <h2>📋 Registros de Alimentación ({{ getRegistrosFiltrados().length }})</h2>
       </div>
@@ -186,7 +195,7 @@
               <th>Animales Vivos</th>
               <th>Animales Muertos</th>
               <th>Estado</th>
-              <th>Día #</th>
+              <th>Jornada</th>
               <th>Observaciones</th>
               <th>Acciones</th>
             </tr>
@@ -213,23 +222,50 @@
               <td class="cantidad-cell">
                 <div class="cantidad-info">
                   <span class="cantidad-valor">{{ registro.cantidadAplicada.toFixed(2) }} kg</span>
+                  <div class="tipo-consumo" style="margin-top:4px; display:flex; align-items:center; gap:6px;">
+                    <i [class]="getIconoTipoConsumo(registro)"></i>
+                    <span class="tipo-label" style="font-size:12px; color:#475569;">{{ getEtiquetaTipoConsumo(registro) }}</span>
+                    <button (click)="abrirDetalleAlimento(registro)" class="btn-accion btn-detalles" title="Ver alimento" style="margin-left:6px; padding:4px 8px;">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    <ng-container *ngIf="getTotalManiana(registro) as totalM; else sinTotalM">
+                      <span *ngIf="totalM > 0" class="total-maniana" style="margin-left:8px;">
+                        <i class="fas fa-sun" style="margin-right:6px;"></i>
+                        Mañana: {{ totalM | number:'1.2-2' }} kg
+                      </span>
+                    </ng-container>
+                    <ng-template #sinTotalM></ng-template>
+                  </div>
                 </div>
               </td>
               
               <td class="animales-vivos-cell">
-                <div class="animales-info" *ngIf="registro.animalesVivos !== undefined">
-                  <i class="fas fa-egg text-green-500"></i>
-                  <span>{{ registro.animalesVivos }}</span>
-                </div>
-                <span *ngIf="registro.animalesVivos === undefined" class="no-data">N/A</span>
+                <ng-container *ngIf="getVivosDelDia(registro) as vivosDia; else noVivos">
+                  <div class="animales-info">
+                    <i class="fas fa-egg text-green-500"></i>
+                    <span>{{ vivosDia }}</span>
+                  </div>
+                </ng-container>
+                <ng-template #noVivos>
+                  <span class="no-data">N/A</span>
+                </ng-template>
               </td>
               
               <td class="animales-muertos-cell">
-                <div class="animales-info" *ngIf="registro.animalesMuertos !== undefined">
-                  <i class="fas fa-skull text-red-500"></i>
-                  <span>{{ registro.animalesMuertos }}</span>
-                </div>
-                <span *ngIf="registro.animalesMuertos === undefined" class="no-data">N/A</span>
+                <ng-container *ngIf="getMuertosDelDia(registro) as muertosDia; else noMuertos">
+                  <ng-container *ngIf="muertosDia > 0; else sinMortalidad">
+                    <div class="animales-info">
+                      <i class="fas fa-skull text-red-500"></i>
+                      <span>{{ muertosDia }}</span>
+                    </div>
+                  </ng-container>
+                  <ng-template #sinMortalidad>
+                    <span class="no-data">No hubo</span>
+                  </ng-template>
+                </ng-container>
+                <ng-template #noMuertos>
+                  <span class="no-data">No hubo</span>
+                </ng-template>
               </td>
               
               <td class="status-cell">
@@ -240,7 +276,7 @@
               </td>
               
               <td class="day-cell">
-                <span class="day-badge">Día {{ registro.dayNumber }}</span>
+                <span class="day-badge">{{ getJornada(registro) }}</span>
               </td>
               
               <td class="observaciones-cell">
@@ -379,4 +415,30 @@
     </div>
   </div>
 
-</div> 
+  <!-- Modal de Detalle de Alimento (solo MAÑANA) -->
+  <div *ngIf="mostrarDetalleAlimento" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+      <div class="p-5 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Alimentos (Mañana)</h3>
+        <button (click)="cerrarDetalleAlimento()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-5">
+        <ng-container *ngIf="detalleAlimentos.length; else sinAlimentos">
+          <div class="space-y-2">
+            <div *ngFor="let item of detalleAlimentos" class="flex items-center justify-between">
+              <span class="text-gray-800">{{ item.nombre }}</span>
+              <span class="font-semibold">{{ item.total | number:'1.2-2' }} kg</span>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #sinAlimentos>
+          <div class="text-sm text-gray-600">Sin registros de alimentos (Mañana).</div>
+        </ng-template>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button (click)="cerrarDetalleAlimento()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

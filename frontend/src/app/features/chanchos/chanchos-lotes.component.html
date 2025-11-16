@@ -163,27 +163,41 @@
 
         <!-- Contenido del lote -->
         <div class="p-4 space-y-4">
-          <!-- Información básica -->
+          <!-- Información básica real del lote -->
           <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-600 font-medium">Cantidad:</p>
-              <p class="text-lg font-bold text-gray-800">{{ lote.quantity }} chanchos</p>
+            <div class="space-y-1">
+              <p class="text-gray-600 font-medium">Registrados:</p>
+              <p class="text-lg font-bold text-gray-800">
+                {{ getRegistrados(lote) }} chanchos
+              </p>
+              <p class="text-gray-600 font-medium mt-2">Vivos actuales:</p>
+              <p class="text-base font-semibold text-blue-800">
+                {{ lote.quantity }} chanchos
+              </p>
             </div>
-            <div>
-              <p class="text-gray-600 font-medium">Edad:</p>
-              <p class="text-lg font-bold text-gray-800">{{ calcularDiasDeVida(lote.birthdate) }} días</p>
+            <div class="space-y-1">
+              <p class="text-gray-600 font-medium">Bajas totales:</p>
+              <p class="text-lg font-bold" [class]="getBajasTotales(lote) > 0 ? 'text-red-700' : 'text-gray-800'">
+                {{ getBajasTotales(lote) }}
+              </p>
+              <p class="text-gray-600 font-medium mt-2">% de bajas:</p>
+              <p class="text-base font-semibold" [class]="getPorcentajeBajas(lote) > 0 ? 'text-red-700' : 'text-gray-800'">
+                {{ getPorcentajeBajas(lote) }} %
+              </p>
             </div>
           </div>
 
-          <!-- Información del proveedor -->
+          <!-- Fechas y costo del lote -->
           <div class="bg-gray-50 rounded-lg p-3">
             <h5 class="font-semibold text-gray-800 text-sm mb-2">
-              <i class="fas fa-truck text-gray-600 mr-1"></i>
-              Información del Proveedor
+              <i class="fas fa-clipboard-list text-gray-600 mr-1"></i>
+              Información del Lote
             </h5>
             <div class="text-sm text-gray-600 space-y-1">
               <p><strong>Nacimiento:</strong> {{ formatearFecha(lote.birthdate) }}</p>
-              <p><strong>Costo:</strong> ${{ lote.cost.toLocaleString('es-ES') }}</p>
+              <p *ngIf="lote.create_date"><strong>Creado:</strong> {{ formatearFecha(lote.create_date) }}</p>
+              <p *ngIf="lote.fechaCierre"><strong>Cierre:</strong> {{ formatearFecha(lote.fechaCierre) }}</p>
+              <p><strong>Costo total:</strong> ${{ lote.cost.toLocaleString('es-ES') }}</p>
             </div>
           </div>
 
@@ -196,6 +210,40 @@
             <div class="text-sm text-blue-700 space-y-1">
               <p><strong>Raza:</strong> {{ lote.race.name }}</p>
               <p><strong>Animal:</strong> {{ lote.race.animal?.name || 'Chancho' }}</p>
+            </div>
+          </div>
+
+          <!-- Distribución por sexo (solo si hay datos) -->
+          <div class="bg-purple-50 rounded-lg p-3" *ngIf="getTotalSexo(lote) > 0">
+            <h5 class="font-semibold text-purple-800 text-sm mb-3">
+              <i class="fas fa-venus-mars text-purple-600 mr-1"></i>
+              Distribución por sexo
+            </h5>
+            <div class="flex flex-col gap-2 text-xs font-semibold">
+              <div class="flex items-center justify-between">
+                <div class="inline-flex items-center px-2 py-0.5 rounded-full bg-pink-100 text-pink-800 border border-pink-200">
+                  <i class="fas fa-venus mr-1"></i>
+                  Hembras: {{ lote.femaleCount || 0 }}
+                </div>
+                <span class="text-pink-700" *ngIf="lote.femaleCount != null">
+                  {{ getPorcentajeSexo(lote.femaleCount || 0, getTotalSexo(lote)) }} %
+                  <span *ngIf="lote.femalePurpose" class="ml-1 text-[10px] font-normal italic">
+                    ({{ lote.femalePurpose }})
+                  </span>
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                  <i class="fas fa-mars mr-1"></i>
+                  Machos: {{ lote.maleCount || 0 }}
+                </div>
+                <span class="text-blue-700" *ngIf="lote.maleCount != null">
+                  {{ getPorcentajeSexo(lote.maleCount || 0, getTotalSexo(lote)) }} %
+                  <span *ngIf="lote.malePurpose" class="ml-1 text-[10px] font-normal italic">
+                    ({{ lote.malePurpose }})
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -227,11 +275,11 @@
                 </div>
               </div>
 
-              <!-- Costo por animal -->
+              <!-- Costo por animal (según registrados) -->
               <div class="flex justify-between items-center text-sm">
                 <span class="text-green-700">Costo por animal:</span>
                 <span class="text-green-800 font-semibold">
-                  ${{ (lote.cost / Math.max(1, lote.quantity)).toLocaleString('es-ES', {maximumFractionDigits: 0}) }}
+                  ${{ (lote.cost / Math.max(1, getRegistrados(lote))).toLocaleString('es-ES', {maximumFractionDigits: 0}) }}
                 </span>
               </div>
             </div>

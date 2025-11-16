@@ -238,4 +238,138 @@
   &:hover {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   }
-} 
+}
+
+/* ===== Estilos profesionales (alineados con Pollos Histórico) ===== */
+.historico-alimentacion-container {
+  padding: 2rem;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  .header-content {
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.5rem;
+    }
+    .page-subtitle {
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+  }
+  .header-actions {
+    .btn-export {
+      background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      border: none;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+      &:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(59,130,246,.4); }
+    }
+  }
+}
+
+.loading-container { display:flex; justify-content:center; align-items:center; padding:3rem; }
+.error-container { margin-bottom: 2rem; }
+
+.estadisticas-generales {
+  margin-bottom: 2rem;
+  .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap:1.5rem; }
+  .stat-card { background:white; border-radius:1rem; padding:1.5rem; box-shadow:0 4px 6px rgba(0,0,0,.07); border:1px solid #e2e8f0; transition:all .3s ease; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,.15); }
+  .stat-icon { width:3rem; height:3rem; border-radius:.75rem; display:flex; align-items:center; justify-content:center; margin-bottom:1rem; }
+  .stat-icon i { font-size:1.5rem; color:white; }
+  .stat-icon.bg-blue-500{background:#3b82f6;} .stat-icon.bg-green-500{background:#10b981;} .stat-icon.bg-yellow-500{background:#f59e0b;} .stat-icon.bg-purple-500{background:#8b5cf6;}
+  .stat-content h3{ font-size:2rem; font-weight:700; color:#1e293b; margin-bottom:.5rem; }
+  .stat-content p{ color:#64748b; font-weight:500; }
+}
+
+.rango-fechas-container { background:white; border-radius:1rem; padding:1.5rem; margin-bottom:2rem; box-shadow:0 4px 6px rgba(0,0,0,.07); border:1px solid #e2e8f0; }
+.rango-fechas-container .rango-grid { display:grid; grid-template-columns:1fr 1fr auto; gap:1.5rem; align-items:end; }
+.rango-fechas-container .fecha-label{ display:block; font-weight:600; color:#374151; margin-bottom:.5rem; }
+.rango-fechas-container .fecha-input{ width:100%; padding:.75rem; border:2px solid #e2e8f0; border-radius:.5rem; font-size:1rem; transition:border-color .2s ease; }
+.rango-fechas-container .fecha-input:focus{ outline:none; border-color:#3b82f6; }
+.rango-fechas-container .btn-primary{ background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:.75rem 1.5rem; border-radius:.5rem; border:none; font-weight:600; display:flex; align-items:center; gap:.5rem; transition:all .3s ease; }
+.rango-fechas-container .btn-primary:hover{ transform: translateY(-1px); box-shadow:0 6px 15px rgba(59,130,246,.4); }
+
+.vista-tabs { display:flex; gap:.5rem; margin-bottom:2rem; }
+.vista-tabs .tab-button{ padding:.75rem 1.5rem; border:2px solid #e2e8f0; background:white; border-radius:.75rem; font-weight:600; color:#64748b; display:flex; align-items:center; gap:.5rem; transition:all .3s ease; cursor:pointer; }
+.vista-tabs .tab-button:hover{ border-color:#cbd5e1; color:#475569; }
+.vista-tabs .tab-button.active{ background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; border-color:#3b82f6; }
+
+.filtros-container{ background:white; border-radius:1rem; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 4px 6px rgba(0,0,0,.07); border:1px solid #e2e8f0; }
+.filtros-container .filtros-grid{ display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:1.5rem; align-items:end; }
+.filtros-container .filtro-label{ display:block; font-weight:600; color:#374151; margin-bottom:.5rem; }
+.filtros-container .filtro-input, .filtro-select{ width:100%; padding:.75rem; border:2px solid #e2e8f0; border-radius:.5rem; font-size:1rem; transition:border-color .2s ease; }
+.filtros-container .filtro-input:focus, .filtro-select:focus{ outline:none; border-color:#3b82f6; }
+.filtros-container .btn-secondary{ background:#6b7280; color:white; padding:.75rem 1rem; border-radius:.5rem; border:none; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+.filtros-container .btn-secondary:hover{ background:#4b5563; }
+
+.tabla-registros{ background:white; border-radius:1rem; box-shadow:0 4px 6px rgba(0,0,0,.07); border:1px solid #e2e8f0; overflow:hidden; }
+.tabla-registros .table-header{ background:linear-gradient(135deg,#f8fafc,#e2e8f0); padding:1.5rem; border-bottom:1px solid #e2e8f0; }
+.tabla-registros .table-header h2{ font-size:1.5rem; font-weight:700; color:#1e293b; margin:0; }
+.tabla-registros .table-responsive{ overflow-x:auto; }
+.registros-table{ width:100%; border-collapse:collapse; }
+.registros-table thead{ background:#f1f5f9; }
+.registros-table thead th{ padding:1rem; text-align:left; font-weight:600; color:#475569; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.registros-table tbody .table-row{ transition: background-color .2s ease; }
+.registros-table tbody .table-row:hover{ background-color:#f8fafc; }
+.registros-table tbody td{ padding:1rem; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.id-badge{ background:#dbeafe; color:#1d4ed8; padding:.25rem .75rem; border-radius:.5rem; font-weight:600; font-size:.875rem; }
+.lote-nombre{ display:block; font-weight:600; color:#1e293b; font-size:.95rem; line-height:1.3; }
+.lote-codigo{ display:block; font-size:.875rem; color:#64748b; font-weight:500; margin-top:2px; }
+.cantidad-valor{ font-weight:600; color:#059669; font-size:1.1rem; }
+.animales-info{ display:flex; align-items:center; gap:.5rem; font-weight:600; }
+.no-data{ color:#9ca3af; font-style:italic; }
+.status-badge{ padding:.5rem 1rem; border-radius:.75rem; font-weight:600; font-size:.875rem; display:inline-flex; align-items:center; gap:.5rem; }
+.status-badge.text-green-600{ color:#059669; background:#dcfce7; }
+.status-badge.text-yellow-600{ color:#d97706; background:#fef3c7; }
+.status-badge.text-red-600{ color:#dc2626; background:#fef2f2; }
+.status-badge.text-blue-600{ color:#2563eb; background:#dbeafe; }
+.status-badge.text-gray-600{ color:#4b5563; background:#f3f4f6; }
+.day-badge{ background:#e0e7ff; color:#3730a3; padding:.25rem .75rem; border-radius:.5rem; font-weight:600; font-size:.875rem; }
+.observaciones-text{ max-width:200px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#64748b; }
+
+/* Badge Total Mañana */
+.cantidad-cell .total-maniana{
+  background:#eff6ff; /* azul muy claro */
+  color:#1d4ed8; /* azul */
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.acciones-cell{ text-align:center; padding:.75rem; min-width:140px; }
+.acciones-container{ display:flex; gap:.5rem; justify-content:center; align-items:center; }
+.btn-accion{ padding:.5rem; border:none; border-radius:.5rem; cursor:pointer; transition:all .3s ease; display:flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; }
+.btn-accion i{ font-size:.875rem; }
+.btn-accion:hover{ transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,.2); }
+.btn-editar{ background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; }
+.btn-editar:hover{ background:linear-gradient(135deg,#d97706,#b45309); }
+.btn-eliminar{ background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; }
+.btn-eliminar:hover{ background:linear-gradient(135deg,#dc2626,#b91c1c); }
+.btn-detalles{ background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; }
+.btn-detalles:hover{ background:linear-gradient(135deg,#2563eb,#1d4ed8); }
+
+@media (max-width: 768px) {
+  .historico-alimentacion-container{ padding:1rem; }
+  .page-header{ flex-direction:column; gap:1rem; text-align:center; }
+  .rango-grid, .filtros-grid, .stats-grid, .estadisticas-grid{ grid-template-columns:1fr !important; }
+  .vista-tabs{ flex-direction:column; }
+  .table-responsive{ font-size:.875rem; }
+  .table-responsive th, .table-responsive td{ padding:.5rem !important; }
+}

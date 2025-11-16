@@ -70,7 +70,7 @@ export class AdminComponent implements OnInit {
     this.inventarioOpen = false;
   }
 
-  navegarAInventario(tab: 'productos' | 'inventario-automatico' | 'entradas' | 'alertas'): void {
+  navegarAInventario(tab: 'productos' | 'inventario-automatico' | 'entradas' | 'alertas' | 'botiquin'): void {
     this.router.navigate(['/admin/inventario'], { queryParams: { tab } });
     this.closeUserMenu();
     this.inventarioOpen = false;

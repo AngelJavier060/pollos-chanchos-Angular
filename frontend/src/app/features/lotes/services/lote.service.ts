@@ -64,7 +64,12 @@ export class LoteService {
         },
         create_date: this.parseDate(lote.create_date) || undefined,
         update_date: this.parseDate(lote.update_date) || undefined,
-        fechaCierre: this.parseDate(lote.fechaCierre)
+        fechaCierre: this.parseDate(lote.fechaCierre),
+        // Campos de distribución por sexo para chanchos
+        maleCount: lote.maleCount != null ? Number(lote.maleCount) : undefined,
+        femaleCount: lote.femaleCount != null ? Number(lote.femaleCount) : undefined,
+        malePurpose: lote.malePurpose || undefined,
+        femalePurpose: lote.femalePurpose || undefined
       };
     });
   }
@@ -74,7 +79,7 @@ export class LoteService {
     const url = `${this.apiUrl}/nuevo`;
     
     // Incluimos la raza completa en la solicitud
-    const loteToSend = {
+    const loteToSend: any = {
       name: lote.name?.trim() || '',
       quantity: Number(lote.quantity) || 0,
       birthdate: lote.birthdate instanceof Date ? 
@@ -86,6 +91,16 @@ export class LoteService {
       }
     };
 
+    // Campos opcionales para chanchos (solo si vienen informados)
+    if (lote.maleCount != null) loteToSend.maleCount = Number(lote.maleCount);
+    if (lote.femaleCount != null) loteToSend.femaleCount = Number(lote.femaleCount);
+    if (lote.malePurpose != null && String(lote.malePurpose).trim() !== '') {
+      loteToSend.malePurpose = String(lote.malePurpose).trim();
+    }
+    if (lote.femalePurpose != null && String(lote.femalePurpose).trim() !== '') {
+      loteToSend.femalePurpose = String(lote.femalePurpose).trim();
+    }
+
     console.log('Datos preparados para enviar:', loteToSend);
     
     return this.http.post<any>(url, loteToSend, this.httpOptions).pipe(
@@ -95,7 +110,7 @@ export class LoteService {
   }
 
   updateLote(lote: Lote): Observable<Lote> {
-    const loteToUpdate = {
+    const loteToUpdate: any = {
       id: lote.id,
       name: lote.name?.trim(),
       quantity: Number(lote.quantity),
@@ -105,6 +120,16 @@ export class LoteService {
       cost: Number(lote.cost),
       race_id: lote.race?.id
     };
+
+    // Campos opcionales para chanchos (solo si vienen informados)
+    if (lote.maleCount != null) loteToUpdate.maleCount = Number(lote.maleCount);
+    if (lote.femaleCount != null) loteToUpdate.femaleCount = Number(lote.femaleCount);
+    if (lote.malePurpose != null && String(lote.malePurpose).trim() !== '') {
+      loteToUpdate.malePurpose = String(lote.malePurpose).trim();
+    }
+    if (lote.femalePurpose != null && String(lote.femalePurpose).trim() !== '') {
+      loteToUpdate.femalePurpose = String(lote.femalePurpose).trim();
+    }
 
     return this.http.put<any>(this.apiUrl, loteToUpdate, this.httpOptions).pipe(
       map(response => this.transformLoteResponse(response)),
@@ -156,7 +181,12 @@ export class LoteService {
       },
       create_date: this.parseDate(lote.create_date) || undefined,
       update_date: this.parseDate(lote.update_date) || undefined,
-      fechaCierre: this.parseDate(lote.fechaCierre)
+      fechaCierre: this.parseDate(lote.fechaCierre),
+      // Campos de distribución por sexo para chanchos
+      maleCount: lote.maleCount != null ? Number(lote.maleCount) : undefined,
+      femaleCount: lote.femaleCount != null ? Number(lote.femaleCount) : undefined,
+      malePurpose: lote.malePurpose || undefined,
+      femalePurpose: lote.femalePurpose || undefined
     };
   }
 

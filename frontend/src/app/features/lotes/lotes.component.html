@@ -31,18 +31,35 @@
     </div>
   </div>
   
-  <!-- Formulario para crear/editar lote - DISEÑO MEJORADO -->
-  <div *ngIf="showForm" class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200 shadow-md mb-6">
-    <div class="flex items-center border-b border-blue-200 pb-3 mb-4">
-      <div class="bg-blue-100 p-2 rounded-full mr-3">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
+  <!-- Modal Flotante - Formulario Nuevo Lote -->
+  <div *ngIf="showForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" (click)="toggleForm()">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden"
+         (click)="$event.stopPropagation()"
+         [style.transform]="'translate(' + tablePanelPosition.x + 'px, ' + tablePanelPosition.y + 'px)'"
+         style="touch-action: none;">
+      
+      <!-- Header arrastrable -->
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 cursor-move select-none"
+           (mousedown)="onTableDragStart($event)"
+           (touchstart)="onTableDragStart($event)">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <h2 class="text-xl font-bold text-white">{{ isEditing ? 'Editar Lote' : 'Nuevo Lote' }}</h2>
+          </div>
+          <button type="button" (click)="toggleForm()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <h2 class="text-xl font-bold text-blue-800">{{ isEditing ? 'Editar Lote' : 'Nuevo Lote' }}</h2>
-    </div>
-    
-    <form [formGroup]="loteForm" (ngSubmit)="onSubmit()" class="space-y-6">
+
+      <!-- Contenido del formulario (scrolleable) -->
+      <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <form [formGroup]="loteForm" (ngSubmit)="onSubmit()" class="space-y-6">
       <!-- Campo Nombre -->
       <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
         <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Nombre del Lote*</label>
@@ -68,24 +85,42 @@
 
       <!-- Campo Descripción (origen del lote) -->
       <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
-        <label for="descripcion" class="block text-sm font-semibold text-gray-700 mb-1">Descripción (origen)</label>
+        <label for="descripcion" class="block text-sm font-semibold text-gray-700 mb-1">
+          Descripción (origen)
+          <span *ngIf="opcionesDescripcion.length === 0" class="text-xs text-gray-400 font-normal ml-2">
+            (Seleccione primero una raza)
+          </span>
+        </label>
         <select id="descripcion" formControlName="descripcion"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+                [disabled]="opcionesDescripcion.length === 0"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed">
           <option value="">Seleccione una opción</option>
-          <option value="Compra de pollos vivos">Compra de pollos vivos</option>
-          <option value="Se encubaron">Se encubaron</option>
-          <option value="Saco crías la gallina">Saco crías la gallina</option>
+          <option *ngFor="let opcion of opcionesDescripcion" [value]="opcion">{{ opcion }}</option>
         </select>
-        <p class="text-xs text-gray-500 mt-2">Este campo no se persiste aún en el backend. Se añadirá soporte si lo deseas.</p>
+        <p class="text-xs text-gray-500 mt-2">
+          <span *ngIf="opcionesDescripcion.length > 0">
+            Las opciones cambian según el tipo de animal seleccionado.
+          </span>
+          <span *ngIf="opcionesDescripcion.length === 0">
+            Este campo se activará al seleccionar una raza.
+          </span>
+        </p>
       </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Campo Cantidad -->
         <div class="bg-white rounded-md p-4 shadow-sm border border-gray-100">
-          <label for="quantity" class="block text-sm font-semibold text-gray-700 mb-1">Cantidad de Animales*</label>
+          <label for="quantity" class="block text-sm font-semibold text-gray-700 mb-1">
+            Cantidad de Animales*
+            <span *ngIf="showDistribucionChanchos" class="text-xs text-blue-600 font-normal ml-2">
+              (Calculado automáticamente)
+            </span>
+          </label>
           <div class="relative rounded-md shadow-sm">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" 
+                   [ngClass]="showDistribucionChanchos ? 'text-blue-400' : 'text-gray-400'" 
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
               </svg>
             </div>
@@ -93,16 +128,22 @@
               type="number" 
               id="quantity" 
               formControlName="quantity"
-              min="1"
-              placeholder="Cantidad"
-              class="pl-10 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors">
+              [class]="'block w-full pl-10 pr-3 py-2 border rounded-md ' + 
+                       (showDistribucionChanchos 
+                         ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold cursor-not-allowed' 
+                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500')"
+              placeholder="Ej: 100">
           </div>
-          <div *ngIf="loteForm.get('quantity')?.invalid && loteForm.get('quantity')?.touched" class="text-red-600 text-sm mt-2 flex items-center">
+          <p *ngIf="showDistribucionChanchos" class="mt-2 text-xs text-blue-600 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            Este campo se calcula sumando machos + hembras
+          </p>
+          <p *ngIf="!showDistribucionChanchos && loteForm.get('quantity')?.invalid && loteForm.get('quantity')?.touched" 
+             class="mt-2 text-sm text-red-600">
             Cantidad es requerida y debe ser mayor a 0
-          </div>
+          </p>
         </div>
         
         <!-- Campo Fecha de Nacimiento -->
@@ -183,6 +224,135 @@
           </div>
         </div>
       </div>
+
+      <!-- Sección de Distribución por Sexo - SOLO CHANCHOS (INLINE) -->
+      <div *ngIf="showDistribucionChanchos" class="mb-6 p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-purple-200 rounded-xl">
+        <div class="flex items-center gap-2 mb-6">
+          <span class="text-2xl">🐷</span>
+          <h3 class="text-lg font-bold text-gray-800">
+            COMPOSICIÓN DEL LOTE DE CHANCHOS
+          </h3>
+        </div>
+
+        <!-- Grid de Machos y Hembras -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+          <!-- MACHOS -->
+          <div class="bg-white p-5 rounded-xl border-2 border-blue-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-3xl">🐗</span>
+              <h4 class="text-base font-bold text-blue-700">
+                MACHOS (Verracos/Castrados)
+              </h4>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Cantidad de Machos
+              </label>
+              <input
+                type="number"
+                formControlName="maleCount"
+                min="0"
+                placeholder="0"
+                class="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Propósito
+              </label>
+              <select
+                formControlName="malePurpose"
+                class="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+              >
+                <option value="">Seleccione propósito</option>
+                <option value="engorde">⚡ Engorde (Castrados)</option>
+                <option value="reproduccion">👑 Reproducción (Verracos)</option>
+              </select>
+            </div>
+
+            <div *ngIf="loteForm.get('malePurpose')?.value === 'engorde'" class="bg-blue-50 p-3 rounded-lg text-xs text-gray-700">
+              <p class="font-semibold mb-1">ℹ️ Castrados:</p>
+              <p>Mayor ganancia de peso, carne de mejor calidad. Peso esperado: 120kg en 6 meses.</p>
+            </div>
+
+            <div *ngIf="loteForm.get('malePurpose')?.value === 'reproduccion'" class="bg-blue-50 p-3 rounded-lg text-xs text-gray-700">
+              <p class="font-semibold mb-1">ℹ️ Verracos:</p>
+              <p>Para reproducción. Se recomienda 1 verraco cada 15-20 hembras.</p>
+            </div>
+          </div>
+
+          <!-- HEMBRAS -->
+          <div class="bg-white p-5 rounded-xl border-2 border-pink-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-3xl">🐖</span>
+              <h4 class="text-base font-bold text-pink-700">
+                HEMBRAS (Marranas/Chanchitas)
+              </h4>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Cantidad de Hembras
+              </label>
+              <input
+                type="number"
+                formControlName="femaleCount"
+                min="0"
+                placeholder="0"
+                class="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-100 transition-all"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Propósito
+              </label>
+              <select
+                formControlName="femalePurpose"
+                class="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-100 transition-all"
+              >
+                <option value="">Seleccione propósito</option>
+                <option value="engorde">🥩 Engorde</option>
+                <option value="reproduccion">🤰 Reproducción (Marranas)</option>
+              </select>
+            </div>
+
+            <div *ngIf="loteForm.get('femalePurpose')?.value === 'reproduccion'" class="bg-pink-50 p-3 rounded-lg text-xs text-gray-700">
+              <p class="font-semibold mb-1">ℹ️ Reproductoras:</p>
+              <p>Seleccionar las mejores para el pie de cría. Producción esperada: 2 partos/año, 10 lechones/parto.</p>
+            </div>
+
+            <div *ngIf="loteForm.get('femalePurpose')?.value === 'engorde'" class="bg-pink-50 p-3 rounded-lg text-xs text-gray-700">
+              <p class="font-semibold mb-1">ℹ️ Engorde:</p>
+              <p>Para venta como carne. Peso esperado: 100-120kg en 6-7 meses.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validación -->
+        <div *ngIf="distribucionError" class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-4">
+          <p class="text-red-700 text-sm font-semibold flex items-center gap-2">
+            <span>❌</span>
+            {{ distribucionError }}
+          </p>
+        </div>
+
+        <div *ngIf="!distribucionError && loteForm.get('quantity')?.value && loteForm.get('maleCount')?.value != null && loteForm.get('femaleCount')?.value != null" class="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">✅</span>
+              <div>
+                <p class="text-green-800 font-bold">Total verificado: {{ loteForm.get('quantity')?.value }} chanchos</p>
+                <p class="text-green-700 text-sm">
+                  {{ loteForm.get('maleCount')?.value || 0 }} machos + {{ loteForm.get('femaleCount')?.value || 0 }} hembras
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <!-- Botones del formulario -->
       <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
@@ -211,8 +381,10 @@
             {{ isEditing ? 'Actualizar Lote' : 'Guardar Lote' }}
           </div>
         </button>
+        </div>
+        </form>
       </div>
-    </form>
+    </div>
   </div>
   
   <!-- Sección de Estadísticas mejorada - solo visible cuando no está activo el formulario -->
@@ -314,22 +486,35 @@
           <tr>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Original</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales Vivos</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distribución</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Nacimiento</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
           <tr *ngIf="lotesFiltrados.length === 0">
-            <td colspan="9" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
+            <td colspan="10" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
           </tr>
           <tr *ngFor="let lote of lotesFiltrados" class="hover:bg-gray-50">
-            <td class="py-4 px-4">{{ lote.codigo || lote.id }}</td>
-            <td class="py-4 px-4">{{ lote.name }}</td>
+            <td class="py-4 px-4">
+              <span class="font-mono text-sm">{{ lote.codigo || lote.id }}</span>
+            </td>
+            <td class="py-4 px-4 font-medium">{{ lote.name }}</td>
+            <td class="py-4 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    [ngClass]="{
+                      'bg-yellow-100 text-yellow-800': lote.race.animal.name?.toLowerCase().includes('pollo'),
+                      'bg-pink-100 text-pink-800': lote.race.animal.name?.toLowerCase().includes('chancho') || lote.race.animal.name?.toLowerCase().includes('cerdo')
+                    }">
+                {{ lote.race.animal.name || 'No asignado' }}
+              </span>
+            </td>
+            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
             <td class="py-4 px-4">
               <span class="text-gray-600">{{ lote.quantityOriginal || lote.quantity }}</span>
             </td>
@@ -346,10 +531,21 @@
                 </span>
               </div>
             </td>
+            <td class="py-4 px-4">
+              <div *ngIf="lote.maleCount != null || lote.femaleCount != null" class="text-xs space-y-1">
+                <div *ngIf="lote.maleCount != null" class="flex items-center gap-1">
+                  <span class="text-blue-600">🐗 {{ lote.maleCount }}</span>
+                  <span *ngIf="lote.malePurpose" class="text-gray-500">({{ lote.malePurpose }})</span>
+                </div>
+                <div *ngIf="lote.femaleCount != null" class="flex items-center gap-1">
+                  <span class="text-pink-600">🐖 {{ lote.femaleCount }}</span>
+                  <span *ngIf="lote.femalePurpose" class="text-gray-500">({{ lote.femalePurpose }})</span>
+                </div>
+              </div>
+              <span *ngIf="lote.maleCount == null && lote.femaleCount == null" class="text-gray-400 text-xs">N/A</span>
+            </td>
             <td class="py-4 px-4">{{ lote.birthdate | date:'dd/MM/yyyy' }}</td>
             <td class="py-4 px-4">{{ lote.cost | currency }}</td>
-            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
-            <td class="py-4 px-4">{{ lote.race.animal.name || 'No asignado' }}</td>
             <td class="py-4 px-4">
               <div class="flex space-x-2">
                 <button 
@@ -422,10 +618,10 @@
           <tr>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Cierre</th>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -436,12 +632,22 @@
             <td colspan="6" class="py-4 px-4 text-center text-sm text-gray-500">Cargando...</td>
           </tr>
           <tr *ngFor="let lote of historicoFechas" class="hover:bg-gray-50">
-            <td class="py-4 px-4">{{ lote.codigo || lote.id }}</td>
-            <td class="py-4 px-4">{{ lote.name }}</td>
+            <td class="py-4 px-4">
+              <span class="font-mono text-sm">{{ lote.codigo || lote.id }}</span>
+            </td>
+            <td class="py-4 px-4 font-medium">{{ lote.name }}</td>
+            <td class="py-4 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    [ngClass]="{
+                      'bg-yellow-100 text-yellow-800': lote.race.animal.name?.toLowerCase().includes('pollo'),
+                      'bg-pink-100 text-pink-800': lote.race.animal.name?.toLowerCase().includes('chancho') || lote.race.animal.name?.toLowerCase().includes('cerdo')
+                    }">
+                {{ lote.race.animal.name || 'No asignado' }}
+              </span>
+            </td>
+            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
             <td class="py-4 px-4">{{ lote.quantity }}</td>
             <td class="py-4 px-4">{{ lote.fechaCierre | date:'dd/MM/yyyy HH:mm' }}</td>
-            <td class="py-4 px-4">{{ lote.race.name || 'No asignada' }}</td>
-            <td class="py-4 px-4">{{ lote.race.animal.name || 'No asignado' }}</td>
           </tr>
         </tbody>
       </table>

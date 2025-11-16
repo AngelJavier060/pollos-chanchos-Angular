@@ -45,8 +45,194 @@
               Crear Plan
             </button>
           </div>
-        </div>
 
+      <!-- Panel flotante: Guía Pollos de Engorde -->
+      <div *ngIf="showGuiaPollosEngordeForm" cdkDrag class="fixed top-24 right-6 w-[860px] min-w-[720px] max-w-[95vw] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 flex flex-col resize-x overflow-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50 cursor-move" cdkDragHandle>
+          <h4 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-drumstick-bite text-yellow-600 mr-2"></i>
+            Guía Pollos de Engorde
+          </h4>
+          <button type="button" (click)="toggleGuiaPollosEngordeForm()" class="text-gray-500 hover:text-red-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] table-auto border border-gray-200 rounded-lg overflow-hidden text-sm leading-5">
+              <colgroup>
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 10%">
+                <col style="width: 10%">
+              </colgroup>
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Semanas)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Días)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Peso Aproximado</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Consumo Diario</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Tipo de Alimento</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">% Proteína</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Etapa</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 align-top">
+                <tr>
+                  <td class="px-4 py-3">0–1 semana</td>
+                  <td class="px-4 py-3">1–7 días</td>
+                  <td class="px-4 py-3">40–80 g</td>
+                  <td class="px-4 py-3">10–15 g</td>
+                  <td class="px-4 py-3">Iniciador pollitos</td>
+                  <td class="px-4 py-3">21–23%</td>
+                  <td class="px-4 py-3">Pollito recién nacido</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">2–4 semanas</td>
+                  <td class="px-4 py-3">8–28 días</td>
+                  <td class="px-4 py-3">80–300 g</td>
+                  <td class="px-4 py-3">15–30 g</td>
+                  <td class="px-4 py-3">Iniciador</td>
+                  <td class="px-4 py-3">20–22%</td>
+                  <td class="px-4 py-3">Pollito</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">5–8 semanas</td>
+                  <td class="px-4 py-3">29–56 días</td>
+                  <td class="px-4 py-3">300–800 g</td>
+                  <td class="px-4 py-3">30–60 g</td>
+                  <td class="px-4 py-3">Crecimiento</td>
+                  <td class="px-4 py-3">18–20%</td>
+                  <td class="px-4 py-3">Crecimiento</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">9–12 semanas</td>
+                  <td class="px-4 py-3">57–84 días</td>
+                  <td class="px-4 py-3">800–1200 g</td>
+                  <td class="px-4 py-3">60–90 g</td>
+                  <td class="px-4 py-3">Engorde</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Engorde</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">13–16 semanas</td>
+                  <td class="px-4 py-3">85–112 días</td>
+                  <td class="px-4 py-3">1200–1800 g</td>
+                  <td class="px-4 py-3">90–110 g</td>
+                  <td class="px-4 py-3">Engorde/Acabado</td>
+                  <td class="px-4 py-3">15–17%</td>
+                  <td class="px-4 py-3">Engorde final</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">17–20 semanas</td>
+                  <td class="px-4 py-3">113–140 días</td>
+                  <td class="px-4 py-3">1800–2200 g</td>
+                  <td class="px-4 py-3">110–120 g</td>
+                  <td class="px-4 py-3">Acabado</td>
+                  <td class="px-4 py-3">14–16%</td>
+                  <td class="px-4 py-3">Finalización</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            Peso ideal de venta: 1.8–2.5 kg (16–20 semanas).
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel flotante: Guía Gallinas Ponedoras -->
+      <div *ngIf="showGuiaGallinasForm" cdkDrag class="fixed top-28 right-6 w-[860px] min-w-[720px] max-w-[95vw] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 flex flex-col resize-x overflow-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50 cursor-move" cdkDragHandle>
+          <h4 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-egg text-rose-600 mr-2"></i>
+            Guía Gallinas Ponedoras
+          </h4>
+          <button type="button" (click)="toggleGuiaGallinasForm()" class="text-gray-500 hover:text-red-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] table-auto border border-gray-200 rounded-lg overflow-hidden text-sm leading-5">
+              <colgroup>
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 10%">
+                <col style="width: 10%">
+              </colgroup>
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Semanas)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Meses)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Peso Aproximado</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Consumo Diario</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Tipo de Alimento</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">% Proteína</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Etapa/Producción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 align-top">
+                <tr>
+                  <td class="px-4 py-3">0–8 semanas</td>
+                  <td class="px-4 py-3">0–2 meses</td>
+                  <td class="px-4 py-3">40–800 g</td>
+                  <td class="px-4 py-3">10–60 g</td>
+                  <td class="px-4 py-3">Iniciador</td>
+                  <td class="px-4 py-3">20–22%</td>
+                  <td class="px-4 py-3">Pollita</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">9–18 semanas</td>
+                  <td class="px-4 py-3">2–4.5 meses</td>
+                  <td class="px-4 py-3">800–1400 g</td>
+                  <td class="px-4 py-3">60–90 g</td>
+                  <td class="px-4 py-3">Levante/Desarrollo</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Recría</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">19–21 semanas</td>
+                  <td class="px-4 py-3">4.5–5 meses</td>
+                  <td class="px-4 py-3">1400–1600 g</td>
+                  <td class="px-4 py-3">90–110 g</td>
+                  <td class="px-4 py-3">Pre-postura</td>
+                  <td class="px-4 py-3">17–18%</td>
+                  <td class="px-4 py-3">Pre-postura</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">22+ semanas</td>
+                  <td class="px-4 py-3">5+ meses</td>
+                  <td class="px-4 py-3">1600–2000 g</td>
+                  <td class="px-4 py-3">110–130 g</td>
+                  <td class="px-4 py-3">Postura</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Postura activa</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">Postura baja</td>
+                  <td class="px-4 py-3">18+ meses</td>
+                  <td class="px-4 py-3">1800–2200 g</td>
+                  <td class="px-4 py-3">100–120 g</td>
+                  <td class="px-4 py-3">Postura mantenimiento</td>
+                  <td class="px-4 py-3">15–16%</td>
+                  <td class="px-4 py-3">Postura descendente</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800">
+            Reajuste según línea genética y curva de postura.
+          </div>
+        </div>
+      </div>
+        </div>
         <!-- Lista de planes -->
         <div *ngIf="!loadingPlanes && planes.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div *ngFor="let plan of planes" class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
@@ -98,7 +284,9 @@
       <div *ngIf="activeTab === 'etapas'" class="etapas-scroll">
         <div class="flex justify-between items-start mb-6">
           <div>
-            <h2 class="text-xl font-semibold text-gray-800">Etapas de Crecimiento</h2>
+            <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+              Etapas de Crecimiento
+            </h2>
             <p class="text-gray-600">Define rangos de días y alimentos específicos para cada etapa</p>
           </div>
           <div class="flex space-x-2">
@@ -693,11 +881,13 @@
             </div>
           </form>
         </div>
+
+        <!-- Panel lateral: (el bloque original se movió dentro del overlay de etapa) -->
       </div>
 
       <!-- Modal: Formulario de Etapa -->
       <div *ngIf="showEtapaForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md modal-panel" [ngStyle]="{'height':'90vh','overflow-y':'auto','overflowY':'auto'}">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md modal-panel" [ngStyle]="{'height':'90vh','overflow-y':'auto','overflowY':'auto'}" [ngClass]="{'mr-[640px]': (showGuiaChanchosForm || showGuiaPollosEngordeForm || showGuiaGallinasForm)}">
           <div class="modal-header-sticky">
             <h3 class="text-lg font-semibold">
               {{ editingEtapa ? 'Editar Etapa' : 'Nueva Etapa de Crecimiento' }}
@@ -826,9 +1016,42 @@
             </div>
 
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-box mr-1"></i>
-                {{ selectedTypeFood?.name || 'Producto' }} *
+              <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                <span class="flex items-center">
+                  <i class="fas fa-box mr-1"></i>
+                  {{ selectedTypeFood?.name || 'Producto' }} *
+                </span>
+                <button
+                  type="button"
+                  *ngIf="selectedPlan && (getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('chancho') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('cerdo') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('porcino'))"
+                  (click)="toggleGuiaChanchosForm()"
+                  class="ml-2 text-green-600 hover:text-green-700 text-xs px-2 py-1 border border-green-300 rounded flex items-center"
+                  title="Ver guía de alimentación para Chanchos">
+                  <i class="fas mr-1" [ngClass]="showGuiaChanchosForm ? 'fa-times' : 'fa-eye'"></i>
+                  {{ showGuiaChanchosForm ? 'Cerrar' : 'Guía' }}
+                </button>
+                
+                <!-- Botón Guía: Pollos de Engorde -->
+                <button
+                  type="button"
+                  *ngIf="selectedPlan && (getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('pollo') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('ave') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('gallina'))"
+                  (click)="toggleGuiaPollosEngordeForm()"
+                  class="ml-2 text-yellow-700 hover:text-yellow-800 text-xs px-2 py-1 border border-yellow-300 rounded flex items-center"
+                  title="Ver guía de alimentación para Pollos de Engorde">
+                  <i class="fas mr-1" [ngClass]="showGuiaPollosEngordeForm ? 'fa-times' : 'fa-eye'"></i>
+                  {{ showGuiaPollosEngordeForm ? 'Cerrar' : 'Engorde' }}
+                </button>
+
+                <!-- Botón Guía: Gallinas Ponedoras -->
+                <button
+                  type="button"
+                  *ngIf="selectedPlan && (getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('pollo') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('ave') || getAnimalNameFromPlan(selectedPlan).toLowerCase().includes('gallina'))"
+                  (click)="toggleGuiaGallinasForm()"
+                  class="ml-2 text-rose-700 hover:text-rose-800 text-xs px-2 py-1 border border-rose-300 rounded flex items-center"
+                  title="Ver guía de alimentación para Gallinas Ponedoras">
+                  <i class="fas mr-1" [ngClass]="showGuiaGallinasForm ? 'fa-times' : 'fa-eye'"></i>
+                  {{ showGuiaGallinasForm ? 'Cerrar' : 'Postura' }}
+                </button>
               </label>
               <select 
                 formControlName="productId"
@@ -922,6 +1145,333 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+      <!-- Panel lateral: Guía Chanchos (dentro del overlay) -->
+      <div *ngIf="showGuiaChanchosForm" cdkDrag class="fixed top-20 right-6 w-[860px] min-w-[720px] max-w-[95vw] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 flex flex-col resize-x overflow-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50 cursor-move" cdkDragHandle>
+          <h4 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-pig text-pink-500 mr-2"></i>
+            Guía Chanchos
+          </h4>
+          <button type="button" (click)="toggleGuiaChanchosForm()" class="text-gray-500 hover:text-red-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] table-auto border border-gray-200 rounded-lg overflow-hidden text-sm leading-5">
+              <colgroup>
+                <col style="width: 14%">
+                <col style="width: 14%">
+                <col style="width: 14%">
+                <col style="width: 18%">
+                <col style="width: 28%">
+                <col style="width: 12%">
+              </colgroup>
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Peso del Cerdo</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Días)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Meses)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Consumo Diario Total</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Alimentos Recomendados (Mezcla Diaria)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Etapa</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 align-top">
+                <tr>
+                  <td class="px-4 py-3">1.5–5 kg</td>
+                  <td class="px-4 py-3">0–21 días</td>
+                  <td class="px-4 py-3">0–0.7 meses</td>
+                  <td class="px-4 py-3">Leche materna</td>
+                  <td class="px-4 py-3">
+                    Leche materna exclusiva
+                  </td>
+                  <td class="px-4 py-3">Lechón lactante</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">5–15 kg</td>
+                  <td class="px-4 py-3">21–60 días</td>
+                  <td class="px-4 py-3">0.7–2 meses</td>
+                  <td class="px-4 py-3">0.4–0.8 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>0.3–0.6 kg concentrado iniciador (20–22% proteína)</li>
+                      <li>0.1–0.2 kg leche en polvo diluida o suero</li>
+                      <li>Agua limpia abundante</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Lechón destetado</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">15–30 kg</td>
+                  <td class="px-4 py-3">60–90 días</td>
+                  <td class="px-4 py-3">2–3 meses</td>
+                  <td class="px-4 py-3">0.8–1.5 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>0.5–1.0 kg concentrado crecimiento (16–18% proteína)</li>
+                      <li>0.3–0.5 kg maíz molido</li>
+                      <li>50 g sémita/salvado</li>
+                      <li>Verduras o desperdicios cocidos (opcional)</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Crecimiento temprano</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">30–60 kg</td>
+                  <td class="px-4 py-3">90–150 días</td>
+                  <td class="px-4 py-3">3–5 meses</td>
+                  <td class="px-4 py-3">1.5–2.5 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>1.0–1.5 kg concentrado crecimiento (14–16% proteína)</li>
+                      <li>0.3–0.7 kg maíz molido</li>
+                      <li>0.2–0.3 kg sémita/salvado</li>
+                      <li>Plátano verde cocido o yuca (opcional)</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Crecimiento</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">60–90 kg</td>
+                  <td class="px-4 py-3">150–180 días</td>
+                  <td class="px-4 py-3">5–6 meses</td>
+                  <td class="px-4 py-3">2.5–3.5 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>1.5–2.0 kg concentrado engorde (13–15% proteína)</li>
+                      <li>0.5–1.0 kg maíz molido</li>
+                      <li>0.3–0.5 kg sémita/salvado</li>
+                      <li>Desperdicios cocidos, tubérculos</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Engorde</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">90–120 kg</td>
+                  <td class="px-4 py-3">180–210 días</td>
+                  <td class="px-4 py-3">6–7 meses</td>
+                  <td class="px-4 py-3">3.5–4.5 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>2.0–2.5 kg concentrado engorde (12–14% proteína)</li>
+                      <li>0.8–1.2 kg maíz molido</li>
+                      <li>0.5–0.8 kg sémita/salvado</li>
+                      <li>Desperdicios cocidos, forraje verde</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Engorde final</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">120+ kg</td>
+                  <td class="px-4 py-3">210+ días</td>
+                  <td class="px-4 py-3">7+ meses</td>
+                  <td class="px-4 py-3">4.5–5.0 kg</td>
+                  <td class="px-4 py-3">
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>2.0–2.5 kg concentrado engorde (12–14% proteína)</li>
+                      <li>1.0–1.5 kg maíz molido</li>
+                      <li>0.8–1.0 kg sémita/salvado</li>
+                      <li>Desperdicios cocidos, forraje</li>
+                    </ul>
+                  </td>
+                  <td class="px-4 py-3">Finalización</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+            Esta guía es referencial y puede ajustarse según genética, ambiente y objetivos productivos.
+          </div>
+        </div>
+      </div>
+      
+      <!-- Panel flotante: Guía Pollos de Engorde (en overlay de Etapa) -->
+      <div *ngIf="showGuiaPollosEngordeForm" cdkDrag class="fixed top-24 right-6 w-[860px] min-w-[720px] max-w-[95vw] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 flex flex-col resize-x overflow-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50 cursor-move" cdkDragHandle>
+          <h4 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-drumstick-bite text-yellow-600 mr-2"></i>
+            Guía Pollos de Engorde
+          </h4>
+          <button type="button" (click)="toggleGuiaPollosEngordeForm()" class="text-gray-500 hover:text-red-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] table-auto border border-gray-200 rounded-lg overflow-hidden text-sm leading-5">
+              <colgroup>
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 10%">
+                <col style="width: 10%">
+              </colgroup>
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Semanas)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Días)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Peso Aproximado</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Consumo Diario</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Tipo de Alimento</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">% Proteína</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Etapa</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 align-top">
+                <tr>
+                  <td class="px-4 py-3">0–1 semana</td>
+                  <td class="px-4 py-3">1–7 días</td>
+                  <td class="px-4 py-3">40–80 g</td>
+                  <td class="px-4 py-3">10–15 g</td>
+                  <td class="px-4 py-3">Iniciador pollitos</td>
+                  <td class="px-4 py-3">21–23%</td>
+                  <td class="px-4 py-3">Pollito recién nacido</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">2–4 semanas</td>
+                  <td class="px-4 py-3">8–28 días</td>
+                  <td class="px-4 py-3">80–300 g</td>
+                  <td class="px-4 py-3">15–30 g</td>
+                  <td class="px-4 py-3">Iniciador</td>
+                  <td class="px-4 py-3">20–22%</td>
+                  <td class="px-4 py-3">Pollito</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">5–8 semanas</td>
+                  <td class="px-4 py-3">29–56 días</td>
+                  <td class="px-4 py-3">300–800 g</td>
+                  <td class="px-4 py-3">30–60 g</td>
+                  <td class="px-4 py-3">Crecimiento</td>
+                  <td class="px-4 py-3">18–20%</td>
+                  <td class="px-4 py-3">Crecimiento</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">9–12 semanas</td>
+                  <td class="px-4 py-3">57–84 días</td>
+                  <td class="px-4 py-3">800–1200 g</td>
+                  <td class="px-4 py-3">60–90 g</td>
+                  <td class="px-4 py-3">Engorde</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Engorde</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">13–16 semanas</td>
+                  <td class="px-4 py-3">85–112 días</td>
+                  <td class="px-4 py-3">1200–1800 g</td>
+                  <td class="px-4 py-3">90–110 g</td>
+                  <td class="px-4 py-3">Engorde/Acabado</td>
+                  <td class="px-4 py-3">15–17%</td>
+                  <td class="px-4 py-3">Engorde final</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">17–20 semanas</td>
+                  <td class="px-4 py-3">113–140 días</td>
+                  <td class="px-4 py-3">1800–2200 g</td>
+                  <td class="px-4 py-3">110–120 g</td>
+                  <td class="px-4 py-3">Acabado</td>
+                  <td class="px-4 py-3">14–16%</td>
+                  <td class="px-4 py-3">Finalización</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            Peso ideal de venta: 1.8–2.5 kg (16–20 semanas).
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel flotante: Guía Gallinas Ponedoras (en overlay de Etapa) -->
+      <div *ngIf="showGuiaGallinasForm" cdkDrag class="fixed top-28 right-6 w-[860px] min-w-[720px] max-w-[95vw] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 flex flex-col resize-x overflow-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50 cursor-move" cdkDragHandle>
+          <h4 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-egg text-rose-600 mr-2"></i>
+            Guía Gallinas Ponedoras
+          </h4>
+          <button type="button" (click)="toggleGuiaGallinasForm()" class="text-gray-500 hover:text-red-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] table-auto border border-gray-200 rounded-lg overflow-hidden text-sm leading-5">
+              <colgroup>
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 16%">
+                <col style="width: 10%">
+                <col style="width: 10%">
+              </colgroup>
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Semanas)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Edad (Meses)</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Peso Aproximado</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Consumo Diario</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Tipo de Alimento</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">% Proteína</th>
+                  <th class="px-4 py-3 text-left font-semibold text-gray-600 uppercase">Etapa/Producción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 align-top">
+                <tr>
+                  <td class="px-4 py-3">0–8 semanas</td>
+                  <td class="px-4 py-3">0–2 meses</td>
+                  <td class="px-4 py-3">40–800 g</td>
+                  <td class="px-4 py-3">10–60 g</td>
+                  <td class="px-4 py-3">Iniciador</td>
+                  <td class="px-4 py-3">20–22%</td>
+                  <td class="px-4 py-3">Pollita</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">9–18 semanas</td>
+                  <td class="px-4 py-3">2–4.5 meses</td>
+                  <td class="px-4 py-3">800–1400 g</td>
+                  <td class="px-4 py-3">60–90 g</td>
+                  <td class="px-4 py-3">Levante/Desarrollo</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Recría</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">19–21 semanas</td>
+                  <td class="px-4 py-3">4.5–5 meses</td>
+                  <td class="px-4 py-3">1400–1600 g</td>
+                  <td class="px-4 py-3">90–110 g</td>
+                  <td class="px-4 py-3">Pre-postura</td>
+                  <td class="px-4 py-3">17–18%</td>
+                  <td class="px-4 py-3">Pre-postura</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">22+ semanas</td>
+                  <td class="px-4 py-3">5+ meses</td>
+                  <td class="px-4 py-3">1600–2000 g</td>
+                  <td class="px-4 py-3">110–130 g</td>
+                  <td class="px-4 py-3">Postura</td>
+                  <td class="px-4 py-3">16–18%</td>
+                  <td class="px-4 py-3">Postura activa</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">Postura baja</td>
+                  <td class="px-4 py-3">18+ meses</td>
+                  <td class="px-4 py-3">1800–2200 g</td>
+                  <td class="px-4 py-3">100–120 g</td>
+                  <td class="px-4 py-3">Postura mantenimiento</td>
+                  <td class="px-4 py-3">15–16%</td>
+                  <td class="px-4 py-3">Postura descendente</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800">
+            Reajuste según línea genética y curva de postura.
+          </div>
         </div>
       </div>
     </div>

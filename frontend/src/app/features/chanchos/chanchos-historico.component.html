@@ -1,186 +1,342 @@
-<!-- Header de la página -->
-<div class="dashboard-header flex items-center mb-6">
-  <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="h-14 w-14 rounded-full border-4 border-pink-400 mr-4">
-  <div>
-    <h1 class="text-2xl font-bold text-pink-700">Histórico de Lotes - Chanchos</h1>
-    <p class="text-gray-600">Registro histórico de lotes cerrados y métricas de rentabilidad</p>
+<!-- Histórico de Alimentación -->
+<div class="historico-alimentacion-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">📚 Historial de Alimentación - Chanchos</h1>
+      <p class="page-subtitle">Registro completo de alimentación con datos reales del sistema</p>
+    </div>
+    <div class="header-actions">
+      <button (click)="exportarDatos()" class="btn btn-export">
+        <i class="fas fa-download"></i>
+        Exportar Datos
+      </button>
+    </div>
+  </div>
+
+  <!-- Indicadores de Carga -->
+  <div *ngIf="cargandoRegistros || cargandoEstadisticas" class="loading-container">
+    <div class="loading-spinner">
+      <i class="fas fa-spinner fa-spin"></i>
+      <span>Cargando datos del historial...</span>
+    </div>
+  </div>
+
+  <!-- Error de Carga -->
+  <div *ngIf="errorCarga" class="error-container">
+    <div class="error-message">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span>{{ errorCarga }}</span>
+      <button (click)="cargarDatosHistoricos()" class="btn btn-retry">
+        <i class="fas fa-redo"></i>
+        Reintentar
+      </button>
+    </div>
+  </div>
+
+  <!-- Estadísticas Generales -->
+  <div class="estadisticas-generales" *ngIf="!cargandoRegistros">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon bg-blue-500">
+          <i class="fas fa-list"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().totalRegistros }}</h3>
+          <p>Registros Totales</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon bg-green-500">
+          <i class="fas fa-layer-group"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().totalLotes }}</h3>
+          <p>Lotes Involucrados</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon bg-yellow-500">
+          <i class="fas fa-weight-hanging"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().cantidadTotal.toFixed(2) }} kg</h3>
+          <p>Cantidad Total</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon bg-purple-500">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getEstadisticasGenerales().promedioGeneral.toFixed(2) }} kg</h3>
+          <p>Promedio por Registro</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controles de Rango de Fechas -->
+  <div class="rango-fechas-container">
+    <div class="rango-grid">
+      <div class="fecha-group">
+        <label class="fecha-label">📅 Fecha Inicio</label>
+        <input type="date" [(ngModel)]="fechaInicio" class="fecha-input">
+      </div>
+      <div class="fecha-group">
+        <label class="fecha-label">📅 Fecha Fin</label>
+        <input type="date" [(ngModel)]="fechaFin" class="fecha-input">
+      </div>
+      <div class="fecha-group">
+        <label class="fecha-label">&nbsp;</label>
+        <button (click)="actualizarRangoFechas()" class="btn btn-primary">
+          <i class="fas fa-sync-alt"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pestañas de Vista -->
+  <div class="vista-tabs">
+    <button (click)="cambiarVista('registros')" [class]="'tab-button ' + (vistaActual === 'registros' ? 'active' : '')">
+      <i class="fas fa-list"></i>
+      Registros Individuales
+    </button>
+    <button (click)="cambiarVista('estadisticas')" [class]="'tab-button ' + (vistaActual === 'estadisticas' ? 'active' : '')">
+      <i class="fas fa-chart-bar"></i>
+      Estadísticas por Lote
+    </button>
+  </div>
+
+  <!-- Vista de Registros Individuales -->
+  <div *ngIf="vistaActual === 'registros'" class="vista-registros">
+    <!-- Filtros -->
+    <div class="filtros-container">
+      <div class="filtros-grid">
+        <div class="filtro-group">
+          <label class="filtro-label">🔍 Buscar</label>
+          <input type="text" [(ngModel)]="busqueda" placeholder="Código de lote, observaciones..." class="filtro-input">
+        </div>
+        <div class="filtro-group">
+          <label class="filtro-label">🏷️ Lote</label>
+          <select [(ngModel)]="filtroLote" class="filtro-select">
+            <option value="">Todos los lotes</option>
+            <option *ngFor="let lote of getLotesUnicos()" [value]="lote.loteId">
+              {{ lote.loteDescripcion }} ({{ lote.codigoLote }})
+            </option>
+          </select>
+        </div>
+        <div class="filtro-group">
+          <label class="filtro-label">📊 Estado</label>
+          <select [(ngModel)]="filtroStatus" class="filtro-select">
+            <option value="">Todos los estados</option>
+            <option *ngFor="let status of getStatusUnicos()" [value]="status">{{ status }}</option>
+          </select>
+        </div>
+        <div class="filtro-group">
+          <label class="filtro-label">&nbsp;</label>
+          <button (click)="limpiarFiltros()" class="btn btn-secondary">
+            <i class="fas fa-eraser"></i>
+            Limpiar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de Registros -->
+    <div class="tabla-registros">
+      <div class="table-header">
+        <h2>📋 Registros de Alimentación ({{ getRegistrosFiltrados().length }})</h2>
+      </div>
+      <div class="table-responsive" *ngIf="!cargandoRegistros">
+        <table class="registros-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha de Creación</th>
+              <th>Lote</th>
+              <th>Cantidad</th>
+              <th>Animales Vivos</th>
+              <th>Animales Muertos</th>
+              <th>Estado</th>
+              <th>Jornada</th>
+              <th>Observaciones</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let registro of getRegistrosPaginados(); trackBy: trackByRegistro" class="table-row">
+              <td class="id-cell"><span class="id-badge">#{{ registro.id }}</span></td>
+              <td class="fecha-cell">
+                <div class="fecha-info">
+                  <div class="fecha-principal">{{ formatearFechaHora(registro.fechaCreacion) }}</div>
+                </div>
+              </td>
+              <td class="lote-cell">
+                <div class="lote-info">
+                  <span class="lote-nombre">{{ registro.loteDescripcion }}</span>
+                  <span class="lote-codigo">{{ registro.codigoLote }}</span>
+                </div>
+              </td>
+              <td class="cantidad-cell">
+                <div class="cantidad-info">
+                  <span class="cantidad-valor">{{ registro.cantidadAplicada.toFixed(2) }} kg</span>
+                  <div class="tipo-consumo" style="margin-top:4px; display:flex; align-items:center; gap:6px;">
+                    <i [class]="getIconoTipoConsumo(registro)"></i>
+                    <span class="tipo-label" style="font-size:12px; color:#475569;">{{ getEtiquetaTipoConsumo(registro) }}</span>
+                    <button (click)="abrirDetalleAlimento(registro)" class="btn-accion btn-detalles" title="Ver alimento" style="margin-left:6px; padding:4px 8px;">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    <ng-container *ngIf="getTotalManiana(registro) as totalM; else sinTotalM">
+                      <span *ngIf="totalM > 0" class="total-maniana" style="margin-left:8px;">
+                        <i class="fas fa-sun" style="margin-right:6px;"></i>
+                        Mañana: {{ totalM | number:'1.2-2' }} kg
+                      </span>
+                    </ng-container>
+                    <ng-template #sinTotalM></ng-template>
+                    <ng-container *ngIf="getPesoPromedio(registro) as peso">
+                      <span class="peso-promedio" style="margin-left:8px; background:#f1f5f9; color:#334155; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; display:inline-flex; align-items:center;">
+                        <i class="fas fa-weight-hanging" style="margin-right:6px;"></i>
+                        Peso: {{ peso | number:'1.1-2' }} kg
+                      </span>
+                    </ng-container>
+                  </div>
+                </div>
+              </td>
+              <td class="animales-vivos-cell">
+                <ng-container *ngIf="getVivosDelDia(registro) as vivosDia; else noVivos">
+                  <div class="animales-info">
+                    <i class="fas fa-egg text-green-500"></i>
+                    <span>{{ vivosDia }}</span>
+                  </div>
+                </ng-container>
+                <ng-template #noVivos>
+                  <span class="no-data">N/A</span>
+                </ng-template>
+              </td>
+              <td class="animales-muertos-cell">
+                <ng-container *ngIf="getMuertosDelDia(registro) as muertosDia; else noMuertos">
+                  <ng-container *ngIf="muertosDia > 0; else sinMortalidad">
+                    <div class="animales-info">
+                      <i class="fas fa-skull text-red-500"></i>
+                      <span>{{ muertosDia }}</span>
+                    </div>
+                  </ng-container>
+                  <ng-template #sinMortalidad>
+                    <span class="no-data">No hubo</span>
+                  </ng-template>
+                </ng-container>
+                <ng-template #noMuertos>
+                  <span class="no-data">No hubo</span>
+                </ng-template>
+              </td>
+              <td class="status-cell">
+                <div class="status-badge" [class]="getColorStatus(registro.status)">
+                  <i [class]="getIconoStatus(registro.status)"></i>
+                  <span>{{ registro.status }}</span>
+                </div>
+              </td>
+              <td class="day-cell"><span class="day-badge">{{ getJornada(registro) }}</span></td>
+              <td class="observaciones-cell">
+                <span class="observaciones-text" [title]="registro.observaciones">{{ registro.observaciones || 'Sin observaciones' }}</span>
+              </td>
+              <td class="acciones-cell">
+                <div class="acciones-container">
+                  <button (click)="editarRegistro(registro)" class="btn-accion btn-editar" title="Editar registro"><i class="fas fa-edit"></i></button>
+                  <button (click)="eliminarRegistro(registro)" class="btn-accion btn-eliminar" title="Eliminar registro"><i class="fas fa-trash"></i></button>
+                  <button (click)="verDetalles(registro)" class="btn-accion btn-detalles" title="Ver detalles"><i class="fas fa-eye"></i></button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="getRegistrosFiltrados().length === 0" class="no-data-message">
+          <i class="fas fa-inbox"></i>
+          <h3>No hay registros</h3>
+          <p>No se encontraron registros para los filtros seleccionados.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vista de Estadísticas por Lote -->
+  <div *ngIf="vistaActual === 'estadisticas'" class="vista-estadisticas">
+    <div class="estadisticas-header">
+      <h2>📊 Estadísticas Agrupadas por Lote</h2>
+      <p>Métricas consolidadas para cada lote</p>
+    </div>
+    <div class="estadisticas-grid" *ngIf="!cargandoEstadisticas">
+      <div *ngFor="let lote of estadisticasPorLote" class="lote-card">
+        <div class="lote-header">
+          <h3>{{ lote.codigo }}</h3>
+          <span class="lote-id">ID: {{ lote.loteId }}</span>
+        </div>
+        <div class="lote-periodo">
+          <i class="fas fa-calendar"></i>
+          <span>{{ formatearFecha(lote.fechaInicio) }} - {{ formatearFecha(lote.fechaUltimo) }}</span>
+          <span class="dias-badge">{{ lote.diasActivos }} días</span>
+        </div>
+        <div class="lote-metricas">
+          <div class="metrica"><i class="fas fa-list text-blue-500"></i><span class="metrica-label">Registros</span><span class="metrica-valor">{{ lote.totalRegistros }}</span></div>
+          <div class="metrica"><i class="fas fa-weight-hanging text-green-500"></i><span class="metrica-label">Total</span><span class="metrica-valor">{{ lote.cantidadTotal.toFixed(2) }} kg</span></div>
+          <div class="metrica"><i class="fas fa-chart-line text-yellow-500"></i><span class="metrica-label">Promedio/día</span><span class="metrica-valor">{{ lote.promedioDiario.toFixed(2) }} kg</span></div>
+          <div class="metrica"><i class="fas fa-heartbeat text-red-500"></i><span class="metrica-label">Supervivencia</span><span class="metrica-valor">{{ lote.tasaSupervivencia.toFixed(1) }}%</span></div>
+        </div>
+        <div class="lote-animales">
+          <div class="animal-stat"><i class="fas fa-egg text-green-600"></i><span>{{ lote.animalesVivos }} vivos</span></div>
+          <div class="animal-stat"><i class="fas fa-skull text-red-600"></i><span>{{ lote.animalesMuertos }} muertos</span></div>
+        </div>
+      </div>
+      <div *ngIf="estadisticasPorLote.length === 0" class="no-stats-message">
+        <i class="fas fa-chart-bar"></i>
+        <h3>No hay estadísticas disponibles</h3>
+        <p>No se pudieron generar estadísticas con los datos actuales.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paginación -->
+  <div class="paginacion-container" *ngIf="vistaActual === 'registros' && getTotalPaginas() > 1">
+    <div class="paginacion">
+      <button (click)="cambiarPagina(paginaActual - 1)" [disabled]="paginaActual <= 1" class="btn btn-pagination">
+        <i class="fas fa-chevron-left"></i>
+        Anterior
+      </button>
+      <div class="pagina-info">
+        <span>Página {{ paginaActual }} de {{ getTotalPaginas() }}</span>
+        <span class="registros-info">({{ getRegistrosFiltrados().length }} registros)</span>
+      </div>
+      <button (click)="cambiarPagina(paginaActual + 1)" [disabled]="paginaActual >= getTotalPaginas()" class="btn btn-pagination">
+        Siguiente
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal de Detalle de Alimento (solo MAÑANA) -->
+  <div *ngIf="mostrarDetalleAlimento" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+      <div class="p-5 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Alimentos (Mañana)</h3>
+        <button (click)="cerrarDetalleAlimento()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-5">
+        <ng-container *ngIf="detalleAlimentos.length; else sinAlimentos">
+          <div class="space-y-2">
+            <div *ngFor="let item of detalleAlimentos" class="flex items-center justify-between">
+              <span class="text-gray-800">{{ item.nombre }}</span>
+              <span class="font-semibold">{{ item.total | number:'1.2-2' }} kg</span>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #sinAlimentos>
+          <div class="text-sm text-gray-600">Sin registros de alimentos (Mañana).</div>
+        </ng-template>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button (click)="cerrarDetalleAlimento()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Cerrar</button>
+      </div>
+    </div>
   </div>
 </div>
-
-<!-- Indicador de carga -->
-<div *ngIf="loading" class="flex justify-center items-center py-8">
-  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
-</div>
-
-<ng-container *ngIf="!loading">
-  <!-- Estadísticas del histórico -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <!-- Total lotes cerrados -->
-    <div class="bg-gradient-to-r from-pink-50 to-pink-100 border border-pink-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-pink-700 text-sm font-medium mb-1">Lotes Cerrados</p>
-          <p class="text-3xl font-bold text-pink-800">{{ estadisticas.totalLotesCerrados }}</p>
-        </div>
-        <div class="p-3 bg-pink-200 rounded-xl">
-          <i class="fas fa-archive text-pink-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Total ventas -->
-    <div class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-green-700 text-sm font-medium mb-1">Total Ventas</p>
-          <p class="text-3xl font-bold text-green-800">${{ estadisticas.totalVentas.toLocaleString('es-ES') }}</p>
-        </div>
-        <div class="p-3 bg-green-200 rounded-xl">
-          <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Mortalidad promedio -->
-    <div class="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-red-700 text-sm font-medium mb-1">Mortalidad Promedio</p>
-          <p class="text-3xl font-bold text-red-800">{{ estadisticas.mortalidadPromedio.toFixed(1) }}%</p>
-        </div>
-        <div class="p-3 bg-red-200 rounded-xl">
-          <i class="fas fa-heart-broken text-red-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Rentabilidad promedio -->
-    <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-blue-700 text-sm font-medium mb-1">Rentabilidad Promedio</p>
-          <p class="text-3xl font-bold text-blue-800">${{ estadisticas.rentabilidadPromedio.toLocaleString('es-ES') }}</p>
-        </div>
-        <div class="p-3 bg-blue-200 rounded-xl">
-          <i class="fas fa-chart-line text-blue-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tabla de lotes históricos -->
-  <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-    <div class="px-6 py-4 bg-gradient-to-r from-pink-50 to-pink-100 border-b border-pink-200">
-      <h3 class="text-xl font-semibold text-pink-700">
-        <i class="fas fa-history mr-2"></i>
-        Lotes Cerrados
-      </h3>
-    </div>
-
-    <div *ngIf="lotesHistoricos.length === 0" class="text-center py-12">
-      <div class="text-gray-400 mb-4">
-        <i class="fas fa-archive text-6xl"></i>
-      </div>
-      <h4 class="text-xl font-semibold text-gray-600 mb-2">Sin histórico disponible</h4>
-      <p class="text-gray-500">No hay lotes cerrados para mostrar en el histórico.</p>
-    </div>
-
-    <div *ngIf="lotesHistoricos.length > 0" class="overflow-x-auto">
-      <table class="w-full">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duración</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ventas</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mortalidad</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rentabilidad</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Motivo</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr *ngFor="let lote of lotesHistoricos" class="hover:bg-gray-50">
-            <!-- Código del lote -->
-            <td class="px-6 py-4 whitespace-nowrap">
-              <div class="flex items-center">
-                <i class="fas fa-pig text-pink-500 mr-2"></i>
-                <span class="text-sm font-medium text-gray-900">{{ lote.codigo }}</span>
-              </div>
-            </td>
-            
-            <!-- Período -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              <div>
-                <div class="font-medium">{{ formatearFecha(lote.fechaInicio) }}</div>
-                <div class="text-xs text-gray-400">→ {{ formatearFecha(lote.fechaCierre) }}</div>
-              </div>
-            </td>
-            
-            <!-- Duración -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                {{ calcularDuracion(lote.fechaInicio, lote.fechaCierre) }} días
-              </span>
-            </td>
-            
-            <!-- Animales -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              <div class="space-y-1">
-                <div class="flex items-center">
-                  <i class="fas fa-play text-green-500 mr-1 text-xs"></i>
-                  <span>{{ lote.animalesIniciales }} iniciales</span>
-                </div>
-                <div class="flex items-center">
-                  <i class="fas fa-dollar-sign text-blue-500 mr-1 text-xs"></i>
-                  <span>{{ lote.animalesVendidos }} vendidos</span>
-                </div>
-                <div class="flex items-center">
-                  <i class="fas fa-times text-red-500 mr-1 text-xs"></i>
-                  <span>{{ lote.animalesMuertos }} muertos</span>
-                </div>
-              </div>
-            </td>
-            
-            <!-- Ventas -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <div class="font-medium text-green-600">
-                ${{ lote.valorTotalVentas.toLocaleString('es-ES') }}
-              </div>
-              <div class="text-xs text-gray-400">
-                ${{ (lote.valorTotalVentas / lote.animalesVendidos).toLocaleString('es-ES') }}/animal
-              </div>
-            </td>
-            
-            <!-- Mortalidad -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <div class="flex items-center">
-                <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                  <div class="bg-red-500 h-2 rounded-full" 
-                       [style.width.%]="(lote.animalesMuertos / lote.animalesIniciales * 100)"></div>
-                </div>
-                <span class="text-red-600 font-medium">
-                  {{ ((lote.animalesMuertos / lote.animalesIniciales) * 100).toFixed(1) }}%
-                </span>
-              </div>
-            </td>
-            
-            <!-- Rentabilidad -->
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <div [class]="getColorRentabilidad(lote.rentabilidad)" class="font-medium">
-                ${{ lote.rentabilidad.toLocaleString('es-ES') }}
-              </div>
-            </td>
-            
-            <!-- Motivo -->
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                {{ lote.motivoCierre }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</ng-container> 

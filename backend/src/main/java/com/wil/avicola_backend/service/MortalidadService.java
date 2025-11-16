@@ -9,11 +9,13 @@ import com.wil.avicola_backend.repository.LoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.annotation.PostConstruct;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Arrays;
 
 @Service
 @Transactional
@@ -87,6 +89,19 @@ public class MortalidadService {
      */
     public RegistroMortalidad crearRegistro(RegistroMortalidad registro) {
         registro.setFechaRegistro(LocalDateTime.now());
+        // Asignar causa por defecto si no viene especificada para evitar violación NOT NULL
+        if (registro.getCausa() == null) {
+            CausaMortalidad causa = causaMortalidadRepository.findByNombre("Causa Desconocida");
+            if (causa == null) {
+                CausaMortalidad nueva = new CausaMortalidad();
+                nueva.setNombre("Causa Desconocida");
+                nueva.setDescripcion("Generada automáticamente");
+                nueva.setColor("#9e9e9e");
+                nueva.setActivo(true);
+                causa = causaMortalidadRepository.save(nueva);
+            }
+            registro.setCausa(causa);
+        }
         
         // ✅ ACTUALIZAR AUTOMÁTICAMENTE LA CANTIDAD DEL LOTE
         try {
@@ -284,6 +299,38 @@ public class MortalidadService {
         LocalDateTime inicioHoy = LocalDate.now().atStartOfDay();
         LocalDateTime finHoy = inicioHoy.plusDays(1).minusSeconds(1);
         return obtenerTotalMuertesPorPeriodo(inicioHoy, finHoy);
+    }
+
+    // ========== SEED DE CAUSAS POR DEFECTO ==========
+    @PostConstruct
+    public void seedCausasPorDefecto() {
+        try {
+            List<String> nombres = Arrays.asList(
+                    "Causa Desconocida",
+                    "Accidente / Trauma",
+                    "Aplastamiento",
+                    "Enfermedad respiratoria",
+                    "Enfermedad digestiva",
+                    "Deshidratación",
+                    "Desnutrición",
+                    "Parásitos",
+                    "Golpe de calor",
+                    "Ataque de otro animal"
+            );
+            for (String nombre : nombres) {
+                CausaMortalidad existente = causaMortalidadRepository.findByNombre(nombre);
+                if (existente == null) {
+                    CausaMortalidad c = new CausaMortalidad();
+                    c.setNombre(nombre);
+                    c.setDescripcion("Sembrada automáticamente");
+                    c.setActivo(true);
+                    c.setColor("#6b7280");
+                    causaMortalidadRepository.save(c);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ No se pudieron sembrar causas por defecto: " + e.getMessage());
+        }
     }
     
     // ========== GESTIÓN DE CAUSAS ==========

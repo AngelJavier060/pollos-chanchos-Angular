@@ -118,6 +118,8 @@ public class CategoryService {
                     "No puede ser eliminado, existe product(s) registrados con la categoría.");
         }
 
+        // Nota: Subcategory ya no se relaciona con Category sino con TypeFood
+
         if (categoryRepository.existsById(id)) {
             Category category = categoryRepository.findById(id).get();
             categoryRepository.deleteById(id);
@@ -170,6 +172,12 @@ public class CategoryService {
     public ResponseEntity<?> deleteCategory(Long id) {
         try {
             if (categoryRepository.existsById(id)) {
+                // Validar referencias antes de eliminar
+                if (productRepository.existsByCategory(id)) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("No puede ser eliminado, existe product(s) registrados con la categoría.");
+                }
+                // Nota: Subcategory ya no se relaciona con Category sino con TypeFood
                 categoryRepository.deleteById(id);
                 return ResponseEntity.ok().body("Categoría eliminada exitosamente");
             } else {

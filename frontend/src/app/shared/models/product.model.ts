@@ -14,6 +14,7 @@ export interface Product {
   unitMeasurement_id?: number;
   animal_id?: number;
   stage_id?: number;
+  subcategory_id?: number;
   
   // Propiedades para relaciones (objetos relacionados)
   provider?: Provider;
@@ -22,10 +23,22 @@ export interface Product {
   animal?: Animal;
   stage?: Stage;
   category?: Category;
+  subcategory?: Subcategory;
   
   // Para registrar cuando se creó o actualizó el registro
   create_date?: Date;
   update_date?: Date;
+
+  // Campos adicionales (botiquín / médicos / nutricionales)
+  incluirEnBotiquin?: boolean;
+  usoPrincipal?: string;
+  dosisRecomendada?: string;
+  viaAdministracion?: string;
+  tiempoRetiro?: number;
+  fechaVencimiento?: Date;
+  observacionesMedicas?: string;
+  presentacion?: string;
+  infoNutricional?: string;
 }
 
 export interface Provider {
@@ -55,6 +68,11 @@ export interface Stage {
 }
 
 export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface Subcategory {
   id: number;
   name: string;
 }

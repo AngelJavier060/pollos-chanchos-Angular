@@ -11,6 +11,7 @@ import { InventarioService, RegistroConsumoRequest } from './services/inventario
 import { ProductService } from '../../shared/services/product.service';
 import { WebsocketService } from '../../shared/services/websocket.service'; // Import WebSocket service
 import { MorbilidadBackendService } from '../../shared/services/morbilidad-backend.service';
+import { InventarioEntradasService } from '../../shared/services/inventario-entradas.service';
 
 interface RegistroAlimentacionCompleto {
   fecha: string;
@@ -132,6 +133,10 @@ export class PollosAlimentacionComponent implements OnInit {
   uiMessageSuccess: string | null = null;
   uiMessageError: string | null = null;
 
+  // Cache de productos para resolver IDs por nombre
+  private productosCache: any[] = [];
+  private productoByNameNorm = new Map<string, any>();
+
   constructor(
     private loteService: LoteService,
     private alimentacionService: AlimentacionService,
@@ -142,7 +147,8 @@ export class PollosAlimentacionComponent implements OnInit {
     private inventarioService: InventarioService,
     private productService: ProductService,
     private websocketService: WebsocketService, // Inject WebSocket service
-    private morbilidadBackend: MorbilidadBackendService
+    private morbilidadBackend: MorbilidadBackendService,
+    private invEntradasService: InventarioEntradasService
   ) {}
 
   ngOnInit(): void {
@@ -152,6 +158,48 @@ export class PollosAlimentacionComponent implements OnInit {
     this.cargarDatosIniciales();
     this.cargarMortalidadTodosLotes(); // Cargar mortalidad real
     this.cargarCausasMortalidad();
+    // Precargar productos para matching local
+    this.cargarProductosCache();
+  }
+
+  // ✅ Registrar solicitudes de recarga en localStorage para que el Admin lo vea en Inventario
+  private async registrarSolicitudesRecarga(faltantes: Array<{ nombre: string; requerido: number; disponible: number }>): Promise<void> {
+    try {
+      const key = 'pc_recharge_requests';
+      const ahora = new Date().toISOString();
+      let current: any[] = [];
+      try {
+        current = JSON.parse(localStorage.getItem(key) || '[]');
+      } catch {
+        current = [];
+      }
+
+      // Intentar resolver productId por nombre para que el admin vea el badge exacto
+      for (const f of faltantes) {
+        let productId: number | null = null;
+        try {
+          const lista = await this.productService.getProducts({ name: f.nombre } as any).toPromise();
+          const prod = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
+          productId = prod?.id ?? null;
+        } catch {}
+        const item = {
+          productId: productId || undefined,
+          name: f.nombre,
+          requestedAt: ahora,
+          loteCodigo: this.loteSeleccionado?.codigo || String(this.loteSeleccionado?.id || ''),
+          cantidadRequerida: Number(f.requerido || 0),
+          cantidadDisponible: Number(f.disponible || 0)
+        };
+
+        // Upsert por productId o nombre
+        const idx = current.findIndex(x => (item.productId && x.productId === item.productId) || (!item.productId && x.name === item.name));
+        if (idx >= 0) current[idx] = item; else current.push(item);
+      }
+
+      localStorage.setItem(key, JSON.stringify(current));
+    } catch (e) {
+      console.warn('No se pudo registrar la solicitud de recarga local:', e);
+    }
   }
 
   /**
@@ -220,6 +268,33 @@ export class PollosAlimentacionComponent implements OnInit {
     if (nombre) {
       const parsed = this.extraerRangoDesdeNombre(nombre);
       return { nombre, rango: parsed || undefined } as any;
+    }
+    return null;
+  }
+
+  // Resolver productId para un alimento seleccionado
+  private async resolverProductoId(al: EtapaAlimento): Promise<number | null> {
+    try {
+      if (al.productoId && Number.isFinite(Number(al.productoId))) {
+        return Number(al.productoId);
+      }
+      if (!this.productosCache?.length) {
+        await this.cargarProductosCache();
+      }
+      const nombre = (al.alimentoRecomendado || '').toString();
+      const norm = this.normalizarTexto(nombre);
+      const prod = this.productoByNameNorm.get(norm) || this.productosCache.find(p => this.normalizarTexto(p?.name) === norm);
+      const id = prod?.id ?? null;
+      if (Number.isFinite(Number(id))) return Number(id);
+      // Último intento: consulta remota
+      if (al.alimentoRecomendado) {
+        const lista = await this.productService.getProducts({ name: al.alimentoRecomendado } as any).toPromise();
+        const prodSrv = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
+        const idSrv = prodSrv?.id ?? null;
+        return Number.isFinite(Number(idSrv)) ? Number(idSrv) : null;
+      }
+    } catch {
+      // ignorar y devolver null
     }
     return null;
   }
@@ -709,6 +784,184 @@ export class PollosAlimentacionComponent implements OnInit {
     }
   }
 
+  // ✅ Resolver el tipo de alimento (TypeFood.id) para un alimento seleccionado
+  private async resolverTipoAlimentoId(al: EtapaAlimento): Promise<number | null> {
+    try {
+      if (al.productoId) {
+        const prod = await this.productService.getProductById(al.productoId).toPromise();
+        const id = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
+        return Number.isFinite(Number(id)) ? Number(id) : null;
+      }
+      if (al.alimentoRecomendado) {
+        const lista = await this.productService.getProducts({ name: al.alimentoRecomendado } as any).toPromise();
+        const prod = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
+        const id = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
+        return Number.isFinite(Number(id)) ? Number(id) : null;
+      }
+    } catch {
+      // ignorar y devolver null
+    }
+    return null;
+  }
+
+  // ✅ Validar stock disponible antes de registrar alimentación
+  private async validarStockAntesDeRegistrar(): Promise<{ ok: boolean; faltantes: Array<{ nombre: string; requerido: number; disponible: number }> }> {
+    const faltantes: Array<{ nombre: string; requerido: number; disponible: number }> = [];
+    const animales = this.loteSeleccionado?.quantity || 0;
+
+    // Asegurar cache de productos (para matching por nombre)
+    if (!this.productosCache?.length) {
+      await this.cargarProductosCache();
+    }
+
+    // Obtener stock válido por PRODUCTO (entradas vigentes)
+    let stockValido: Record<string, number> = {};
+    try {
+      stockValido = await this.invEntradasService.stockValidoAgrupado().toPromise() || {};
+    } catch {
+      stockValido = {};
+    }
+    console.log('🔎 stockValidoAgrupado keys:', Object.keys(stockValido || {}));
+
+    // Demanda por PRODUCTO (puede haber múltiples candidatos por nombre)
+    const demandaPorProducto = new Map<number, { requerido: number; nombre: string }>();
+    const demandaPorGrupoNombre: Array<{ nombre: string; requerido: number; pids: number[]; tipoId: number | null }> = [];
+
+    const candidatosPorNombre = (nombre: string): any[] => {
+      const n = this.normalizarTexto(nombre);
+      const exactos = (this.productosCache || []).filter(p => this.normalizarTexto(p?.name) === n);
+      if (exactos.length > 0) {
+        console.log('🔍 candidatos exactos para', nombre, '=>', exactos.map(x => ({ id: x?.id, name: x?.name })));
+        return exactos;
+      }
+      const todos = (this.productosCache || []);
+      const parciales = todos.filter(p => {
+        const pn = this.normalizarTexto(p?.name);
+        return pn.includes(n) || n.includes(pn);
+      });
+      console.log('🔍 candidatos parciales para', nombre, '=>', parciales.map(x => ({ id: x?.id, name: x?.name })));
+      return parciales;
+    };
+
+    for (const al of this.alimentosSeleccionados) {
+      const qty = parseFloat(((al.quantityPerAnimal || 0) * animales).toFixed(3));
+      if (Number.isFinite(Number(al.productoId))) {
+        const pid = Number(al.productoId);
+        const prev = demandaPorProducto.get(pid);
+        demandaPorProducto.set(pid, { requerido: (prev?.requerido || 0) + qty, nombre: al.alimentoRecomendado });
+      } else {
+        const candidatos = candidatosPorNombre(al.alimentoRecomendado);
+        if (candidatos.length > 0) {
+          const pids = candidatos.map(c => Number(c?.id)).filter(id => Number.isFinite(id)) as number[];
+          demandaPorGrupoNombre.push({ nombre: al.alimentoRecomendado, requerido: qty, pids, tipoId: await this.resolverTipoAlimentoId(al) });
+        } else {
+          // Fallback por tipo si no hay candidatos por nombre
+          const tipoId = await this.resolverTipoAlimentoId(al);
+          demandaPorGrupoNombre.push({ nombre: al.alimentoRecomendado, requerido: qty, pids: [], tipoId: Number.isFinite(Number(tipoId)) ? Number(tipoId) : null });
+        }
+      }
+    }
+
+    // Mapa productos por tipo (para fallback)
+    const productosByType = new Map<number, number[]>();
+    for (const p of this.productosCache) {
+      const tfid = Number(p?.typeFood?.id || (p as any)?.typeFood_id);
+      const pid = Number(p?.id);
+      if (!Number.isFinite(tfid) || !Number.isFinite(pid)) continue;
+      const arr = productosByType.get(tfid) || [];
+      arr.push(pid);
+      productosByType.set(tfid, arr);
+    }
+
+    // Validar por producto (ids explícitos del plan)
+    for (const [pid, info] of demandaPorProducto.entries()) {
+      let disponible = Number(stockValido[String(pid)] || 0);
+      if (disponible <= 0) {
+        // Fallback: consultar entradas por producto y sumar stockBaseRestante
+        try {
+          const entradas = await this.invEntradasService.listarPorProducto(pid).toPromise();
+          const total = (entradas || []).reduce((sum, e: any) => sum + Number(e?.stockBaseRestante || 0), 0);
+          if (Number.isFinite(total)) disponible = total;
+          console.log(`🔁 Fallback entradas[pid=${pid}] total=`, total);
+        } catch (e) {
+          console.warn('No se pudo consultar entradas para pid', pid, e);
+        }
+      }
+      if (info.requerido > disponible + 1e-6) {
+        faltantes.push({ nombre: info.nombre, requerido: info.requerido, disponible });
+      }
+    }
+
+    // Validar por grupo de nombre (sumando todos los candidatos por nombre)
+    if (demandaPorGrupoNombre.length > 0) {
+      // Precalcular stock por tipo (desde stock válido) para fallbacks
+      const stockPorTipo = new Map<number, number>();
+      for (const [tfid, pids] of productosByType.entries()) {
+        const total = (pids || []).reduce((sum, id) => sum + Number(stockValido[String(id)] || 0), 0);
+        stockPorTipo.set(tfid, total);
+      }
+      for (const item of demandaPorGrupoNombre) {
+        // Sumar disponible sobre todos los candidatos por nombre
+        let disp = (item.pids || []).reduce((sum, id) => sum + Number(stockValido[String(id)] || 0), 0);
+        if (disp <= 0) {
+          // Fallback: entradas por cada candidato
+          try {
+            let total = 0;
+            for (const pid of (item.pids || [])) {
+              const entradas = await this.invEntradasService.listarPorProducto(pid).toPromise();
+              total += (entradas || []).reduce((s, e: any) => s + Number(e?.stockBaseRestante || 0), 0);
+            }
+            disp = total;
+            console.log(`🔁 Fallback nombre='${item.nombre}' totalEntradas=`, total);
+          } catch {}
+        }
+        if (disp <= 0 && item.tipoId != null) {
+          // Último recurso: por tipo (stock válido sumado de todos los productos del tipo)
+          let totalTipo = Number(stockPorTipo.get(item.tipoId) || 0);
+          if (totalTipo <= 0) {
+            try {
+              const pids = productosByType.get(item.tipoId) || [];
+              totalTipo = 0;
+              for (const pid of pids) {
+                const entradas = await this.invEntradasService.listarPorProducto(pid).toPromise();
+                totalTipo += (entradas || []).reduce((s, e: any) => s + Number(e?.stockBaseRestante || 0), 0);
+              }
+              console.log(`🔁 Fallback tipoId=${item.tipoId} totalEntradas=`, totalTipo);
+            } catch {}
+          }
+          disp = totalTipo;
+        }
+        if (item.requerido > disp + 1e-6) {
+          faltantes.push({ nombre: item.nombre, requerido: item.requerido, disponible: disp });
+        }
+      }
+    }
+
+    // Log detallado del resultado
+    console.log('🧪 Validación stock - faltantes:', faltantes);
+
+    return { ok: faltantes.length === 0, faltantes };
+  }
+
+  private normalizarTexto(v: any): string {
+    return (v ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+
+  private async cargarProductosCache(): Promise<void> {
+    try {
+      const lista = await this.productService.getProducts({} as any).toPromise();
+      this.productosCache = Array.isArray(lista) ? lista : [];
+      this.productoByNameNorm.clear();
+      for (const p of this.productosCache) {
+        const key = this.normalizarTexto(p?.name);
+        if (key) this.productoByNameNorm.set(key, p);
+      }
+    } catch {
+      this.productosCache = [];
+      this.productoByNameNorm.clear();
+    }
+  }
+
   async registrarAlimentacionCompleta(): Promise<void> {
     try {
       console.log('🚀 Registrando alimentación con deducción automática de inventario...');
@@ -716,6 +969,22 @@ export class PollosAlimentacionComponent implements OnInit {
       // Validaciones básicas
       if (!this.loteSeleccionado) {
         alert('❌ No se ha seleccionado un lote');
+        return;
+      }
+
+      // ✅ Validar stock antes de continuar
+      const validacion = await this.validarStockAntesDeRegistrar();
+      if (!validacion.ok) {
+        const detalle = validacion.faltantes
+          .map(f => `• ${f.nombre}: requerido ${f.requerido.toFixed(2)} kg, disponible ${f.disponible.toFixed(2)} kg`)
+          .join('\n');
+        // Registrar la solicitud de recarga para que el administrador la vea en Inventario
+        await this.registrarSolicitudesRecarga(validacion.faltantes);
+        this.uiMessageError = `❌ No hay suficiente stock para completar el registro.\n\n${detalle}\n\n` +
+          `Se notificó al administrador para recargar los productos. ` +
+          `Por favor, vuelva a intentar cuando el stock esté disponible.`;
+        this.uiMessageSuccess = null;
+        // Permanecer en la misma página sin redirección
         return;
       }
 
@@ -809,8 +1078,11 @@ export class PollosAlimentacionComponent implements OnInit {
                 const lista = await this.productService.getProducts({ name: al.alimentoRecomendado } as any).toPromise();
                 const prod = Array.isArray(lista) && lista.length > 0 ? lista[0] : null;
                 tipoAlimentoId = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
-                // Importante: NO fijar productId cuando solo lo obtuvimos por nombre.
-                // Si no vino productId desde el plan, dejamos que el backend consuma por tipo (FIFO).
+                // Si logramos resolver un producto único por nombre, usar su id para que la
+                // disminución en Admin/Inventario sea por producto y no solo por tipo.
+                if (prod?.id != null) {
+                  productId = prod.id;
+                }
               } catch (e) {
                 console.warn('⚠️ No se pudo buscar producto por nombre', al.alimentoRecomendado, e);
               }

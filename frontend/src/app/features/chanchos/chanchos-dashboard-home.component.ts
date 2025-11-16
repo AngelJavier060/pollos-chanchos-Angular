@@ -21,21 +21,23 @@ export class ChanchosDashboardHomeComponent implements OnInit {
     promedioEdad: 0
   };
 
-  // Datos para gráficos (simulados)
-  produccionMensual = [
-    { mes: 'Enero', valor: 125 },
-    { mes: 'Febrero', valor: 145 },
-    { mes: 'Marzo', valor: 165 },
-    { mes: 'Abril', valor: 155 },
-    { mes: 'Mayo', valor: 175 },
-    { mes: 'Junio', valor: 185 }
-  ];
+  // Datos para gráficos de producción (se alimentan con datos reales)
+  produccionMensual: Array<{ mes: string; valor: number }> = [];
 
+  // Distribución de animales (porcentaje sobre adquiridos o sobre vivos+vendidos+muertos)
   estadoSalud = {
-    excelente: 75,
-    bueno: 20,
-    regular: 5,
+    excelente: 0, // Vivos
+    bueno: 0,     // Vendidos
+    regular: 0,   // Muertos
     critico: 0
+  };
+
+  // Resumen global de animales de chanchos
+  resumenAnimales = {
+    adquiridos: 0,
+    actuales: 0,
+    vendidos: 0,
+    muertos: 0
   };
 
   // Resumen ejecutivo
@@ -77,25 +79,11 @@ export class ChanchosDashboardHomeComponent implements OnInit {
 
   /**
    * Cargar alertas próximas (por defecto 7 días)
+   * Temporalmente desactivado para evitar ruido por errores 500 en el backend.
    */
   async cargarAlertas(): Promise<void> {
-    try {
-      const hoy = new Date().toISOString().split('T')[0];
-      this.planEjecucionServiceFront.getAlertas(7, hoy).subscribe({
-        next: (res) => {
-          this.alertas = res || [];
-          this.resumenEjecutivo.alertasActivas = this.alertas.length;
-          console.log('🔔 Alertas próximas:', this.alertas);
-        },
-        error: (err) => {
-          console.error('❌ Error cargando alertas:', err);
-          this.alertas = [];
-          this.resumenEjecutivo.alertasActivas = 0;
-        }
-      });
-    } catch (e) {
-      console.error('❌ Error inesperado cargando alertas:', e);
-    }
+    this.alertas = [];
+    this.resumenEjecutivo.alertasActivas = 0;
   }
 
   /**
@@ -123,8 +111,40 @@ export class ChanchosDashboardHomeComponent implements OnInit {
           total + this.calcularDiasDeVida(lote.birthdate), 0);
         this.metricas.promedioEdad = Math.round(edadTotal / lotesConFecha.length);
       }
+      // Cargar resumen global de animales solo para chanchos (animalId = 2)
+      try {
+        const resumen: any = await this.loteService.getResumen(2).toPromise();
+        const adquiridos = Number(resumen?.animalesAdquiridos ?? 0);
+        const actuales = Number(resumen?.animalesActuales ?? 0);
+        const vendidos = Number(resumen?.animalesVendidos ?? 0);
+        const muertos = Number(resumen?.animalesMuertos ?? 0);
 
-      console.log('📊 Métricas de chanchos cargadas:', this.metricas);
+        this.resumenAnimales = { adquiridos, actuales, vendidos, muertos };
+
+        // Gráfico 1: Distribución absoluta de animales (barras)
+        this.produccionMensual = [
+          { mes: 'Vivos', valor: actuales },
+          { mes: 'Vendidos', valor: vendidos },
+          { mes: 'Muertos', valor: muertos }
+        ];
+
+        // Gráfico 2: Distribución porcentual (vivos / vendidos / muertos)
+        const base = adquiridos > 0 ? adquiridos : (actuales + vendidos + muertos);
+        const safeBase = base > 0 ? base : 1;
+        this.estadoSalud = {
+          excelente: Math.round((actuales / safeBase) * 100),
+          bueno: Math.round((vendidos / safeBase) * 100),
+          regular: Math.round((muertos / safeBase) * 100),
+          critico: 0
+        };
+      } catch (e) {
+        console.error('❌ Error cargando resumen de lotes para chanchos:', e);
+        this.resumenAnimales = { adquiridos: 0, actuales: 0, vendidos: 0, muertos: 0 };
+        this.produccionMensual = [];
+        this.estadoSalud = { excelente: 0, bueno: 0, regular: 0, critico: 0 };
+      }
+
+      console.log('📊 Métricas de chanchos cargadas:', this.metricas, 'Resumen animales:', this.resumenAnimales);
     } catch (error) {
       console.error('❌ Error al cargar métricas:', error);
     }

@@ -9,6 +9,7 @@ import com.wil.avicola_backend.error.RequestException;
 import com.wil.avicola_backend.model.Product;
 import com.wil.avicola_backend.repository.AnimalRepository;
 import com.wil.avicola_backend.repository.CategoryRepository;
+import com.wil.avicola_backend.repository.SubcategoryRepository;
 import com.wil.avicola_backend.repository.ProductRepository;
 import com.wil.avicola_backend.repository.ProviderRepository;
 import com.wil.avicola_backend.repository.StageRepository;
@@ -40,6 +41,8 @@ public class ProductService {
     private CategoryService categoryService; // Añadido el servicio de categorías
     @Autowired
     private InventarioProductoService inventarioProductoService; // Sincronización de inventario por producto
+    @Autowired
+    private SubcategoryRepository subcategoryRepository;
 
     public ResponseEntity<?> findProducts() {
         return ResponseEntity.ok().body(productRepository.findByActiveTrue());
@@ -102,6 +105,15 @@ public class ProductService {
             product.setStage(stageRepository.findById(id_stage).orElse(null));
             product.setCategory(categoryRepository.findById(categoryId).orElse(null)); // Usando el ID que sabemos que es válido
 
+            if (product.getSubcategory() != null && product.getSubcategory().getId() != null) {
+                Long sid = product.getSubcategory().getId();
+                if (sid != null && sid > 0 && subcategoryRepository.existsById(sid)) {
+                    product.setSubcategory(subcategoryRepository.findById(sid).orElse(null));
+                } else {
+                    product.setSubcategory(null);
+                }
+            }
+
             // Asignar valores por defecto si es necesario
             if (product.getName_stage() == null) {
                 product.setName_stage("");
@@ -156,6 +168,39 @@ public class ProductService {
                 // Actualizar descripción si viene en el payload (permitiendo vaciarla con "")
                 product_old.setDescription(
                         null != product.getDescription() ? product.getDescription() : product_old.getDescription());
+
+                // Campos nuevos opcionales
+                if (product.getIncluirEnBotiquin() != null) {
+                    product_old.setIncluirEnBotiquin(product.getIncluirEnBotiquin());
+                }
+                product_old.setUsoPrincipal(
+                        null != product.getUsoPrincipal() ? product.getUsoPrincipal() : product_old.getUsoPrincipal());
+                product_old.setDosisRecomendada(
+                        null != product.getDosisRecomendada() ? product.getDosisRecomendada() : product_old.getDosisRecomendada());
+                product_old.setViaAdministracion(
+                        null != product.getViaAdministracion() ? product.getViaAdministracion() : product_old.getViaAdministracion());
+                if (product.getTiempoRetiro() != null) {
+                    product_old.setTiempoRetiro(product.getTiempoRetiro());
+                }
+                if (product.getFechaVencimiento() != null) {
+                    product_old.setFechaVencimiento(product.getFechaVencimiento());
+                }
+                product_old.setObservacionesMedicas(
+                        null != product.getObservacionesMedicas() ? product.getObservacionesMedicas() : product_old.getObservacionesMedicas());
+                product_old.setPresentacion(
+                        null != product.getPresentacion() ? product.getPresentacion() : product_old.getPresentacion());
+                product_old.setInfoNutricional(
+                        null != product.getInfoNutricional() ? product.getInfoNutricional() : product_old.getInfoNutricional());
+
+                // Subcategoría si se incluye en el payload
+                if (product.getSubcategory() != null) {
+                    Long sid = product.getSubcategory().getId();
+                    if (sid != null && sid > 0 && subcategoryRepository.existsById(sid)) {
+                        product_old.setSubcategory(subcategoryRepository.findById(sid).orElse(null));
+                    } else {
+                        product_old.setSubcategory(null);
+                    }
+                }
 
                 productRepository.save(product_old);
 
