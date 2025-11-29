@@ -19,7 +19,9 @@ class LoteDto {
     required this.raceName,
     required this.birthdate,
     required this.quantityOriginal,
+    required this.cost,
   });
+  final double cost;
   factory LoteDto.fromMap(Map<String, dynamic> m) {
     final race = (m['race'] ?? {}) as Map<String, dynamic>;
     final animal = (race['animal'] ?? {}) as Map<String, dynamic>;
@@ -39,17 +41,34 @@ class LoteDto {
       raceName: (race['name'] ?? '').toString(),
       birthdate: birthdate,
       quantityOriginal: int.tryParse((m['quantityOriginal'] ?? '').toString()),
+      cost: double.tryParse((m['cost'] ?? '0').toString()) ?? 0.0,
     );
   }
 }
 
 class LoteServiceMobile {
   final ApiClient _api = ApiClient(baseUrl: apiBaseUrl);
+  Future<List<LoteDto>> getAll() async {
+    final data = await _api.get('/api/lote');
+    final list = (data is List) ? data : <dynamic>[];
+    return list.whereType<Map<String, dynamic>>().map((e) => LoteDto.fromMap(e)).toList();
+  }
+  Future<List<LoteDto>> getActivos() async {
+    final data = await _api.get('/api/lote/activos');
+    final list = (data is List) ? data : <dynamic>[];
+    return list.whereType<Map<String, dynamic>>().map((e) => LoteDto.fromMap(e)).toList();
+  }
   Future<List<LoteDto>> getActivosPollos() async {
     final data = await _api.get('/api/lote/activos');
     final list = (data is List) ? data : <dynamic>[];
     final lotes = list.whereType<Map<String, dynamic>>().map((e) => LoteDto.fromMap(e)).toList();
-    return lotes.where((l) => l.animalName.toLowerCase().contains('pollo')).toList();
+    // Filtrar solo lotes de pollos/aves que tengan animales (quantity > 0)
+    return lotes.where((l) {
+      final nombre = l.animalName.toLowerCase();
+      final esPollo = nombre.contains('pollo') || nombre.contains('ave') || nombre.contains('gallina');
+      final tieneAnimales = l.quantity > 0;
+      return esPollo && tieneAnimales;
+    }).toList();
   }
 }
 

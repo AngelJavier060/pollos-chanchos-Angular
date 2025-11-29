@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'productos_page.dart';
+import 'gastos_operacion_dashboard_clean_page.dart';
+import 'mano_obra_dashboard_page.dart';
+import 'logistica_dashboard_page.dart';
+import 'gastos_fijos_dashboard_page.dart';
 
 class InventarioMenuPage extends StatelessWidget {
   const InventarioMenuPage({super.key});
@@ -18,7 +23,38 @@ class InventarioMenuPage extends StatelessWidget {
     ];
 
     void onTapItem(String label) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label + ' próximamente')));
+      if (label == 'Producto') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ProductosPage()),
+        );
+      } else if (label == 'Gastos de Operación') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const GastosOperacionDashboardPage()),
+        );
+      } else if (label == 'Mano de Obra') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const ManoObraDashboardPage()),
+        );
+      } else if (label == 'Movilización y Logística') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const LogisticaDashboardPage()),
+        );
+      } else if (label == 'Costos Fijos') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const GastosFijosDashboardPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label + ' próximamente')));
+      }
     }
 
     return Scaffold(

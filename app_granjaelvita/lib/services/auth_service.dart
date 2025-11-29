@@ -1,4 +1,8 @@
-﻿import '../config.dart';
+﻿import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../config.dart';
 import '../api_client.dart';
 
 class LoginResult {
@@ -19,6 +23,17 @@ class LoginResult {
 }
 
 class AuthService {
+  // Sesión actual (token en memoria)
+  static String? _token;
+  static String? _refreshToken;
+
+  static const String _keySession = 'auth_session';
+  static const String _keyBiometricEnabled = 'auth_biometric_enabled';
+  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+
+  static String? get token => _token;
+  static String? get refreshToken => _refreshToken;
+
   final ApiClient _api = ApiClient(baseUrl: apiBaseUrl);
 
   Future<LoginResult> login(String username, String password) async {
@@ -29,9 +44,28 @@ class AuthService {
         : <String>[];
     final name = (res['name'] ?? res['username'] ?? '') as String;
     final greeting = _greetingForRoles(roles);
+
+    final token = (res['token'] ?? '') as String;
+    final refreshToken = (res['refreshToken'] ?? '') as String;
+
+    // Guardar token en memoria para otros servicios (ej: productos)
+    _token = token;
+    _refreshToken = refreshToken;
+
+    // Persistir sesión de forma segura para uso con huella
+    final sessionMap = <String, dynamic>{
+      'token': token,
+      'refreshToken': refreshToken,
+      'username': (res['username'] ?? username) as String,
+      'name': name,
+      'roles': roles,
+      'greeting': greeting,
+    };
+    await _storage.write(key: _keySession, value: json.encode(sessionMap));
+
     return LoginResult(
-      token: (res['token'] ?? '') as String,
-      refreshToken: (res['refreshToken'] ?? '') as String,
+      token: token,
+      refreshToken: refreshToken,
       username: (res['username'] ?? '') as String,
       name: name,
       roles: roles,
@@ -44,6 +78,59 @@ class AuthService {
     if (roles.contains('ROLE_POULTRY')) return 'Bienvenido a Pollos';
     if (roles.contains('ROLE_PORCINE')) return 'Bienvenido a Chanchos';
     return 'Bienvenido';
+  }
+
+  // ========= Métodos estáticos para sesión persistente / biometría =========
+
+  static Future<LoginResult?> loadSavedSession() async {
+    final jsonStr = await _storage.read(key: _keySession);
+    if (jsonStr == null) return null;
+    try {
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      final rolesRaw = data['roles'];
+      final List<String> roles = rolesRaw is List
+          ? rolesRaw.map((e) => e.toString()).toList()
+          : <String>[];
+
+      final result = LoginResult(
+        token: (data['token'] ?? '') as String,
+        refreshToken: (data['refreshToken'] ?? '') as String,
+        username: (data['username'] ?? '') as String,
+        name: (data['name'] ?? '') as String,
+        roles: roles,
+        greeting: (data['greeting'] ?? 'Bienvenido') as String,
+      );
+
+      // Restaurar en memoria
+      _token = result.token;
+      _refreshToken = result.refreshToken;
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> hasSavedSession() async {
+    final v = await _storage.read(key: _keySession);
+    return v != null;
+  }
+
+  static Future<void> clearSession() async {
+    _token = null;
+    _refreshToken = null;
+    await _storage.delete(key: _keySession);
+  }
+
+  static Future<void> setBiometricEnabled(bool enabled) async {
+    await _storage.write(
+      key: _keyBiometricEnabled,
+      value: enabled ? 'true' : 'false',
+    );
+  }
+
+  static Future<bool> isBiometricEnabled() async {
+    final v = await _storage.read(key: _keyBiometricEnabled);
+    return v == 'true';
   }
 }
 

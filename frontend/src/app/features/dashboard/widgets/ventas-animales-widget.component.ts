@@ -14,33 +14,61 @@ import { Animal } from '../../../shared/models/product.model';
   imports: [CommonModule, FormsModule],
   template: `
   <div class="space-y-6">
-    <!-- Resumen de ventas de animales (acumulado global fijo) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div class="bg-blue-50 border border-blue-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-blue-700">Registros</div>
-        <div class="text-2xl font-bold text-blue-900">{{ totalRegistrosAnimAcum }}</div>
-      </div>
-      <div class="bg-emerald-50 border border-emerald-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-emerald-700">Cantidad total</div>
-        <div class="text-2xl font-bold text-emerald-900">{{ totalCantidadVentasAnim }}</div>
-      </div>
-      <div class="bg-amber-50 border border-amber-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalMontoAnimAcum | currency:'USD':'symbol-narrow' }}</div>
-        <div class="text-xs text-amber-700/80 mt-1">(Acumulado histórico)</div>
-      </div>
-      <div class="bg-white border border-gray-200 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-gray-600">Costo de Pollos</div>
-        <div class="text-2xl font-bold text-gray-900">{{ costoPollos | currency:'USD':'symbol-narrow' }}</div>
-      </div>
-      <div class="bg-white border border-gray-200 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-gray-600">Costo de Chanchos</div>
-        <div class="text-2xl font-bold text-gray-900">{{ costoChanchos | currency:'USD':'symbol-narrow' }}</div>
+    <!-- Buscador superior por periodo -->
+    <div class="bg-white border rounded p-4">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-sm text-gray-600">Periodo</label>
+          <select [(ngModel)]="filtroPeriodoAnim" class="border rounded px-2 py-1">
+            <option value="todos">Todos</option>
+            <option value="hoy">Hoy</option>
+            <option value="ayer">Ayer</option>
+            <option value="semana">Esta semana</option>
+            <option value="mes">Mes actual</option>
+            <option value="anio">Año actual</option>
+            <option value="rango">Rango personalizado</option>
+          </select>
+          <input *ngIf="filtroPeriodoAnim==='mes'" [(ngModel)]="mesSeleccionAnim" type="month" class="border rounded px-2 py-1" />
+          <input *ngIf="filtroPeriodoAnim==='anio'" [(ngModel)]="anioSeleccionAnim" type="number" min="2000" max="2100" placeholder="Año" class="w-28 border rounded px-2 py-1" />
+          <input *ngIf="filtroPeriodoAnim==='rango'" [(ngModel)]="fechaDesdeAnim" type="date" class="border rounded px-2 py-1" />
+          <input *ngIf="filtroPeriodoAnim==='rango'" [(ngModel)]="fechaHastaAnim" type="date" class="border rounded px-2 py-1" />
+          <button (click)="aplicarFiltroVentasAnim()" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">Buscar</button>
+        </div>
       </div>
     </div>
-    <!-- Formulario de venta de animales (solo frontend) -->
+
+    <!-- Resumen de ventas de animales (periodo seleccionado) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="bg-blue-50 border border-blue-100 rounded p-4">
+        <div class="text-xs uppercase tracking-wide text-blue-700">Pollos vendidos (periodo)</div>
+        <div class="text-2xl font-bold text-blue-900">{{ cantidadPollosPeriodo }}</div>
+        <div class="text-xs text-blue-700/80 mt-1">{{ montoPollosPeriodo | currency:'USD':'symbol-narrow' }}</div>
+      </div>
+      <div class="bg-pink-50 border border-pink-100 rounded p-4">
+        <div class="text-xs uppercase tracking-wide text-pink-700">Chanchos vendidos (periodo)</div>
+        <div class="text-2xl font-bold text-pink-900">{{ cantidadChanchosPeriodo }}</div>
+        <div class="text-xs text-pink-700/80 mt-1">{{ montoChanchosPeriodo | currency:'USD':'symbol-narrow' }}</div>
+      </div>
+      <div class="bg-amber-50 border border-amber-100 rounded p-4">
+        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
+        <div class="text-2xl font-bold text-amber-900">{{ totalCostoVentasAnim | currency:'USD':'symbol-narrow' }}</div>
+        <div class="text-xs text-amber-700/80 mt-1">{{ totalCantidadVentasAnim }} animales</div>
+      </div>
+    </div>
+    <!-- Formulario de venta de animales -->
     <div class="bg-white border rounded p-4">
-      <h2 class="text-lg font-semibold mb-3">Registrar venta de animales (solo vista)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Venta de animales</h2>
+        <button
+          *ngIf="!mostrarFormulario"
+          (click)="mostrarFormulario = true"
+          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          Ingresar una venta de animales
+        </button>
+      </div>
+
+      <div *ngIf="mostrarFormulario">
+      <h3 class="text-md font-semibold mb-3">Registrar venta</h3>
       <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div>
           <label class="block text-sm text-gray-600 mb-1">Animal</label>
@@ -80,28 +108,17 @@ import { Animal } from '../../../shared/models/product.model';
         <div class="space-x-2">
           <button (click)="guardarVentaActual()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar venta</button>
           <button (click)="limpiarFormulario()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200">Limpiar</button>
+          <button (click)="mostrarFormulario = false" class="bg-gray-50 text-gray-600 px-4 py-2 rounded hover:bg-gray-100">Cerrar</button>
         </div>
+      </div>
       </div>
 
       <!-- Ventas guardadas (desde backend) -->
       <div class="mt-6">
         <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-2">
-          <h3 class="font-semibold">Ventas de animales guardadas</h3>
-          <div class="flex items-center gap-2 flex-wrap">
-            <select [(ngModel)]="filtroPeriodoAnim" class="border rounded px-2 py-1">
-              <option value="hoy">Hoy</option>
-              <option value="ayer">Ayer</option>
-              <option value="semana">Esta semana</option>
-              <option value="mes">Mes</option>
-              <option value="anio">Año</option>
-              <option value="rango">Rango</option>
-            </select>
-            <input *ngIf="filtroPeriodoAnim==='mes'" [(ngModel)]="mesSeleccionAnim" type="month" class="border rounded px-2 py-1" />
-            <input *ngIf="filtroPeriodoAnim==='anio'" [(ngModel)]="anioSeleccionAnim" type="number" min="2000" max="2100" placeholder="Año" class="w-28 border rounded px-2 py-1" />
-            <input *ngIf="filtroPeriodoAnim==='rango'" [(ngModel)]="fechaDesdeAnim" type="date" class="border rounded px-2 py-1" />
-            <input *ngIf="filtroPeriodoAnim==='rango'" [(ngModel)]="fechaHastaAnim" type="date" class="border rounded px-2 py-1" />
-            <button (click)="aplicarFiltroVentasAnim()" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">Buscar</button>
-          </div>
+          <h3 class="font-semibold">Ventas de animales guardadas
+            <span class="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded" *ngIf="ventasAnimalesHoy && ventasAnimalesHoy.length">{{ ventasAnimalesHoy.length }} registros</span>
+          </h3>
         </div>
         <div class="overflow-auto border rounded" *ngIf="ventasAnimalesHoy && ventasAnimalesHoy.length; else sinVentasAnim">
           <table class="min-w-full">
@@ -168,7 +185,10 @@ import { Animal } from '../../../shared/models/product.model';
           </table>
         </div>
         <ng-template #sinVentasAnim>
-          <div class="text-sm text-gray-500">No hay ventas de animales registradas para el periodo.</div>
+          <div class="text-sm text-gray-500 p-4 text-center bg-gray-50 rounded border">
+            <p>No hay ventas de animales registradas para el periodo seleccionado.</p>
+            <p class="text-xs mt-1">Prueba cambiando el filtro de periodo a "Todos" para ver todas las ventas.</p>
+          </div>
         </ng-template>
       </div>
     <div class="mt-4" *ngIf="borrador.length">
@@ -289,6 +309,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   animalSeleccionadoId: number | null = null;
   // Flag para ocultar el panel de especie/buscar sin afectar el resto
   mostrarPanelExplorador = false;
+  // Flag para mostrar/ocultar el formulario de registro
+  mostrarFormulario = false;
   // Borrador local de ventas de animales
   borrador: Array<{ loteId: string; loteCodigo?: string; animal: string; fecha: string; cantidad: number; precioUnit: number; total: number; }>= [];
   venta: { loteId: string | null; fecha: string; cantidad: number; precioUnit: number; total: number } = {
@@ -310,8 +332,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     this.cargarLotes();
     this.cargarAnimales();
     this.cargarBorradorLocal();
-    // Cargar ventas del día al abrir
-    this.cargarVentasAnimalesHoy();
+    // Cargar ventas usando el filtro por defecto (todos)
+    this.aplicarFiltroVentasAnim();
     // Cargar acumulado global fijo
     this.cargarVentasAnimAcum();
   }
@@ -391,12 +413,37 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   }
 
   // Totales de ventas mostradas
+  private calcularCostoRealVenta(v: any): number {
+    if (!v) return 0;
+    const loteIdStr = String(v.loteId || '');
+    if (!loteIdStr) return 0;
+
+    const lote = this.lotes.find(l => String(l.id || '') === loteIdStr);
+    if (!lote) return 0;
+
+    const cantidadVendida = Number(v.cantidad) || 0;
+    if (cantidadVendida <= 0) return 0;
+
+    const qtyOriginal = Number(lote.quantityOriginal ?? lote.quantity ?? 0);
+    if (!qtyOriginal || qtyOriginal <= 0) return 0;
+
+    const costoTotalLote = Number(lote.cost) || 0;
+    const costoUnitario = costoTotalLote / qtyOriginal;
+    return cantidadVendida * costoUnitario;
+  }
+
   get totalCantidadVentasAnim(): number {
     return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (Number(v?.cantidad) || 0), 0);
   }
 
   get totalMontoVentasAnim(): number {
     return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
+  }
+
+  get totalCostoVentasAnim(): number {
+    // Definimos el total de costo del periodo como la suma de los costos por especie
+    // para que coincida exactamente con lo que ves en las tarjetas de Pollos y Chanchos.
+    return this.montoPollosPeriodo + this.montoChanchosPeriodo;
   }
 
   // --- Acumulado global fijo (no depende del filtro) ---
@@ -435,12 +482,30 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     return name.includes('chancho') || name.includes('cerdo') || name.includes('puerco');
   }
 
-  get costoPollos(): number {
+  // Suma directa de v.total por especie (lo que el usuario vendió)
+  get totalVentasPollos(): number {
     return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (this.esPollo(v) ? (Number(v?.total) || 0) : 0), 0);
   }
 
-  get costoChanchos(): number {
+  get totalVentasChanchos(): number {
     return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (this.esChancho(v) ? (Number(v?.total) || 0) : 0), 0);
+  }
+
+  // --- KPIs del periodo seleccionado ---
+  get cantidadPollosPeriodo(): number {
+    return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (this.esPollo(v) ? (Number(v?.cantidad) || 0) : 0), 0);
+  }
+
+  get montoPollosPeriodo(): number {
+    return this.totalVentasPollos;
+  }
+
+  get cantidadChanchosPeriodo(): number {
+    return (this.ventasAnimalesHoy || []).reduce((acc, v) => acc + (this.esChancho(v) ? (Number(v?.cantidad) || 0) : 0), 0);
+  }
+
+  get montoChanchosPeriodo(): number {
+    return this.totalVentasChanchos;
   }
 
   ngOnDestroy(): void {
@@ -719,8 +784,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     try { return new Date(f).toISOString().slice(0,10); } catch { return String(f ?? ''); }
   }
 
-  // Filtros de periodo (hoy/ayer/semana/mes/año/rango)
-  filtroPeriodoAnim: 'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'hoy';
+  // Filtros de periodo (todos/hoy/ayer/semana/mes/año/rango)
+  filtroPeriodoAnim: 'todos'|'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'todos';
   fechaDesdeAnim: string = '';
   fechaHastaAnim: string = '';
   mesSeleccionAnim: string = '';// YYYY-MM
@@ -738,6 +803,11 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       return d;
     };
     switch (this.filtroPeriodoAnim) {
+      case 'todos':
+        // Sin filtro de fechas - traer todos los registros
+        from = '';
+        to = '';
+        break;
       case 'hoy':
         from = to = fmt(hoy); break;
       case 'ayer': {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'venta_huevo_dashboard_page.dart';
+import 'venta_animales_dashboard_page.dart';
 
 class VentasMenuPage extends StatelessWidget {
   const VentasMenuPage({super.key});
@@ -11,7 +13,21 @@ class VentasMenuPage extends StatelessWidget {
     ];
 
     void onTapItem(String label) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label + ' próximamente')));
+      if (label == 'Venta de Huevo') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const VentaHuevoDashboardPage()),
+        );
+      } else if (label == 'Venta de Animales') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const VentaAnimalesDashboardPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label + ' próximamente')));
+      }
     }
 
     return Scaffold(

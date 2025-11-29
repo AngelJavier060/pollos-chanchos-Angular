@@ -21,12 +21,13 @@ import { VentasService } from '../../../shared/services/ventas.service';
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-sm text-gray-600">Periodo</label>
           <select [(ngModel)]="filtroPeriodo" class="border rounded px-2 py-1">
+            <option value="todos">Todos</option>
             <option value="hoy">Hoy</option>
             <option value="ayer">Ayer</option>
             <option value="semana">Esta semana</option>
-            <option value="mes">Mes</option>
-            <option value="anio">Año</option>
-            <option value="rango">Rango</option>
+            <option value="mes">Mes actual</option>
+            <option value="anio">Año actual</option>
+            <option value="rango">Rango personalizado</option>
           </select>
           <input *ngIf="filtroPeriodo==='mes'" [(ngModel)]="mesSeleccion" type="month" class="border rounded px-2 py-1" />
           <input *ngIf="filtroPeriodo==='anio'" [(ngModel)]="anioSeleccion" type="number" min="2000" max="2100" placeholder="Año" class="w-28 border rounded px-2 py-1" />
@@ -41,24 +42,35 @@ import { VentasService } from '../../../shared/services/ventas.service';
     </div>
     <!-- Resumen de ventas (acumulado global: fijo, no cambia con filtros) -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div class="bg-blue-50 border border-blue-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-blue-700">Registros</div>
-        <div class="text-2xl font-bold text-blue-900">{{ totalRegistrosAcum }}</div>
-      </div>
       <div class="bg-emerald-50 border border-emerald-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-emerald-700">Cantidad total</div>
-        <div class="text-2xl font-bold text-emerald-900">{{ totalCantidadVentas }}</div>
+        <div class="text-xs uppercase tracking-wide text-emerald-700">Cubetas (periodo)</div>
+        <div class="text-2xl font-bold text-emerald-900">{{ totalCubetasPeriodo }}</div>
+        <div class="text-xs text-emerald-700/80 mt-1">+ {{ totalHuevosSueltosPeriodo }} huevos sueltos</div>
+      </div>
+      <div class="bg-blue-50 border border-blue-100 rounded p-4">
+        <div class="text-xs uppercase tracking-wide text-blue-700">Huevos totales (periodo)</div>
+        <div class="text-2xl font-bold text-blue-900">{{ totalHuevosPeriodo }}</div>
       </div>
       <div class="bg-amber-50 border border-amber-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalMontoAcum | currency:'USD':'symbol-narrow' }}</div>
-        <div class="text-xs text-amber-700/80 mt-1">(Acumulado histórico)</div>
+        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
+        <div class="text-2xl font-bold text-amber-900">{{ totalMontoVentas | currency:'USD':'symbol-narrow' }}</div>
       </div>
     </div>
     <!-- Formulario de venta (registro directo) -->
-    <div class="bg-white border rounded p-4" *ngIf="mostrarCaptura">
-      <h2 class="text-lg font-semibold mb-3">Registrar venta de huevo (solo vista)</h2>
-      <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+    <div class="bg-white border rounded p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Venta de huevo</h2>
+        <button
+          *ngIf="!mostrarCaptura"
+          (click)="mostrarFormulario()"
+          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          Ingresar una venta de huevos
+        </button>
+      </div>
+
+      <div *ngIf="mostrarCaptura">
+        <h3 class="text-md font-semibold mb-3">Registrar venta de huevo (solo vista)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
         <div>
           <label class="block text-sm text-gray-600 mb-1">Animal</label>
           <select [(ngModel)]="animalSeleccionadoId" (ngModelChange)="onChangeAnimal()" class="w-full border rounded px-3 py-2">
@@ -67,11 +79,16 @@ import { VentasService } from '../../../shared/services/ventas.service';
           </select>
         </div>
         <div class="md:col-span-2">
-          <label class="block text-sm text-gray-600 mb-1">Lote (solo aves)</label>
-          <select [(ngModel)]="loteSeleccionadoId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
+          <label class="block text-sm text-gray-600 mb-1">Lote activo (con pollos)</label>
+          <select *ngIf="lotesFiltradosPorAnimal.length > 0; else sinLotes" [(ngModel)]="loteSeleccionadoId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
             <option [ngValue]="null">Seleccione un lote</option>
-            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }}</option>
+            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }} ({{ l.quantity }} pollos)</option>
           </select>
+          <ng-template #sinLotes>
+            <div class="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+              ⚠️ No hay lotes activos con pollos disponibles
+            </div>
+          </ng-template>
         </div>
         
         <div>
@@ -79,17 +96,30 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <input [(ngModel)]="nuevo.fecha" type="date" class="w-full border rounded px-3 py-2" />
         </div>
         <div>
-          <label class="block text-sm text-gray-600 mb-1">Cantidad (unid.)</label>
-          <input [(ngModel)]="nuevo.cantidad" (ngModelChange)="recalcularLinea()" type="number" min="1" class="w-full border rounded px-3 py-2" />
+          <label class="block text-sm text-gray-600 mb-1">Registrar por</label>
+          <select [(ngModel)]="tipoCantidad" (ngModelChange)="recalcularLinea()" class="w-full border rounded px-3 py-2">
+            <option value="cubetas">Cubetas</option>
+            <option value="unidades">Unidades (huevos)</option>
+          </select>
+        </div>
+        <div *ngIf="tipoCantidad === 'cubetas'">
+          <label class="block text-sm text-gray-600 mb-1">Cantidad de cubetas</label>
+          <input [(ngModel)]="nuevoCubetas" (ngModelChange)="recalcularLinea()" type="number" min="1" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div *ngIf="tipoCantidad === 'unidades'">
+          <label class="block text-sm text-gray-600 mb-1">Cantidad de huevos</label>
+          <input [(ngModel)]="nuevoHuevos" (ngModelChange)="recalcularLinea()" type="number" min="1" class="w-full border rounded px-3 py-2" />
         </div>
         <div>
-          <label class="block text-sm text-gray-600 mb-1">Precio Unit.</label>
-          <input [(ngModel)]="nuevo.precioUnit" (ngModelChange)="recalcularLinea()" type="number" step="0.01" class="w-full border rounded px-3 py-2" />
+          <label *ngIf="tipoCantidad === 'cubetas'" class="block text-sm text-gray-600 mb-1">Precio por cubeta</label>
+          <label *ngIf="tipoCantidad === 'unidades'" class="block text-sm text-gray-600 mb-1">Precio por huevo</label>
+          <input [(ngModel)]="precioReferencia" (ngModelChange)="recalcularLinea()" type="number" step="0.01" class="w-full border rounded px-3 py-2" />
         </div>
       </div>
       <div class="flex items-center justify-between mt-3">
         <div class="text-sm text-gray-700 flex flex-col">
           <span>Total línea: <span class="font-semibold">{{ nuevo.totalLinea | currency:'USD':'symbol-narrow' }}</span></span>
+          <span *ngIf="nuevo.cantidad">Cantidad total (huevos): <span class="font-semibold">{{ nuevo.cantidad }}</span></span>
           <span *ngIf="loteSeleccionado">Lote: <span class="font-medium">{{ loteSeleccionado.codigo || loteSeleccionado.id }}</span> - {{ loteSeleccionado.name }} • Animales en lote: {{ loteSeleccionado.quantity }}</span>
         </div>
         <div class="space-x-2">
@@ -133,6 +163,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
           </table>
         </div>
       </div>
+      </div>
 
       <!-- Ventas guardadas (desde backend) -->
       <div class="mt-6">
@@ -149,7 +180,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
                 <th class="px-4 py-3">ID</th>
                 <th class="px-4 py-3">Fecha</th>
                 <th class="px-4 py-3">Lote</th>
-                <th class="px-4 py-3">Cantidad</th>
+                <th class="px-4 py-3">Cantidad (cubetas / huevos)</th>
                 <th class="px-4 py-3">Precio Unit.</th>
                 <th class="px-4 py-3">Total</th>
                 <th class="px-4 py-3">Acciones</th>
@@ -161,14 +192,31 @@ import { VentasService } from '../../../shared/services/ventas.service';
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
                 <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
                 <td class="px-4 py-2">
-                  <ng-container *ngIf="editingId===v.id; else viewCant"> 
-                    <input type="number" [(ngModel)]="editModel.cantidad" min="0" class="w-24 border rounded px-2 py-1" />
+                  <ng-container *ngIf="editingId===v.id; else viewCant">
+                    <div class="space-y-2">
+                      <select [(ngModel)]="editModel.tipoCantidad" (ngModelChange)="recalcularEditLinea()" class="w-full border rounded px-2 py-1 text-sm">
+                        <option value="cubetas">Cubetas</option>
+                        <option value="unidades">Unidades</option>
+                      </select>
+                      <div *ngIf="editModel.tipoCantidad === 'cubetas'">
+                        <input type="number" [(ngModel)]="editModel.cubetas" (ngModelChange)="recalcularEditLinea()" min="0" step="0.5" class="w-20 border rounded px-2 py-1" placeholder="Cubetas" />
+                        <div class="text-xs text-gray-500 mt-1">= {{ editModel.cantidad }} huevos</div>
+                      </div>
+                      <div *ngIf="editModel.tipoCantidad === 'unidades'">
+                        <input type="number" [(ngModel)]="editModel.cantidad" (ngModelChange)="recalcularEditLineaDesdeHuevos()" min="0" class="w-20 border rounded px-2 py-1" placeholder="Huevos" />
+                      </div>
+                    </div>
                   </ng-container>
-                  <ng-template #viewCant>{{ v.cantidad }}</ng-template>
+                  <ng-template #viewCant>{{ formatCantidadHuevosValor(v.cantidad) }}</ng-template>
                 </td>
                 <td class="px-4 py-2">
-                  <ng-container *ngIf="editingId===v.id; else viewPU"> 
-                    <input type="number" step="0.01" [(ngModel)]="editModel.precioUnit" class="w-28 border rounded px-2 py-1" />
+                  <ng-container *ngIf="editingId===v.id; else viewPU">
+                    <div class="space-y-1">
+                      <input type="number" step="0.01" [(ngModel)]="editModel.precioReferencia" (ngModelChange)="recalcularEditLinea()" class="w-24 border rounded px-2 py-1" />
+                      <div class="text-xs text-gray-500">
+                        {{ editModel.tipoCantidad === 'cubetas' ? 'por cubeta' : 'por huevo' }}
+                      </div>
+                    </div>
                   </ng-container>
                   <ng-template #viewPU>{{ v.precioUnit | currency:'USD':'symbol-narrow' }}</ng-template>
                 </td>
@@ -205,7 +253,10 @@ import { VentasService } from '../../../shared/services/ventas.service';
           </table>
         </div>
         <ng-template #sinVentas>
-          <div class="text-sm text-gray-500">No hay ventas registradas para hoy.</div>
+          <div class="text-sm text-gray-500 p-4 text-center bg-gray-50 rounded border">
+            <p>No hay ventas registradas para el periodo seleccionado.</p>
+            <p class="text-xs mt-1">Prueba cambiando el filtro de periodo a "Todos" para ver todas las ventas.</p>
+          </div>
         </ng-template>
       </div>
     </div>
@@ -319,10 +370,16 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   private cargarLotesAves(): void {
     this.loteService.getLotes().subscribe({
       next: (lotes) => {
-        // Filtramos solo lotes cuyo animal sea aves/gallinas/pollos
+        // Filtramos solo lotes:
+        // 1. Cuyo animal sea aves/gallinas/pollos
+        // 2. Que tengan animales (quantity > 0) - si quantity es 0, el lote está vacío/inactivo
+        // 3. Que no tengan fecha de cierre (fechaCierre indica lote cerrado)
         this.lotesAves = (lotes || []).filter(l => {
           const a = l.race?.animal?.name?.toLowerCase?.() || '';
-          return a.includes('ave') || a.includes('gallina') || a.includes('pollo');
+          const esAve = a.includes('ave') || a.includes('gallina') || a.includes('pollo');
+          const tieneAnimales = (l.quantity ?? 0) > 0;
+          const noEstaCerrado = !l.fechaCierre;
+          return esAve && tieneAnimales && noEstaCerrado;
         });
       },
       error: () => { this.lotesAves = []; }
@@ -353,13 +410,18 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   borrador: Array<{ loteId: string; loteCodigo?: string; fecha: string; cantidad: number; precioUnit: number; totalLinea: number; }>= [];
   nuevo: { fecha: string; cantidad: number; precioUnit: number; totalLinea: number; } = {
     fecha: this.hoyISO(),
-    cantidad: 1,
+    cantidad: 0,
     precioUnit: 0,
     totalLinea: 0
   };
+  readonly HUEVOS_POR_CUBETA = 30;
+  tipoCantidad: 'cubetas' | 'unidades' = 'cubetas';
+  nuevoCubetas: number = 1;
+  nuevoHuevos: number = 0;
+  precioReferencia: number = 0;
 
   // Flag para mostrar el formulario/borrador (habilitado para permitir ingresar ventas)
-  mostrarCaptura = true;
+  mostrarCaptura = false;
   // Flag seguro para mostrar/ocultar el bloque de catálogo (animal/buscar/productos)
   mostrarCatalogo = false;
 
@@ -387,6 +449,17 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     const last3 = (digits || '1').slice(-3); // por defecto '001'
     const num = Number(last3) || 1;
     return `Lote${num.toString().padStart(3, '0')}`;
+  }
+
+  // Formatea una cantidad de huevos a "X cubetas y Y huevos (Z huevos)"
+  formatCantidadHuevosValor(cantidadRaw: any): string {
+    const cantidad = Number(cantidadRaw ?? 0) || 0;
+    if (!cantidad || this.HUEVOS_POR_CUBETA <= 0) {
+      return '0 cubetas y 0 huevos (0 huevos)';
+    }
+    const cubetas = Math.floor(cantidad / this.HUEVOS_POR_CUBETA);
+    const huevosSueltos = cantidad % this.HUEVOS_POR_CUBETA;
+    return `${cubetas} cubetas y ${huevosSueltos} huevos (${cantidad} huevos)`;
   }
 
   private cargarProductos(): void {
@@ -484,9 +557,28 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   // --------- Lógica de borrador local ---------
 
   recalcularLinea(): void {
+    const tipo = this.tipoCantidad || 'cubetas';
+    const precioRef = Number(String(this.precioReferencia ?? 0).replace(',', '.')) || 0;
+
+    if (tipo === 'cubetas') {
+      const cubetas = Number(this.nuevoCubetas) || 0;
+      const totalHuevos = cubetas * this.HUEVOS_POR_CUBETA;
+      const precioPorHuevo = totalHuevos > 0 ? precioRef / this.HUEVOS_POR_CUBETA : 0;
+      this.nuevo.cantidad = totalHuevos;
+      this.nuevo.precioUnit = +(precioPorHuevo || 0);
+    } else {
+      const huevos = Number(this.nuevoHuevos) || 0;
+      this.nuevo.cantidad = huevos;
+      this.nuevo.precioUnit = precioRef;
+    }
+
     const qty = Number(this.nuevo.cantidad) || 0;
     const pu = Number(String(this.nuevo.precioUnit ?? 0).replace(',', '.')) || 0;
     this.nuevo.totalLinea = +(qty * pu).toFixed(2);
+  }
+
+  mostrarFormulario(): void {
+    this.mostrarCaptura = true;
   }
 
   // Guardado directo de la venta actual (sin borrador)
@@ -516,10 +608,15 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
         // Reset rápido del formulario manteniendo animal/lote/fecha
         this.nuevo = {
           fecha: this.nuevo.fecha,
-          cantidad: 1,
+          cantidad: 0,
           precioUnit: 0,
           totalLinea: 0
         };
+        this.tipoCantidad = 'cubetas';
+        this.nuevoCubetas = 1;
+        this.nuevoHuevos = 0;
+        this.precioReferencia = 0;
+        this.mostrarCaptura = false;
         this.savingDirect = false;
       },
       error: (err) => {
@@ -568,10 +665,14 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   limpiarFormulario(keepProduct = false): void {
     this.nuevo = {
       fecha: this.hoyISO(),
-      cantidad: 1,
-      precioUnit: this.nuevo.precioUnit,
+      cantidad: 0,
+      precioUnit: 0,
       totalLinea: 0
     };
+    this.tipoCantidad = 'cubetas';
+    this.nuevoCubetas = 1;
+    this.nuevoHuevos = 0;
+    this.recalcularLinea();
   }
 
   get totalBorrador(): number {
@@ -654,7 +755,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     });
   }
 
-  filtroPeriodo: 'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'mes';
+  filtroPeriodo: 'todos'|'hoy'|'ayer'|'semana'|'mes'|'anio'|'rango' = 'todos';
   fechaDesde: string = '';
   fechaHasta: string = '';
   mesSeleccion: string = '';// formato YYYY-MM
@@ -673,6 +774,11 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     };
     const startOfMonth = () => new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     switch (this.filtroPeriodo) {
+      case 'todos':
+        // Sin filtro de fechas - traer todos los registros
+        from = '';
+        to = '';
+        break;
       case 'hoy':
         from = to = fmt(hoy); break;
       case 'ayer': {
@@ -722,6 +828,23 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     return (this.ventasHoy || []).reduce((acc, v) => acc + (Number(v?.total) || 0), 0);
   }
 
+  // Métricas por periodo (basadas en ventasHoy)
+  get totalHuevosPeriodo(): number {
+    return this.totalCantidadVentas;
+  }
+
+  get totalCubetasPeriodo(): number {
+    const totalHuevos = this.totalHuevosPeriodo;
+    if (!totalHuevos || this.HUEVOS_POR_CUBETA <= 0) return 0;
+    return Math.floor(totalHuevos / this.HUEVOS_POR_CUBETA);
+  }
+
+  get totalHuevosSueltosPeriodo(): number {
+    const totalHuevos = this.totalHuevosPeriodo;
+    if (!totalHuevos || this.HUEVOS_POR_CUBETA <= 0) return 0;
+    return totalHuevos % this.HUEVOS_POR_CUBETA;
+  }
+
   // Acumulados fijos (no dependen del filtro)
   get totalRegistrosAcum(): number { return (this.ventasAll || []).length; }
   get totalCantidadAcum(): number {
@@ -747,14 +870,48 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
 
   // --- Edición en línea / Eliminar ---
   editingId: number | null = null;
-  editModel: { cantidad: number; precioUnit: number } = { cantidad: 0, precioUnit: 0 };
+  editModel: { 
+    cantidad: number; 
+    precioUnit: number; 
+    tipoCantidad: 'cubetas' | 'unidades';
+    cubetas: number;
+    precioReferencia: number;
+  } = { cantidad: 0, precioUnit: 0, tipoCantidad: 'cubetas', cubetas: 0, precioReferencia: 0 };
 
   startEdit(v: any): void {
     this.editingId = v.id;
+    const cantidadHuevos = Number(v.cantidad) || 0;
+    const precioUnitHuevo = Number(v.precioUnit) || 0;
+    const cubetas = Math.floor(cantidadHuevos / this.HUEVOS_POR_CUBETA);
+    const huevosSueltos = cantidadHuevos % this.HUEVOS_POR_CUBETA;
+    
+    // Si la cantidad es múltiplo exacto de 30, asumimos que fue ingresado por cubetas
+    const esCubetas = huevosSueltos === 0 && cubetas > 0;
+    
     this.editModel = {
-      cantidad: Number(v.cantidad) || 0,
-      precioUnit: Number(v.precioUnit) || 0
+      cantidad: cantidadHuevos,
+      precioUnit: precioUnitHuevo,
+      tipoCantidad: esCubetas ? 'cubetas' : 'unidades',
+      cubetas: esCubetas ? cubetas : cantidadHuevos / this.HUEVOS_POR_CUBETA,
+      precioReferencia: esCubetas ? (precioUnitHuevo * this.HUEVOS_POR_CUBETA) : precioUnitHuevo
     };
+  }
+
+  recalcularEditLinea(): void {
+    if (this.editModel.tipoCantidad === 'cubetas') {
+      const cubetas = Number(this.editModel.cubetas) || 0;
+      this.editModel.cantidad = cubetas * this.HUEVOS_POR_CUBETA;
+      this.editModel.precioUnit = cubetas > 0 ? (this.editModel.precioReferencia / this.HUEVOS_POR_CUBETA) : 0;
+    } else {
+      this.editModel.precioUnit = this.editModel.precioReferencia;
+    }
+  }
+
+  recalcularEditLineaDesdeHuevos(): void {
+    // Cuando edita directamente los huevos, actualizar cubetas y precio
+    const huevos = Number(this.editModel.cantidad) || 0;
+    this.editModel.cubetas = huevos / this.HUEVOS_POR_CUBETA;
+    this.editModel.precioUnit = this.editModel.precioReferencia;
   }
 
   cancelEdit(): void {
@@ -775,7 +932,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       animalId: v.animalId,
       animalName: v.animalName,
       cantidad,
-      precioUnit,
+      precioUnit: +precioUnit.toFixed(4),
       total
     };
     this.ventasService.actualizarVentaHuevo(v.id, body).subscribe({
