@@ -51,31 +51,50 @@ public class AuthController {
 
     @PostMapping({"/signin", "/login"})
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
-        log.info("Intento de login para usuario: {}", loginRequest.getUsername());
+        String identifier = loginRequest.getUsername();
+        boolean isEmail = loginRequest.isEmail();
+        
+        log.info("Intento de login con {}: '{}'", isEmail ? "email" : "usuario", identifier);
         
         try {
-            // Log de credenciales recibidas (sin mostrar la contraseña por seguridad)
-            log.info("Login recibido para username: '{}', password length: {}", loginRequest.getUsername(), loginRequest.getPassword() != null ? loginRequest.getPassword().length() : 0);
-
-            // Buscar usuario en la base de datos
-            var usuarioOpt = usuarioRepository.findByUsername(loginRequest.getUsername());
+            // Buscar usuario en la base de datos (por username o email)
+            var usuarioOpt = isEmail 
+                ? usuarioRepository.findByEmail(identifier)
+                : usuarioRepository.findByUsernameIgnoreCase(identifier);
+            
             if (usuarioOpt.isEmpty()) {
-                log.warn("Usuario '{}' no encontrado en la base de datos", loginRequest.getUsername());
-            } else {
-                var usuario = usuarioOpt.get();
-                log.info("Usuario encontrado: username='{}', activo={}, roles={}", usuario.getUsername(), usuario.isActive(), usuario.getRoles());
-                // Verificar contraseña manualmente para loguear el resultado
-                boolean passwordMatches = false;
-                try {
-                    passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), usuario.getPassword());
-                } catch (Exception e) {
-                    log.error("Error al verificar la contraseña: {}", e.getMessage());
-                }
-                log.info("¿Contraseña coincide?: {}", passwordMatches);
+                log.warn("{} '{}' no encontrado en la base de datos", isEmail ? "Email" : "Usuario", identifier);
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Usuario o contraseña incorrectos");
+                return ResponseEntity.status(401).body(response);
             }
-
+            
+            var usuario = usuarioOpt.get();
+            
+            // Si es username, validar CASE-SENSITIVE
+            if (!isEmail && !usuario.getUsername().equals(identifier)) {
+                log.warn("Username no coincide exactamente: esperado='{}', recibido='{}'", 
+                    usuario.getUsername(), identifier);
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Usuario o contraseña incorrectos. Verifique mayúsculas y minúsculas.");
+                return ResponseEntity.status(401).body(response);
+            }
+            
+            log.info("Usuario encontrado: username='{}', activo={}, roles={}", 
+                usuario.getUsername(), usuario.isActive(), usuario.getRoles());
+            
+            // Verificar contraseña manualmente para loguear el resultado
+            boolean passwordMatches = false;
+            try {
+                passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), usuario.getPassword());
+            } catch (Exception e) {
+                log.error("Error al verificar la contraseña: {}", e.getMessage());
+            }
+            log.info("¿Contraseña coincide?: {}", passwordMatches);
+            
+            // Usar el username real del usuario (no el identifier) para autenticación
             Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+                new UsernamePasswordAuthenticationToken(usuario.getUsername(), loginRequest.getPassword()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
@@ -87,8 +106,8 @@ public class AuthController {
                     .map(item -> item.getAuthority())
                     .collect(Collectors.toList());
             
-            // Actualizar último login
-            userService.updateLastLogin(loginRequest.getUsername());
+            // Actualizar último login (usar username real, no identifier)
+            userService.updateLastLogin(userDetails.getUsername());
             
             // Registrar sesión
             Usuario user = usuarioRepository.findById(userDetails.getId())
@@ -115,7 +134,7 @@ public class AuthController {
             
             userSessionRepository.save(session);
             
-            log.info("Login exitoso para usuario: {}", loginRequest.getUsername());
+            log.info("Login exitoso para usuario: {}", userDetails.getUsername());
             
             return ResponseEntity.ok(LoginResponseDto.builder()
                     .token(jwt)
@@ -130,12 +149,12 @@ public class AuthController {
                     .build());
 
         } catch (BadCredentialsException e) {
-            log.warn("Credenciales inválidas para usuario: {}", loginRequest.getUsername());
+            log.warn("Credenciales inválidas para: {}", identifier);
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Usuario o contraseña incorrectos");
+            response.put("message", "Usuario o contraseña incorrectos. Verifique que la contraseña respete mayúsculas y minúsculas.");
             return ResponseEntity.status(401).body(response);
         } catch (Exception e) {
-            log.error("Error en el proceso de autenticación para usuario: {}", loginRequest.getUsername(), e);
+            log.error("Error en el proceso de autenticación para: {}", identifier, e);
             Map<String, String> response = new HashMap<>();
             response.put("message", "Error en el proceso de autenticación");
             return ResponseEntity.status(500).body(response);

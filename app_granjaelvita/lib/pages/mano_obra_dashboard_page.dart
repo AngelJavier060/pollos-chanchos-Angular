@@ -1,92 +1,149 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+
+import '../models/mano_obra_model.dart';
+import '../services/mano_obra_service.dart';
 import 'mano_obra_form_page.dart';
 
-class ManoObraDashboardPage extends StatelessWidget {
+class ManoObraDashboardPage extends StatefulWidget {
   const ManoObraDashboardPage({super.key});
 
-  List<_RegistroManoObra> get _registrosDemo => const [
-        _RegistroManoObra(
-          fecha: '2025.11.4',
-          lote: '00002',
-          trabajador: 'Enrique Valle',
-          cargo: 'Cuidador',
-          horas: 5,
-          costoMes: 150,
-          total: 750,
-        ),
-        _RegistroManoObra(
-          fecha: '2025.11.4',
-          lote: '03001',
-          trabajador: 'Enrique Valle',
-          cargo: 'Cuidador',
-          horas: 5,
-          costoMes: 150,
-          total: 750,
-        ),
-        _RegistroManoObra(
-          fecha: '2025.11.4',
-          lote: '00003',
-          trabajador: 'Enrique Valle',
-          cargo: 'Cuidador',
-          horas: 5,
-          costoMes: 150,
-          total: 750,
-        ),
-        _RegistroManoObra(
-          fecha: '2025.11.4',
-          lote: '00001',
-          trabajador: 'Enrique Valle',
-          cargo: 'Cuidador',
-          horas: 5,
-          costoMes: 150,
-          total: 750,
-        ),
-      ];
+  @override
+  State<ManoObraDashboardPage> createState() => _ManoObraDashboardPageState();
+}
+
+class _ManoObraDashboardPageState extends State<ManoObraDashboardPage> {
+  List<GastoManoObraModel> _registros = [];
+  bool _cargando = true;
+  String? _error;
+  int _currentPage = 0;
+  static const int _rowsPerPage = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  Future<void> _cargarDatos() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final data = await ManoObraServiceMobile.listar();
+      if (!mounted) return;
+      setState(() {
+        _registros = data;
+        _cargando = false;
+        _currentPage = 0;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  String _loteLabel(GastoManoObraModel r) {
+    final nombre = r.loteNombre?.trim();
+    if (nombre != null && nombre.isNotEmpty) return nombre;
+    final codigo = r.loteCodigo?.trim();
+    if (codigo != null && codigo.isNotEmpty) return 'Lote $codigo';
+    final id = r.loteId?.trim();
+    if (id != null && id.isNotEmpty) return 'Lote $id';
+    return '-';
+  }
+
+  String _shortLabel(String text, {int maxLength = 10}) {
+    text = text.trim();
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}…';
+  }
+
+  Future<void> _abrirFormulario() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ManoObraFormPage()),
+    );
+    if (result == true) {
+      _cargarDatos();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final registros = _registrosDemo;
+    if (_cargando) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mano de Obra')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final registros = _registros;
 
     final totalGasto =
         registros.fold<double>(0, (sum, r) => sum + r.total);
     final totalHoras =
-        registros.fold<double>(0, (sum, r) => sum + r.horas);
+        registros.fold<double>(0, (sum, r) => sum + r.horasTrabajadas);
     final totalRegistros = registros.length;
     final costoPorHora =
         totalHoras == 0 ? 0.0 : totalGasto / totalHoras;
     final totalTrabajadores =
-        registros.map((r) => r.trabajador).toSet().length;
+        registros.map((r) => r.nombreTrabajador).toSet().length;
+    final Map<String, double> totalPorLote = {};
+    final Map<String, double> horasPorLoteMap = {};
+    for (final r in registros) {
+      final lote = _loteLabel(r);
+      totalPorLote[lote] = (totalPorLote[lote] ?? 0) + r.total;
+      horasPorLoteMap[lote] =
+          (horasPorLoteMap[lote] ?? 0) + r.horasTrabajadas;
+    }
 
-    final costoPorLote = registros
-        .map((r) => _CostoPorLote(lote: r.lote, costo: r.total, horas: r.horas))
-        .toList();
+    final costoPorLote = totalPorLote.entries
+        .map((e) => _CostoPorLote(
+              lote: e.key,
+              costo: e.value,
+              horas: horasPorLoteMap[e.key] ?? 0,
+            ))
+        .toList()
+      ..sort((a, b) => b.costo.compareTo(a.costo));
 
-    final distribucionLotes = registros
-        .map((r) => _DistribucionLote(nombre: 'Lote ${r.lote}', valor: r.total))
-        .toList();
+    final distribucionLotes = totalPorLote.entries
+        .map((e) => _DistribucionLote(
+              nombre: e.key,
+              valor: e.value,
+            ))
+        .toList()
+      ..sort((a, b) => b.valor.compareTo(a.valor));
 
-    final horasPorLote = registros
-        .map((r) => _HorasPorLote(lote: r.lote, horas: r.horas))
-        .toList();
+    final horasPorLote = horasPorLoteMap.entries
+        .map((e) => _HorasPorLote(
+              lote: e.key,
+              horas: e.value,
+            ))
+        .toList()
+      ..sort((a, b) => b.horas.compareTo(a.horas));
 
     final resumenTrabajador = <_ResumenTrabajador>[];
     for (final r in registros) {
       final index =
-          resumenTrabajador.indexWhere((e) => e.nombre == r.trabajador);
+          resumenTrabajador.indexWhere((e) => e.nombre == r.nombreTrabajador);
       if (index >= 0) {
         final actual = resumenTrabajador[index];
         resumenTrabajador[index] = actual.copyWith(
-          totalHoras: actual.totalHoras + r.horas,
+          totalHoras: actual.totalHoras + r.horasTrabajadas,
           totalCosto: actual.totalCosto + r.total,
           registros: actual.registros + 1,
         );
       } else {
         resumenTrabajador.add(
           _ResumenTrabajador(
-            nombre: r.trabajador,
+            nombre: r.nombreTrabajador,
             cargo: r.cargo,
-            totalHoras: r.horas,
+            totalHoras: r.horasTrabajadas,
             totalCosto: r.total,
             registros: 1,
           ),
@@ -94,40 +151,36 @@ class ManoObraDashboardPage extends StatelessWidget {
       }
     }
 
-    final eficienciaLotes = registros
-        .map((r) => _EficienciaLote(
-              lote: r.lote,
-              costoPorHora: r.horas == 0 ? 0.0 : r.total / r.horas,
-            ))
-        .toList();
+    final eficienciaLotes = totalPorLote.entries
+        .map((e) {
+          final horas = horasPorLoteMap[e.key] ?? 0;
+          final costoHora = horas == 0 ? 0.0 : e.value / horas;
+          return _EficienciaLote(
+            lote: e.key,
+            costoPorHora: costoHora,
+          );
+        })
+        .toList()
+      ..sort((a, b) => b.costoPorHora.compareTo(a.costoPorHora));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mano de Obra'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Actualizar',
+            onPressed: _cargarDatos,
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Nuevo registro',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ManoObraFormPage(),
-                ),
-              );
-            },
+            onPressed: _abrirFormulario,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ManoObraFormPage(),
-            ),
-          );
-        },
+        onPressed: _abrirFormulario,
         icon: const Icon(Icons.add),
         label: const Text('Ingresar mano de obra'),
       ),
@@ -329,20 +382,55 @@ class ManoObraDashboardPage extends StatelessWidget {
       Color(0xFFEC4899),
     ];
     final pieSections = <PieChartSectionData>[];
+    final showNamesInSlice = distribucionLotes.length <= 6;
+    final legendItems = <Widget>[];
     for (var i = 0; i < distribucionLotes.length; i++) {
       final d = distribucionLotes[i];
       final percent = total == 0 ? 0 : d.valor / total * 100;
+      final color = colors[i % colors.length];
+      final shortName = _shortLabel(d.nombre, maxLength: 14);
       pieSections.add(
         PieChartSectionData(
-          color: colors[i % colors.length],
+          color: color,
           value: d.valor,
           radius: 60,
-          title: '${d.nombre}\n${percent.toStringAsFixed(0)}%',
+          title: showNamesInSlice
+              ? '$shortName (${percent.toStringAsFixed(0)}%)'
+              : '${percent.toStringAsFixed(0)}%',
           titleStyle: const TextStyle(
             color: Colors.white,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      );
+
+      legendItems.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              shortName,
+              style: const TextStyle(fontSize: 11),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${percent.toStringAsFixed(0)}%',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -402,7 +490,8 @@ class ManoObraDashboardPage extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            costoPorLote[index].lote,
+                            _shortLabel(costoPorLote[index].lote,
+                                maxLength: 10),
                             style: const TextStyle(fontSize: 11),
                           ),
                         );
@@ -417,15 +506,28 @@ class ManoObraDashboardPage extends StatelessWidget {
 
         final pieCard = _CardDashboard(
           titulo: 'Distribución de Costos',
-          child: SizedBox(
-            height: 260,
-            child: PieChart(
-              PieChartData(
-                sections: pieSections,
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 200,
+                child: PieChart(
+                  PieChartData(
+                    sections: pieSections,
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 40,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: legendItems,
+                ),
+              ),
+            ],
           ),
         );
 
@@ -541,7 +643,8 @@ class ManoObraDashboardPage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        horasPorLote[index].lote,
+                        _shortLabel(horasPorLote[index].lote,
+                            maxLength: 10),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );
@@ -619,7 +722,8 @@ class ManoObraDashboardPage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        eficienciaLotes[index].lote,
+                        _shortLabel(eficienciaLotes[index].lote,
+                            maxLength: 10),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );
@@ -789,65 +893,140 @@ class ManoObraDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTablaRegistros(List<_RegistroManoObra> registros,
+  Widget _buildTablaRegistros(List<GastoManoObraModel> registros,
       double totalHoras, double totalGasto) {
+    final totalRegistros = registros.length;
+    List<GastoManoObraModel> pageItems = registros;
+    bool hasPagination = totalRegistros > _rowsPerPage;
+    int totalPages = hasPagination
+        ? (totalRegistros / _rowsPerPage).ceil()
+        : 1;
+    int startIndex = 0;
+    int endIndex = totalRegistros;
+
+    if (hasPagination) {
+      if (_currentPage >= totalPages) {
+        _currentPage = totalPages - 1;
+      }
+      startIndex = _currentPage * _rowsPerPage;
+      endIndex = startIndex + _rowsPerPage;
+      if (endIndex > totalRegistros) {
+        endIndex = totalRegistros;
+      }
+      pageItems = registros.sublist(startIndex, endIndex);
+    }
+
     return _CardDashboard(
       titulo: 'Registros Detallados',
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: const [
-            DataColumn(label: Text('Fecha')),
-            DataColumn(label: Text('Lote')),
-            DataColumn(label: Text('Trabajador')),
-            DataColumn(label: Text('Cargo')),
-            DataColumn(label: Text('Horas'), numeric: true),
-            DataColumn(label: Text('Costo Mes'), numeric: true),
-            DataColumn(label: Text('Total'), numeric: true),
-          ],
-          rows: [
-            for (final r in registros)
-              DataRow(
-                cells: [
-                  DataCell(Text(r.fecha)),
-                  DataCell(Text(r.lote)),
-                  DataCell(Text(r.trabajador)),
-                  DataCell(Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDBEAFE),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      r.cargo,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF1D4ED8),
-                      ),
-                    ),
-                  )),
-                  DataCell(Text(r.horas.toStringAsFixed(0))),
-                  DataCell(Text('S/ ${r.costoMes.toStringAsFixed(2)}')),
-                  DataCell(Text('S/ ${r.total.toStringAsFixed(2)}')),
-                ],
-              ),
-            DataRow(
-              cells: [
-                const DataCell(Text('TOTALES',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('')),
-                const DataCell(Text('')),
-                const DataCell(Text('')),
-                DataCell(Text(totalHoras.toStringAsFixed(0),
-                    style: const TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('')),
-                DataCell(Text('S/ ${totalGasto.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Fecha')),
+                DataColumn(label: Text('Lote')),
+                DataColumn(label: Text('Trabajador')),
+                DataColumn(label: Text('Cargo')),
+                DataColumn(label: Text('Horas'), numeric: true),
+                DataColumn(label: Text('Costo Mes'), numeric: true),
+                DataColumn(label: Text('Total'), numeric: true),
+              ],
+              rows: [
+                for (final r in pageItems)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(r.fecha)),
+                      DataCell(Text(_loteLabel(r))),
+                      DataCell(Text(r.nombreTrabajador)),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDBEAFE),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          r.cargo,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      )),
+                      DataCell(
+                          Text(r.horasTrabajadas.toStringAsFixed(0))),
+                      DataCell(Text(
+                          'S/ ${(r.costoPorHora * r.horasTrabajadas).toStringAsFixed(2)}')),
+                      DataCell(Text('S/ ${r.total.toStringAsFixed(2)}')),
+                    ],
+                  ),
+                DataRow(
+                  cells: [
+                    const DataCell(Text('TOTALES',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
+                    DataCell(Text(totalHoras.toStringAsFixed(0),
+                        style:
+                            const TextStyle(fontWeight: FontWeight.bold))),
+                    const DataCell(Text('')),
+                    DataCell(Text('S/ ${totalGasto.toStringAsFixed(2)}',
+                        style:
+                            const TextStyle(fontWeight: FontWeight.bold))),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (hasPagination) const SizedBox(height: 12),
+          if (hasPagination)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Mostrando ${startIndex + 1}-${endIndex} de $totalRegistros',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _currentPage > 0
+                          ? () {
+                              setState(() {
+                                _currentPage--;
+                              });
+                            }
+                          : null,
+                    ),
+                    Text(
+                      '${_currentPage + 1} / $totalPages',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _currentPage < totalPages - 1
+                          ? () {
+                              setState(() {
+                                _currentPage++;
+                              });
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }

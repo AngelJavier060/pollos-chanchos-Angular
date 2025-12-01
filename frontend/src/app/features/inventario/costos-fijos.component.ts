@@ -17,9 +17,101 @@ import { forkJoin } from 'rxjs';
         <h1 class="text-2xl font-bold text-blue-800">Costos Fijos</h1>
         <p class="text-gray-600">Prorrateables por periodo y por lote (opcional)</p>
       </div>
+      <button (click)="toggleFormulario()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+        <svg *ngIf="!mostrarFormulario" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <svg *ngIf="mostrarFormulario" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        {{ mostrarFormulario ? 'Cerrar formulario' : 'Nuevo gasto fijo' }}
+      </button>
     </div>
 
-    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl p-4 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-xs font-semibold opacity-80">TOTAL</span>
+        </div>
+        <p class="text-2xl font-bold mt-2">$ {{ totalGastos | number:'1.2-2' }}</p>
+        <p class="text-xs opacity-80">Gastos registrados</p>
+      </div>
+      <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl p-4 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          <span class="text-xs font-semibold opacity-80">REGISTROS</span>
+        </div>
+        <p class="text-2xl font-bold mt-2">{{ registros.length }}</p>
+        <p class="text-xs opacity-80">Total de gastos</p>
+      </div>
+      <div class="bg-gradient-to-br from-pink-500 to-pink-700 rounded-xl p-4 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+          <span class="text-xs font-semibold opacity-80">PROMEDIO</span>
+        </div>
+        <p class="text-2xl font-bold mt-2">$ {{ promedioGasto | number:'1.2-2' }}</p>
+        <p class="text-xs opacity-80">Por registro</p>
+      </div>
+      <div class="bg-gradient-to-br from-rose-500 to-rose-700 rounded-xl p-4 text-white shadow-lg">
+        <div class="flex items-center justify-between">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <span class="text-xs font-semibold opacity-80">LOTES</span>
+        </div>
+        <p class="text-2xl font-bold mt-2">{{ lotesConGastos }}</p>
+        <p class="text-xs opacity-80">Con gastos asignados</p>
+      </div>
+    </div>
+
+    <!-- Gráficas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6" *ngIf="registros.length > 0">
+      <!-- Gráfica de barras: Gasto por Lote -->
+      <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Gasto por Lote</h3>
+        <div class="space-y-3">
+          <div *ngFor="let g of gastosPorLote" class="flex items-center gap-3">
+            <span class="w-28 text-sm text-gray-600 truncate" [title]="g.loteNombre">{{ g.loteNombre }}</span>
+            <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+              <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full flex items-center justify-end pr-2"
+                   [style.width.%]="totalGastos > 0 ? (g.total / totalGastos * 100) : 0">
+                <span class="text-xs text-white font-semibold" *ngIf="(g.total / totalGastos * 100) > 15">$ {{ g.total | number:'1.2-2' }}</span>
+              </div>
+            </div>
+            <span class="w-20 text-sm font-semibold text-indigo-700 text-right">$ {{ g.total | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+      <!-- Distribución por tipo de gasto -->
+      <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribución por Tipo de Gasto</h3>
+        <div class="space-y-3">
+          <div *ngFor="let t of gastosPorTipo; let i = index" class="flex items-center gap-3">
+            <span class="w-28 text-sm text-gray-600 truncate" [title]="t.nombre">{{ t.nombre }}</span>
+            <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+              <div class="h-full rounded-full flex items-center justify-end pr-2"
+                   [class]="getBarColor(i)"
+                   [style.width.%]="totalGastos > 0 ? (t.total / totalGastos * 100) : 0">
+                <span class="text-xs text-white font-semibold" *ngIf="(t.total / totalGastos * 100) > 15">{{ (t.total / totalGastos * 100) | number:'1.0-0' }}%</span>
+              </div>
+            </div>
+            <span class="w-20 text-sm font-semibold text-gray-700 text-right">$ {{ t.total | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario (oculto por defecto) -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6" *ngIf="mostrarFormulario">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ editandoId ? 'Editar Gasto Fijo' : 'Nuevo Gasto Fijo' }}</h3>
       <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -53,14 +145,16 @@ import { forkJoin } from 'rxjs';
                 <button type="button" (click)="agregarLote()" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700" [disabled]="form.get('aplicarTodosLotes')?.value">Agregar lote</button>
               </div>
             </div>
-            <div *ngIf="form.get('aplicarTodosLotes')?.value" class="text-sm text-gray-600 mb-2">
-              Se aplicará a {{ lotes.length }} lote(s).
+            <div *ngIf="form.get('aplicarTodosLotes')?.value" class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 mb-2">
+              <strong>Distribución equitativa:</strong> El monto de <strong>$ {{ form.get('montoTotal')?.value | number:'1.2-2' }}</strong> 
+              se dividirá entre <strong>{{ lotes.length }}</strong> lote(s) activos = 
+              <strong>$ {{ (form.get('montoTotal')?.value / lotes.length) | number:'1.2-2' }}</strong> por lote.
             </div>
             <div class="space-y-2" *ngIf="!form.get('aplicarTodosLotes')?.value">
               <div class="flex items-center gap-2" *ngFor="let ctrl of lotesFormArray.controls; let i = index">
                 <select [formControl]="ctrl.get('loteId')" class="flex-1 p-2 border rounded-md">
                   <option [ngValue]="null">Sin lote</option>
-                  <option *ngFor="let l of lotes" [ngValue]="l.id">{{ l.codigo || l.name }} — {{ l.race?.animal?.name }}</option>
+                  <option *ngFor="let l of lotes" [ngValue]="l.id">{{ l.name || l.codigo }} — {{ l.race?.animal?.name }}</option>
                 </select>
                 <button type="button" (click)="removerLote(i)" class="px-2 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Quitar</button>
               </div>
@@ -72,7 +166,9 @@ import { forkJoin } from 'rxjs';
           </div>
         </div>
         <div class="flex items-center gap-3 pt-2">
-          <button type="submit" [disabled]="form.invalid || saving" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">Guardar</button>
+          <button type="submit" [disabled]="form.invalid || saving" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+            {{ editandoId ? 'Actualizar' : 'Guardar' }}
+          </button>
           <button type="button" (click)="limpiar()" class="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200">Limpiar</button>
           <div *ngIf="saveMessage" class="text-green-700 text-sm">{{ saveMessage }}</div>
           <div *ngIf="errorMessage" class="text-red-700 text-sm">{{ errorMessage }}</div>
@@ -80,28 +176,44 @@ import { forkJoin } from 'rxjs';
       </form>
     </div>
 
+    <!-- Tabla de registros -->
     <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm" *ngIf="registros.length > 0">
       <h3 class="text-lg font-semibold text-gray-800 mb-3">Registros</h3>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periodo</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Lote</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nombre</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Monto</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Periodo</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Método</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr *ngFor="let r of registros">
-              <td class="px-4 py-2 text-sm">{{ r.fecha }}</td>
-              <td class="px-4 py-2 text-sm">{{ r.lote?.codigo || getLoteCodigo(r.lote?.id || r.loteId) || '—' }}</td>
-              <td class="px-4 py-2 text-sm">{{ r.nombreCosto }}</td>
-              <td class="px-4 py-2 text-sm font-semibold text-indigo-700">$ {{ r.montoTotal | number:'1.2-2' }}</td>
-              <td class="px-4 py-2 text-sm">{{ r.periodoProrrateo || '—' }}</td>
-              <td class="px-4 py-2 text-sm">{{ r.metodoProrrateo || '—' }}</td>
+              <td class="px-4 py-3 text-sm">{{ r.fecha }}</td>
+              <td class="px-4 py-3 text-sm">{{ getLoteNombre(r.lote?.id || r.loteId) }}</td>
+              <td class="px-4 py-3 text-sm">{{ r.nombreCosto }}</td>
+              <td class="px-4 py-3 text-sm font-semibold text-indigo-700">$ {{ r.montoTotal | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-sm">{{ r.periodoProrrateo || '—' }}</td>
+              <td class="px-4 py-3 text-sm">{{ r.metodoProrrateo || '—' }}</td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button (click)="editarRegistro(r)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button (click)="eliminarRegistro(r)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -117,6 +229,25 @@ export class CostosFijosComponent implements OnInit {
   saving = false;
   saveMessage = '';
   errorMessage = '';
+  mostrarFormulario = false;
+  editandoId: string | null = null;
+  editandoLoteId: string | null = null;
+
+  // KPIs
+  totalGastos = 0;
+  promedioGasto = 0;
+  lotesConGastos = 0;
+  gastosPorLote: { loteId: string; loteNombre: string; total: number }[] = [];
+  gastosPorTipo: { nombre: string; total: number }[] = [];
+
+  private barColors = [
+    'bg-gradient-to-r from-blue-500 to-blue-600',
+    'bg-gradient-to-r from-emerald-500 to-emerald-600',
+    'bg-gradient-to-r from-amber-500 to-amber-600',
+    'bg-gradient-to-r from-rose-500 to-rose-600',
+    'bg-gradient-to-r from-violet-500 to-violet-600',
+    'bg-gradient-to-r from-cyan-500 to-cyan-600'
+  ];
 
   constructor(private fb: FormBuilder, private lotesService: LoteService, private service: CostosFijosService) {}
 
@@ -132,30 +263,67 @@ export class CostosFijosComponent implements OnInit {
       observaciones: ['']
     });
 
-    this.lotesService.getLotes().subscribe({ next: (l) => this.lotes = l, error: () => this.lotes = [] });
+    // Cargar solo lotes activos
+    this.lotesService.getActivos().subscribe({ next: (l) => this.lotes = l, error: () => this.lotes = [] });
     this.cargarRegistros();
     this.agregarLote();
   }
 
   hoyISO(): string { const d = new Date(); return d.toISOString().split('T')[0]; }
 
-  getLoteCodigo(id: string | number): string {
+  getBarColor(index: number): string {
+    return this.barColors[index % this.barColors.length];
+  }
+
+  getLoteNombre(id: string | number | null | undefined): string {
+    if (!id) return '—';
     const l = this.lotes.find(x => String(x.id) === String(id));
-    return l?.codigo || l?.name || String(id);
+    return l?.name || l?.codigo || '—';
+  }
+
+  toggleFormulario(): void {
+    if (this.mostrarFormulario) {
+      this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: false });
+      this.resetLotes();
+      this.errorMessage = '';
+      this.saveMessage = '';
+      this.editandoId = null;
+      this.editandoLoteId = null;
+    }
+    this.mostrarFormulario = !this.mostrarFormulario;
+  }
+
+  editarRegistro(r: any): void {
+    this.editandoId = String(r.id);
+    this.editandoLoteId = r.lote?.id || r.loteId || null;
+    this.form.patchValue({
+      nombreCosto: r.nombreCosto || '',
+      montoTotal: r.montoTotal,
+      periodoProrrateo: r.periodoProrrateo || '',
+      metodoProrrateo: r.metodoProrrateo || '',
+      fecha: r.fecha,
+      observaciones: r.observaciones || '',
+      aplicarTodosLotes: false
+    });
+    this.mostrarFormulario = true;
+  }
+
+  eliminarRegistro(r: any): void {
+    if (!confirm('¿Está seguro de eliminar este registro de gasto fijo?')) return;
+    this.service.eliminar(String(r.id)).subscribe({
+      next: () => {
+        this.cargarRegistros();
+        alert('Registro eliminado correctamente.');
+      },
+      error: (err) => alert(err?.message || 'Error al eliminar el registro.')
+    });
   }
 
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving = true; this.errorMessage = '';
     const v = this.form.value;
-    const basePayload = {
-      nombreCosto: String(v.nombreCosto || '').trim(),
-      montoTotal: Number(v.montoTotal || 0),
-      periodoProrrateo: v.periodoProrrateo || '',
-      metodoProrrateo: v.metodoProrrateo || '',
-      fecha: v.fecha,
-      observaciones: v.observaciones || ''
-    };
+    const montoTotal = Number(v.montoTotal || 0);
 
     const aplicarTodos = !!this.form.get('aplicarTodosLotes')?.value;
     let lotesSel: Array<string | number> = [];
@@ -167,9 +335,46 @@ export class CostosFijosComponent implements OnInit {
         .filter((x: any) => x !== null && x !== undefined && x !== '');
     }
 
+    // Calcular monto por lote (distribución equitativa si se seleccionan todos)
+    const cantidadLotes = lotesSel.length > 0 ? lotesSel.length : 1;
+    const montoPorLote = aplicarTodos && cantidadLotes > 1 ? montoTotal / cantidadLotes : montoTotal;
+
+    const basePayload = {
+      nombreCosto: String(v.nombreCosto || '').trim(),
+      montoTotal: montoPorLote,
+      periodoProrrateo: v.periodoProrrateo || '',
+      metodoProrrateo: v.metodoProrrateo || '',
+      fecha: v.fecha,
+      observaciones: v.observaciones || ''
+    };
+
+    // Si estamos editando, actualizar solo ese registro
+    if (this.editandoId) {
+      const payloadEdicion: any = { ...basePayload, montoTotal: montoTotal };
+      if (this.editandoLoteId != null) {
+        payloadEdicion.loteId = String(this.editandoLoteId);
+      }
+      this.service.actualizar(this.editandoId, payloadEdicion).subscribe({
+        next: () => {
+          this.cargarRegistros();
+          this.saveMessage = 'Registro actualizado correctamente.';
+          setTimeout(() => this.saveMessage = '', 3000);
+          this.saving = false;
+          this.mostrarFormulario = false;
+          this.editandoId = null;
+          this.editandoLoteId = null;
+          this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: false });
+          this.resetLotes();
+        },
+        error: (err) => { this.errorMessage = err?.message || 'Error al actualizar.'; this.saving = false; }
+      });
+      return;
+    }
+
+    // Crear nuevos registros
     const peticiones = (lotesSel && lotesSel.length > 0)
       ? lotesSel.map(lid => this.service.crear({ ...basePayload, loteId: String(lid) }))
-      : [this.service.crear({ ...basePayload })]; // sin lote
+      : [this.service.crear({ ...basePayload })];
 
     forkJoin(peticiones).subscribe({
       next: () => {
@@ -177,7 +382,8 @@ export class CostosFijosComponent implements OnInit {
         this.saveMessage = 'Guardado correctamente.';
         setTimeout(() => this.saveMessage = '', 3000);
         this.saving = false;
-        this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: aplicarTodos });
+        this.mostrarFormulario = false;
+        this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: false });
         this.resetLotes();
       },
       error: (err) => { this.errorMessage = err?.message || 'Error al guardar.'; this.saving = false; }
@@ -185,7 +391,47 @@ export class CostosFijosComponent implements OnInit {
   }
 
   cargarRegistros(): void {
-    this.service.listar().subscribe({ next: (data) => this.registros = data, error: () => this.registros = [] });
+    this.service.listar().subscribe({
+      next: (data) => {
+        this.registros = data;
+        this.calcularKPIs();
+      },
+      error: () => this.registros = []
+    });
+  }
+
+  calcularKPIs(): void {
+    this.totalGastos = this.registros.reduce((sum, r) => sum + (r.montoTotal || 0), 0);
+    this.promedioGasto = this.registros.length > 0 ? this.totalGastos / this.registros.length : 0;
+
+    // Gastos por lote
+    const loteMap = new Map<string, { loteNombre: string; total: number }>();
+    for (const r of this.registros) {
+      const loteId = r.lote?.id || r.loteId || 'sin-lote';
+      const loteNombre = this.getLoteNombre(loteId);
+      if (loteMap.has(loteId)) {
+        loteMap.get(loteId)!.total += r.montoTotal || 0;
+      } else {
+        loteMap.set(loteId, { loteNombre, total: r.montoTotal || 0 });
+      }
+    }
+    this.gastosPorLote = Array.from(loteMap.entries()).map(([loteId, v]) => ({
+      loteId,
+      loteNombre: v.loteNombre,
+      total: v.total
+    })).sort((a, b) => b.total - a.total);
+    this.lotesConGastos = this.gastosPorLote.filter(g => g.loteId !== 'sin-lote').length;
+
+    // Gastos por tipo (nombre del costo)
+    const tipoMap = new Map<string, number>();
+    for (const r of this.registros) {
+      const nombre = r.nombreCosto || 'Otros';
+      tipoMap.set(nombre, (tipoMap.get(nombre) || 0) + (r.montoTotal || 0));
+    }
+    this.gastosPorTipo = Array.from(tipoMap.entries()).map(([nombre, total]) => ({
+      nombre,
+      total
+    })).sort((a, b) => b.total - a.total);
   }
 
   // ===== Helpers de lotes dinámicos =====
@@ -197,5 +443,7 @@ export class CostosFijosComponent implements OnInit {
   limpiar(): void {
     this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: false });
     this.resetLotes();
+    this.editandoId = null;
+    this.editandoLoteId = null;
   }
 }

@@ -63,6 +63,10 @@ export class InventarioEntradasService {
     return this.http.get<InventarioEntrada[]>(`${this.apiUrl}?productId=${productId}`);
   }
 
+  listarTodas(): Observable<InventarioEntrada[]> {
+    return this.http.get<InventarioEntrada[]>(`${this.apiUrl}/todas`);
+  }
+
   vencidas(productId?: number): Observable<InventarioEntrada[]> {
     const url = productId ? `${this.apiUrl}/vencidas?productId=${productId}` : `${this.apiUrl}/vencidas`;
     return this.http.get<InventarioEntrada[]>(url);

@@ -407,33 +407,57 @@
       </div>
     </div>
     
-    <!-- Estadísticas dinámicas por tipo de animal -->
+    <!-- Estadísticas fijas por tipo de animal: Pollos y Chanchos -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Panel dinámico para cada tipo de animal -->
-      <div *ngFor="let tipo of tiposAnimales" 
-           [ngClass]="'bg-' + tipo.color + '-50 p-4 rounded-lg shadow-sm border border-' + tipo.color + '-200'">
-        <h3 class="text-lg font-semibold" 
-            [ngClass]="'text-' + tipo.color + '-800'">{{ tipo.nombre }}</h3>
+      <!-- Panel de POLLOS -->
+      <div class="bg-yellow-50 p-4 rounded-lg shadow-sm border border-yellow-200">
+        <h3 class="text-lg font-semibold text-yellow-800 mb-3 flex items-center gap-2">
+          <span class="text-2xl">🐔</span> Pollos
+        </h3>
         <div class="grid grid-cols-3 gap-3">
           <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
             <p class="text-xs text-gray-500">Lotes</p>
-            <p class="text-xl font-bold"
-               [ngClass]="'text-' + tipo.color + '-700'">
-              {{ metricasPorAnimal.get(tipo.id)?.total || 0 }}
+            <p class="text-xl font-bold text-yellow-700">
+              {{ getMetricasPollos().total }}
             </p>
           </div>
           <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
             <p class="text-xs text-gray-500">Animales</p>
-            <p class="text-xl font-bold"
-               [ngClass]="'text-' + tipo.color + '-700'">
-              {{ metricasPorAnimal.get(tipo.id)?.cantidad || 0 }}
+            <p class="text-xl font-bold text-yellow-700">
+              {{ getMetricasPollos().cantidad }}
             </p>
           </div>
           <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
             <p class="text-xs text-gray-500">Inversión</p>
-            <p class="text-xl font-bold"
-               [ngClass]="'text-' + tipo.color + '-700'">
-              {{ metricasPorAnimal.get(tipo.id)?.inversion | currency }}
+            <p class="text-xl font-bold text-yellow-700">
+              {{ getMetricasPollos().inversion | currency }}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Panel de CHANCHOS -->
+      <div class="bg-pink-50 p-4 rounded-lg shadow-sm border border-pink-200">
+        <h3 class="text-lg font-semibold text-pink-800 mb-3 flex items-center gap-2">
+          <span class="text-2xl">🐷</span> Chanchos
+        </h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Lotes</p>
+            <p class="text-xl font-bold text-pink-700">
+              {{ getMetricasChanchos().total }}
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Animales</p>
+            <p class="text-xl font-bold text-pink-700">
+              {{ getMetricasChanchos().cantidad }}
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded shadow-sm border border-gray-100">
+            <p class="text-xs text-gray-500">Inversión</p>
+            <p class="text-xl font-bold text-pink-700">
+              {{ getMetricasChanchos().inversion | currency }}
             </p>
           </div>
         </div>

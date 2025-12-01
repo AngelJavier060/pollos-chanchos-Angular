@@ -184,7 +184,7 @@ import { forkJoin } from 'rxjs';
               <div class="flex items-center gap-2" *ngFor="let ctrl of lotesFormArray.controls; let i = index">
                 <select [formControl]="ctrl.get('loteId')" class="flex-1 p-2 border rounded-md">
                   <option [ngValue]="null">Seleccione lote</option>
-                  <option *ngFor="let l of lotesActivos" [ngValue]="l.id">{{ l.codigo || l.name }} — {{ l.race?.animal?.name }} ({{ l.quantity }} animales)</option>
+                  <option *ngFor="let l of lotesActivos" [ngValue]="l.id">{{ l.name || l.codigo }} — {{ l.race?.animal?.name }} ({{ l.quantity }} animales)</option>
                 </select>
                 <button type="button" (click)="removerLote(i)" class="px-2 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Quitar</button>
               </div>
@@ -237,7 +237,7 @@ import { forkJoin } from 'rxjs';
               <td class="px-4 py-3 text-sm text-gray-700">{{ r.fecha }}</td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">
-                  {{ r.lote?.codigo || getLoteCodigo(r.lote?.id || r.loteId) }}
+                  {{ r.lote?.name || r.lote?.codigo || getLoteCodigo(r.lote?.id || r.loteId) }}
                 </span>
               </td>
               <td class="px-4 py-3 text-sm text-gray-700">{{ r.tipoTransporte }}</td>
@@ -359,7 +359,7 @@ export class LogisticaComponent implements OnInit {
 
   getLoteCodigo(id: string | number): string {
     const l = this.lotes.find(x => String(x.id) === String(id));
-    return l?.codigo || l?.name || String(id);
+    return l?.name || l?.codigo || String(id);
   }
 
   abrirFormularioNuevo(): void {
@@ -441,13 +441,38 @@ export class LogisticaComponent implements OnInit {
       return;
     }
 
-    const peticiones = lotesSel.map(lid => this.service.crear({ ...basePayload, loteId: String(lid) }));
+    // LÓGICA DE DIVISIÓN DE COSTOS:
+    // - Si "Aplicar a todos" está activo y hay más de 1 lote: el costo total se DIVIDE entre todos los lotes
+    // - Si se selecciona un lote específico: el costo completo va a ese lote
+    const numLotes = lotesSel.length;
+    let costoUnitarioPorLote = basePayload.costoUnitario;
+    let cantidadPorLote = basePayload.cantidadTransportada;
+
+    if (aplicarTodos && numLotes > 1) {
+      // Dividir el costo y cantidad entre todos los lotes
+      costoUnitarioPorLote = basePayload.costoUnitario / numLotes;
+      cantidadPorLote = basePayload.cantidadTransportada / numLotes;
+    }
+
+    const payloadPorLote = {
+      ...basePayload,
+      costoUnitario: costoUnitarioPorLote,
+      cantidadTransportada: cantidadPorLote
+    };
+
+    const peticiones = lotesSel.map(lid => this.service.crear({ ...payloadPorLote, loteId: String(lid) }));
     forkJoin(peticiones).subscribe({
       next: () => {
         this.cargarRegistros();
         this.saving = false;
         this.cerrarFormulario();
-        alert('Registro de logística guardado correctamente.');
+        if (aplicarTodos && numLotes > 1) {
+          const costoTotal = basePayload.cantidadTransportada * basePayload.costoUnitario;
+          const costoPorLote = costoTotal / numLotes;
+          alert(`Costo dividido: $${costoPorLote.toFixed(2)} por cada uno de los ${numLotes} lotes.`);
+        } else {
+          alert('Registro de logística guardado correctamente.');
+        }
       },
       error: (err) => { this.errorMessage = err?.message || 'Error al guardar.'; this.saving = false; }
     });

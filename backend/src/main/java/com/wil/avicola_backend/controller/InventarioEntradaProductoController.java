@@ -88,6 +88,15 @@ public class InventarioEntradaProductoController {
     }
 
     // ============================
+    // Listar TODAS las entradas activas (para listado principal)
+    // ============================
+    @GetMapping("/todas")
+    public ResponseEntity<?> listarTodas() {
+        List<InventarioEntradaProducto> lista = entradasService.listarTodasActivas();
+        return ResponseEntity.ok(lista);
+    }
+
+    // ============================
     // Vencidas (global o por producto si se pasa productId)
     // ============================
     @GetMapping("/vencidas")

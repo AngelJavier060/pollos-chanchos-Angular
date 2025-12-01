@@ -54,8 +54,12 @@
           <button (click)="navegarAInventario('entradas')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
             Entradas
           </button>
-          <button (click)="navegarAInventario('alertas')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
-            Alertas
+          <button (click)="navegarAInventario('alertas')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md relative flex items-center justify-between">
+            <span>Alertas</span>
+            <span *ngIf="totalAlertas > 0" 
+                  class="ml-2 px-2 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full animate-pulse">
+              {{ totalAlertas > 99 ? '99+' : totalAlertas }}
+            </span>
           </button>
           <button (click)="navegarA('inventario/sanidad')" class="w-full text-left block px-4 py-2 text-blue-100 hover:bg-blue-700 rounded-md">
             Sanidad y Cuidado Animal
@@ -144,7 +148,38 @@
     <header class="border-b border-gray-200 bg-white shadow-sm">
       <div class="px-6 py-3 flex justify-between items-center">
         <h2 class="text-xl font-semibold text-gray-800">Dashboard</h2>
-        <div class="flex items-center">
+        <div class="flex items-center gap-4">
+          
+          <!-- Icono de Notificaciones/Alertas -->
+          <div class="relative">
+            <button (click)="navegarAInventario('alertas')" 
+                    class="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                    title="Ver alertas de inventario">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+              <!-- Badge con contador -->
+              <span *ngIf="totalAlertas > 0" 
+                    class="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white bg-red-500 rounded-full animate-bounce">
+                {{ totalAlertas > 99 ? '99+' : totalAlertas }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Toggle de sonido -->
+          <button (click)="toggleSonido()" 
+                  class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                  [title]="sonidoHabilitado ? 'Desactivar sonido de alertas' : 'Activar sonido de alertas'">
+            <svg *ngIf="sonidoHabilitado" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+            </svg>
+            <svg *ngIf="!sonidoHabilitado" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+            </svg>
+          </button>
+
           <!-- Perfil de usuario con menú desplegable -->
           <div class="relative" x-data="{ open: false }">
             <div class="relative">
@@ -211,4 +246,52 @@
        (click)="closeUserMenu()"
        class="fixed inset-0 z-40 bg-black opacity-5">
   </div>
+
+  <!-- Toast de Alertas -->
+  <div *ngIf="mostrarToastAlertas" 
+       class="fixed bottom-4 right-4 z-50 max-w-md animate-slide-in-right">
+    <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg shadow-2xl p-4 flex items-start gap-3">
+      <div class="flex-shrink-0 bg-white/20 rounded-full p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <h4 class="font-bold text-lg">¡Atención!</h4>
+        <p class="text-sm opacity-90">{{ mensajeToast }}</p>
+        <div class="mt-2 flex gap-2">
+          <button (click)="verAlertas()" 
+                  class="px-3 py-1 bg-white text-orange-600 rounded-md text-sm font-semibold hover:bg-orange-100 transition-colors">
+            Ver Alertas
+          </button>
+          <button (click)="cerrarToast()" 
+                  class="px-3 py-1 bg-white/20 rounded-md text-sm hover:bg-white/30 transition-colors">
+            Cerrar
+          </button>
+        </div>
+      </div>
+      <button (click)="cerrarToast()" class="text-white/70 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
 </div>
+
+<style>
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+</style>

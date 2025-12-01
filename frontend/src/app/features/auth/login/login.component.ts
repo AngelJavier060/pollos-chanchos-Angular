@@ -19,6 +19,7 @@ export class LoginComponent implements OnInit {
   returnUrl: string = '/admin/dashboard';
   error: string = '';
   loading: boolean = false;
+  showPassword: boolean = false;
   private healthUrl = `${environment.apiUrl}/health`;
   private alternativeUrl = `${environment.apiUrl}/health/alternative`;
   pageTitle = 'Panel de Administrador';
@@ -65,6 +66,10 @@ export class LoginComponent implements OnInit {
     return this.loginForm.get('password');
   }
 
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
+  }
+
   getErrorMessage(controlName: string): string {
     const control = this.loginForm.get(controlName);
     if (!control) return '';
@@ -98,12 +103,8 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    // Determinar si es email o username
-    const isEmail = identifier.includes('@');
-    const loginData = isEmail ? {
-      email: identifier,
-      password
-    } : {
+    // Siempre enviamos como 'username', el backend detecta si es email
+    const loginData = {
       username: identifier,
       password
     };

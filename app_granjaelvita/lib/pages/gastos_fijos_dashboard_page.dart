@@ -1,109 +1,174 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../models/gasto_fijo_model.dart';
+import '../services/gastos_fijos_service.dart';
 import 'costos_fijos_form_page.dart';
 
-class GastosFijosDashboardPage extends StatelessWidget {
+class GastosFijosDashboardPage extends StatefulWidget {
   const GastosFijosDashboardPage({super.key});
 
-  List<_RegistroGastoFijo> get _registrosDemo => const [
-        _RegistroGastoFijo(
-          fecha: '2025.11.9',
-          lote: '03001',
-          nombre: 'Pintura',
-          monto: 2,
-          periodo: 'Semestral',
-          metodo: 'Por galpones',
-        ),
-        _RegistroGastoFijo(
-          fecha: '2025.11.9',
-          lote: '00002',
-          nombre: 'Pintura',
-          monto: 2,
-          periodo: 'Semestral',
-          metodo: 'Por galpones',
-        ),
-        _RegistroGastoFijo(
-          fecha: '2025.11.9',
-          lote: '00001',
-          nombre: 'Pintura',
-          monto: 2,
-          periodo: 'Semestral',
-          metodo: 'Por galpones',
-        ),
-        _RegistroGastoFijo(
-          fecha: '2025.11.9',
-          lote: '00003',
-          nombre: 'Pintura',
-          monto: 2,
-          periodo: 'Semestral',
-          metodo: 'Por galpones',
-        ),
-      ];
+  @override
+  State<GastosFijosDashboardPage> createState() => _GastosFijosDashboardPageState();
+}
+
+class _GastosFijosDashboardPageState extends State<GastosFijosDashboardPage> {
+  List<GastoFijoModel> _registros = [];
+  bool _cargando = true;
+  String? _error;
+  int _currentPage = 0;
+  static const int _rowsPerPage = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  Future<void> _cargarDatos() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final data = await GastosFijosServiceMobile.listar();
+      if (!mounted) return;
+      setState(() {
+        _registros = data;
+        _cargando = false;
+        _currentPage = 0;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  Future<void> _abrirFormulario() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const CostosFijosFormPage()),
+    );
+    if (result == true) {
+      _cargarDatos();
+    }
+  }
+
+  String _loteLabel(GastoFijoModel r) {
+    final nombre = r.loteNombre?.trim();
+    if (nombre != null && nombre.isNotEmpty) return nombre;
+    final codigo = r.loteCodigo?.trim();
+    if (codigo != null && codigo.isNotEmpty) return 'Lote $codigo';
+    final id = r.loteId?.trim();
+    if (id != null && id.isNotEmpty) return 'Lote $id';
+    return '-';
+  }
+
+  String _shortLabel(String text, {int maxLength = 12}) {
+    text = text.trim();
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}…';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final registros = _registrosDemo;
+    if (_cargando) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Gastos Fijos')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Gastos Fijos')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Error: $_error', style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _cargarDatos,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final registros = _registros;
 
     final totalGasto =
-        registros.fold<double>(0, (sum, r) => sum + r.monto);
+        registros.fold<double>(0, (sum, r) => sum + r.montoTotal);
     final totalRegistros = registros.length;
     final gastoPromedio =
         totalRegistros == 0 ? 0.0 : totalGasto / totalRegistros;
-    final lotesConGasto = registros.map((r) => r.lote).toSet().length;
-
-    final gastoPorLote = registros
-        .map((r) => _GastoPorLote(lote: r.lote, monto: r.monto))
-        .toList();
+    
+    // Agregar gastos por lote
+    final Map<String, double> totalPorLote = {};
+    for (final r in registros) {
+      final lote = _loteLabel(r);
+      totalPorLote[lote] = (totalPorLote[lote] ?? 0) + r.montoTotal;
+    }
+    final gastoPorLote = totalPorLote.entries
+        .map((e) => _GastoPorLote(lote: e.key, monto: e.value))
+        .toList()
+      ..sort((a, b) => b.monto.compareTo(a.monto));
+    final lotesConGasto = gastoPorLote.where((g) => g.lote != '-').length;
 
     final distribucionPorPeriodo = <_DistribucionValor>[];
     for (final r in registros) {
-      final index = distribucionPorPeriodo
-          .indexWhere((e) => e.nombre == r.periodo);
+      final periodo = r.periodoProrrateo.isEmpty ? 'Sin periodo' : r.periodoProrrateo;
+      final index = distribucionPorPeriodo.indexWhere((e) => e.nombre == periodo);
       if (index >= 0) {
         final actual = distribucionPorPeriodo[index];
         distribucionPorPeriodo[index] = _DistribucionValor(
           nombre: actual.nombre,
-          valor: actual.valor + r.monto,
+          valor: actual.valor + r.montoTotal,
         );
       } else {
         distribucionPorPeriodo.add(
-          _DistribucionValor(nombre: r.periodo, valor: r.monto),
+          _DistribucionValor(nombre: periodo, valor: r.montoTotal),
         );
       }
     }
 
     final distribucionPorMetodo = <_DistribucionValor>[];
     for (final r in registros) {
-      final index = distribucionPorMetodo
-          .indexWhere((e) => e.nombre == r.metodo);
+      final metodo = r.metodoProrrateo.isEmpty ? 'Sin método' : r.metodoProrrateo;
+      final index = distribucionPorMetodo.indexWhere((e) => e.nombre == metodo);
       if (index >= 0) {
         final actual = distribucionPorMetodo[index];
         distribucionPorMetodo[index] = _DistribucionValor(
           nombre: actual.nombre,
-          valor: actual.valor + r.monto,
+          valor: actual.valor + r.montoTotal,
         );
       } else {
         distribucionPorMetodo.add(
-          _DistribucionValor(nombre: r.metodo, valor: r.monto),
+          _DistribucionValor(nombre: metodo, valor: r.montoTotal),
         );
       }
     }
 
     final resumenPorNombre = <_ResumenPorNombre>[];
     for (final r in registros) {
-      final index =
-          resumenPorNombre.indexWhere((e) => e.nombre == r.nombre);
+      final nombre = r.nombreCosto.isEmpty ? 'Sin nombre' : r.nombreCosto;
+      final index = resumenPorNombre.indexWhere((e) => e.nombre == nombre);
       if (index >= 0) {
         final actual = resumenPorNombre[index];
         resumenPorNombre[index] = _ResumenPorNombre(
           nombre: actual.nombre,
-          total: actual.total + r.monto,
+          total: actual.total + r.montoTotal,
           count: actual.count + 1,
         );
       } else {
         resumenPorNombre.add(
-          _ResumenPorNombre(nombre: r.nombre, total: r.monto, count: 1),
+          _ResumenPorNombre(nombre: nombre, total: r.montoTotal, count: 1),
         );
       }
     }
@@ -113,28 +178,19 @@ class GastosFijosDashboardPage extends StatelessWidget {
         title: const Text('Gastos Fijos'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Actualizar',
+            onPressed: _cargarDatos,
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Ingresar datos',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CostosFijosFormPage(),
-                ),
-              );
-            },
+            onPressed: _abrirFormulario,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const CostosFijosFormPage(),
-            ),
-          );
-        },
+        onPressed: _abrirFormulario,
         icon: const Icon(Icons.add),
         label: const Text('Ingresar datos'),
       ),
@@ -395,7 +451,7 @@ class GastosFijosDashboardPage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        gastoPorLote[index].lote,
+                        _shortLabel(gastoPorLote[index].lote, maxLength: 10),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );
@@ -542,7 +598,7 @@ class GastosFijosDashboardPage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        gastoPorLote[index].lote,
+                        _shortLabel(gastoPorLote[index].lote, maxLength: 10),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );
@@ -698,82 +754,139 @@ class GastosFijosDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTabla(List<_RegistroGastoFijo> registros, double totalGasto) {
+  Widget _buildTabla(List<GastoFijoModel> registros, double totalGasto) {
+    final totalRegistros = registros.length;
+    List<GastoFijoModel> pageItems = registros;
+    bool hasPagination = totalRegistros > _rowsPerPage;
+    int totalPages = hasPagination
+        ? (totalRegistros / _rowsPerPage).ceil()
+        : 1;
+    int startIndex = 0;
+    int endIndex = totalRegistros;
+
+    if (hasPagination) {
+      if (_currentPage >= totalPages) {
+        _currentPage = totalPages - 1;
+      }
+      startIndex = _currentPage * _rowsPerPage;
+      endIndex = startIndex + _rowsPerPage;
+      if (endIndex > totalRegistros) {
+        endIndex = totalRegistros;
+      }
+      pageItems = registros.sublist(startIndex, endIndex);
+    }
+
     return _CardDashboard(
       titulo: 'Registros de Gastos Fijos',
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: const [
-            DataColumn(label: Text('Fecha')),
-            DataColumn(label: Text('Lote')),
-            DataColumn(label: Text('Nombre')),
-            DataColumn(label: Text('Monto'), numeric: true),
-            DataColumn(label: Text('Periodo')),
-            DataColumn(label: Text('Método')),
-          ],
-          rows: [
-            for (final r in registros)
-              DataRow(
-                cells: [
-                  DataCell(Text(r.fecha)),
-                  DataCell(Text(r.lote)),
-                  DataCell(Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E7FF),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      r.nombre,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF4338CA),
-                      ),
-                    ),
-                  )),
-                  DataCell(Text('S/ ${r.monto.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600))),
-                  DataCell(Text(r.periodo)),
-                  DataCell(Text(r.metodo)),
-                ],
-              ),
-            DataRow(
-              cells: [
-                const DataCell(Text('TOTAL',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('')),
-                const DataCell(Text('')),
-                DataCell(Text('S/ ${totalGasto.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('')),
-                const DataCell(Text('')),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Fecha')),
+                DataColumn(label: Text('Lote')),
+                DataColumn(label: Text('Nombre')),
+                DataColumn(label: Text('Monto'), numeric: true),
+                DataColumn(label: Text('Periodo')),
+                DataColumn(label: Text('Método')),
+              ],
+              rows: [
+                for (final r in pageItems)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(r.fecha)),
+                      DataCell(Text(_loteLabel(r))),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0E7FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          r.nombreCosto,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF4338CA),
+                          ),
+                        ),
+                      )),
+                      DataCell(Text('S/ ${r.montoTotal.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600))),
+                      DataCell(Text(r.periodoProrrateo.isEmpty
+                          ? '-'
+                          : r.periodoProrrateo)),
+                      DataCell(Text(r.metodoProrrateo.isEmpty
+                          ? '-'
+                          : r.metodoProrrateo)),
+                    ],
+                  ),
+                DataRow(
+                  cells: [
+                    const DataCell(Text('TOTAL',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
+                    DataCell(Text('S/ ${totalGasto.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (hasPagination) const SizedBox(height: 12),
+          if (hasPagination)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Mostrando ${startIndex + 1}-$endIndex de $totalRegistros',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _currentPage > 0
+                          ? () {
+                              setState(() {
+                                _currentPage--;
+                              });
+                            }
+                          : null,
+                    ),
+                    Text(
+                      '${_currentPage + 1} / $totalPages',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _currentPage < totalPages - 1
+                          ? () {
+                              setState(() {
+                                _currentPage++;
+                              });
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
-}
-
-class _RegistroGastoFijo {
-  final String fecha;
-  final String lote;
-  final String nombre;
-  final double monto;
-  final String periodo;
-  final String metodo;
-
-  const _RegistroGastoFijo({
-    required this.fecha,
-    required this.lote,
-    required this.nombre,
-    required this.monto,
-    required this.periodo,
-    required this.metodo,
-  });
 }
 
 class _GastoPorLote {

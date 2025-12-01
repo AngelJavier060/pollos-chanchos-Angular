@@ -62,7 +62,7 @@ export class InventarioComponent implements OnInit {
   invProductoSeleccionado: InventarioProductoFront | null = null;
 
   // Vista actual (por defecto en Productos)
-  vistaActual: 'productos' | 'analisis' | 'inventario-automatico' | 'entradas' | 'alertas' = 'productos';
+  vistaActual: 'productos' | 'analisis' | 'stock-real' | 'entradas' | 'alertas' = 'productos';
   // Modo Botiquín: mostrar solo productos marcados para botiquín
   botiquinOnly: boolean = false;
   // Estado UI Botiquín
@@ -103,8 +103,12 @@ export class InventarioComponent implements OnInit {
   // Entradas por producto (UI Entradas)
   selectedProductIdEntradas: number | null = null;
   productoEntradasBloqueado: boolean = false; // Bloquear selector cuando se viene desde "Reponer"
+  mostrarFormularioEntrada: boolean = false; // Controla visibilidad del formulario de entrada
   entradasProducto: InventarioEntrada[] = [];
+  todasLasEntradas: InventarioEntrada[] = []; // Todas las entradas para mostrar en listado principal
   movimientosProducto: MovimientoProductoResponse[] = [];
+  filtroProductoEntradas: string = ''; // Filtro para buscar por producto
+  filtroEstadoEntradas: 'vigentes' | 'finalizados' | 'todos' = 'vigentes'; // Filtro por estado
   // Expandibles por producto (vista Productos)
   private expandedEntradas: Set<number> = new Set<number>();
   private expandedMovimientos: Set<number> = new Set<number>();
@@ -629,7 +633,7 @@ export class InventarioComponent implements OnInit {
     this.loadProducts();
     this.loadRechargeRequestsFromStorage();
     if (!this.botiquinOnly) {
-      this.cargarInventarioAutomatico();
+      this.cargarStockReal();
       this.cargarInventarioPorProducto();
       this.cargarVencimientos();
       this.cargarDisminuciones();
@@ -649,7 +653,7 @@ export class InventarioComponent implements OnInit {
           this.cargarValidosParaProductos();
           this.loadRechargeRequestsFromStorage();
         } else {
-          this.cargarInventarioAutomatico();
+          this.cargarStockReal();
           this.cargarInventarioPorProducto();
           this.cargarVencimientos();
           this.cargarValidosParaProductos();
@@ -659,10 +663,10 @@ export class InventarioComponent implements OnInit {
       }
     });
 
-    // ✅ Leer la pestaña desde query params (?tab=productos|inventario-automatico|entradas|alertas|botiquin)
+    // ✅ Leer la pestaña desde query params (?tab=productos|stock-real|entradas|alertas|botiquin)
     this.route.queryParamMap.subscribe(params => {
       const tabParam = (params.get('tab') || '').trim();
-      const validTabs = ['productos', 'inventario-automatico', 'entradas', 'alertas', 'botiquin'];
+      const validTabs = ['productos', 'stock-real', 'entradas', 'alertas', 'botiquin'];
       const isBotiquin = tabParam === 'botiquin';
       const target = validTabs.includes(tabParam) ? (isBotiquin ? 'productos' : tabParam) : 'productos';
       this.botiquinOnly = isBotiquin;
@@ -685,9 +689,9 @@ export class InventarioComponent implements OnInit {
   private setupAutoRefresh(): void {
     // Actualizar cada 30 segundos en vistas relevantes
     setInterval(() => {
-      if (!this.botiquinOnly && (this.vistaActual === 'inventario-automatico' || this.vistaActual === 'productos')) {
-        console.log('🔄 Auto-refresh: Actualizando inventario automáticamente...');
-        this.cargarInventarioAutomatico();
+      if (!this.botiquinOnly && (this.vistaActual === 'stock-real' || this.vistaActual === 'productos')) {
+        console.log('🔄 Auto-refresh: Actualizando stock real automáticamente...');
+        this.cargarStockReal();
         this.cargarInventarioPorProducto();
         this.cargarVencimientos();
         this.cargarValidosParaProductos();
@@ -823,17 +827,19 @@ export class InventarioComponent implements OnInit {
   /**
    * Cambiar entre vistas
    */
-  cambiarVista(vista: 'productos' | 'analisis' | 'inventario-automatico' | 'entradas' | 'alertas'): void {
+  cambiarVista(vista: 'productos' | 'analisis' | 'stock-real' | 'entradas' | 'alertas'): void {
     this.vistaActual = vista;
     // Desbloquear selector de producto al cambiar de vista
     if (vista !== 'entradas') {
       this.productoEntradasBloqueado = false;
     }
     // La vista de análisis fue trasladada a 'Análisis Financiero'
-    if (vista === 'inventario-automatico') {
-      this.cargarInventarioAutomatico();
+    if (vista === 'stock-real') {
+      this.cargarStockReal();
       this.cargarInventarioPorProducto();
       this.cargarVencimientos();
+      this.cargarValidosParaProductos();
+      this.cargarDisminuciones();
     }
     if (vista === 'productos') {
       // Al entrar a Productos, refrescar productos e inventario real inmediatamente
@@ -846,14 +852,12 @@ export class InventarioComponent implements OnInit {
     if (vista === 'entradas') {
       // Preparar listas de productos si aún no
       if (!this.products || this.products.length === 0) this.loadProducts();
-      // Si ya hay un producto seleccionado, refrescar sus entradas
-      if (this.selectedProductIdEntradas) {
-        this.cargarEntradasPorProducto(this.selectedProductIdEntradas);
-      }
-      // Asegurar que 'Cantidad Real' esté actualizada para listas Activos/Histórico
+      // Ocultar formulario por defecto al entrar a la pestaña
+      this.mostrarFormularioEntrada = false;
+      // Cargar todas las entradas para el listado principal
+      this.cargarTodasLasEntradas();
+      // Asegurar que 'Cantidad Real' esté actualizada
       this.cargarValidosParaProductos();
-      // Cargar listado global de entradas (Activos/Histórico)
-      this.cargarEntradasGlobales();
     }
     if (vista === 'alertas') {
       this.cargarAlertasEntradas(this.diasAlertaPorVencer);
@@ -984,31 +988,17 @@ export class InventarioComponent implements OnInit {
   }
   
   /**
-   * Cargar inventario automático con control de stock
+   * Cargar Stock Real usando datos FEFO (fuente de verdad: entradas vigentes)
    */
-  cargarInventarioAutomatico(): void {
-    console.log('📦 Cargando inventario automático...');
+  cargarStockReal(): void {
+    console.log('📊 Cargando Stock Real (FEFO)...');
     
-    // Cargar inventarios disponibles
-    this.inventarioService.obtenerInventarios().subscribe({
-      next: (inventarios) => {
-        console.log('✅ Inventarios cargados:', inventarios);
-        this.inventarioAlimentos = inventarios;
-        this.recalcularResumenCantidadReal();
-        
-        // Si no hay inventarios, mostrar mensaje de ayuda
-        if (inventarios.length === 0) {
-          console.log('⚠️ No hay inventarios disponibles. Puede necesitar crear datos de ejemplo.');
-        }
-      },
-      error: (error) => {
-        console.error('❌ Error cargando inventarios:', error);
-        console.log('💡 Intente crear datos de ejemplo si la base de datos está vacía');
-        this.inventarioAlimentos = [];
-      }
-    });
+    // El stock real se calcula desde entradas vigentes (stockValidoMap)
+    // No usamos la tabla obsoleta inventario_alimento
+    this.cargarValidosParaProductos();
+    this.cargarDisminuciones();
     
-    // Cargar inventarios con stock bajo
+    // Cargar inventarios con stock bajo (para alertas)
     this.inventarioService.obtenerInventariosStockBajo().subscribe({
       next: (stockBajo) => {
         console.log('⚠️ Inventarios con stock bajo:', stockBajo);
@@ -1019,6 +1009,85 @@ export class InventarioComponent implements OnInit {
         this.inventariosStockBajo = [];
       }
     });
+    
+    // Recalcular alertas de productos
+    this.calcularAlertasProductos();
+  }
+
+  // Productos con stock agotado (cantidad real = 0)
+  productosAgotados: Product[] = [];
+  // Productos con stock crítico (< mínimo pero > 0)
+  productosCriticos: Product[] = [];
+  // Peticiones de reposición atendidas (historial)
+  peticionesAtendidas: Array<{ producto: string; cantidad: number; fecha: Date; usuario: string }> = [];
+
+  /**
+   * Calcular alertas de productos basado en stock FEFO real
+   */
+  calcularAlertasProductos(): void {
+    const agotados: Product[] = [];
+    const criticos: Product[] = [];
+    
+    for (const p of this.products || []) {
+      if (!p?.id) continue;
+      const stockReal = this.getCantidadRealProducto(p);
+      const stockMinimo = Number(p.level_min ?? 0);
+      
+      if (stockReal <= 0.001) {
+        agotados.push(p);
+      } else if (stockMinimo > 0 && stockReal <= stockMinimo) {
+        criticos.push(p);
+      }
+    }
+    
+    this.productosAgotados = agotados;
+    this.productosCriticos = criticos;
+    console.log(`📊 Alertas: ${agotados.length} agotados, ${criticos.length} críticos`);
+  }
+
+  /**
+   * Obtener el estado del stock de un producto
+   */
+  getEstadoStockProducto(product: Product): 'NORMAL' | 'BAJO' | 'AGOTADO' {
+    if (!product?.id) return 'NORMAL';
+    const stockReal = this.getCantidadRealProducto(product);
+    const stockMinimo = Number(product.level_min ?? 0);
+    
+    if (stockReal <= 0.001) return 'AGOTADO';
+    if (stockMinimo > 0 && stockReal <= stockMinimo) return 'BAJO';
+    return 'NORMAL';
+  }
+
+  /**
+   * Calcular porcentaje de stock disponible por producto
+   */
+  getPorcentajeStockProducto(product: Product): number {
+    if (!product?.id) return 0;
+    const stockReal = this.getCantidadRealProducto(product);
+    const stockOriginal = Number(product.quantity ?? 0);
+    if (stockOriginal <= 0) return stockReal > 0 ? 100 : 0;
+    return Math.min(100, Math.round((stockReal / stockOriginal) * 100));
+  }
+
+  /**
+   * Obtener cantidad sugerida para reponer (hasta alcanzar stock mínimo * 1.5)
+   */
+  getCantidadSugerida(product: Product): number {
+    if (!product?.id) return 0;
+    const stockReal = this.getCantidadRealProducto(product);
+    const stockMinimo = Number(product.level_min ?? 0);
+    if (stockMinimo <= 0) return 50; // Valor por defecto si no hay mínimo
+    const objetivo = stockMinimo * 1.5; // Objetivo: 150% del mínimo
+    const faltante = objetivo - stockReal;
+    return Math.max(0, Math.round(faltante * 100) / 100);
+  }
+
+  /**
+   * Obtener producto por ID (útil para templates)
+   */
+  getProductoById(productId: number | null): Product | null {
+    if (!productId) return null;
+    return this.products.find(p => p.id === productId) || null;
   }
 
   /**
@@ -1033,7 +1102,7 @@ export class InventarioComponent implements OnInit {
         alert('Datos de ejemplo creados exitosamente. Actualizando inventario...');
         
         // Recargar el inventario después de crear los datos
-        this.cargarInventarioAutomatico();
+        this.cargarStockReal();
       },
       error: (error) => {
         console.error('❌ Error creando datos de ejemplo:', error);
@@ -1672,6 +1741,151 @@ export class InventarioComponent implements OnInit {
     });
   }
 
+  /**
+   * Cargar todas las entradas para mostrar en listado principal
+   */
+  cargarTodasLasEntradas(): void {
+    this.entradasService.listarTodas().subscribe({
+      next: (lista) => {
+        this.todasLasEntradas = lista || [];
+        // Limpiar cache de últimas entradas para recalcular
+        this.ultimasEntradasCache.clear();
+        console.log('📦 Total entradas cargadas:', this.todasLasEntradas.length);
+      },
+      error: (err) => {
+        console.error('Error cargando todas las entradas', err);
+        this.todasLasEntradas = [];
+      }
+    });
+  }
+
+  /**
+   * Filtrar entradas por nombre de producto y estado
+   */
+  getEntradasFiltradas(): InventarioEntrada[] {
+    let resultado = this.todasLasEntradas;
+    
+    // Filtrar por estado (vigentes/finalizados)
+    if (this.filtroEstadoEntradas === 'vigentes') {
+      resultado = resultado.filter(e => this.esEntradaVigente(e));
+    } else if (this.filtroEstadoEntradas === 'finalizados') {
+      resultado = resultado.filter(e => !this.esEntradaVigente(e));
+    }
+    
+    // Filtrar por texto de búsqueda
+    if (this.filtroProductoEntradas && this.filtroProductoEntradas.trim() !== '') {
+      const filtro = this.filtroProductoEntradas.toLowerCase().trim();
+      resultado = resultado.filter(e => 
+        e.product?.name?.toLowerCase().includes(filtro) ||
+        e.codigoLote?.toLowerCase().includes(filtro)
+      );
+    }
+    
+    return resultado;
+  }
+
+  /**
+   * Verificar si una entrada está finalizada (sin stock o vencida)
+   */
+  esEntradaFinalizada(entrada: InventarioEntrada): boolean {
+    return !this.esEntradaVigente(entrada);
+  }
+
+  /**
+   * Obtener entradas pendientes de consumir para un producto (excluyendo la más reciente)
+   */
+  getEntradasPendientesDelProducto(productId: number): InventarioEntrada[] {
+    if (!this.todasLasEntradas) return [];
+    
+    // Obtener todas las entradas vigentes del producto
+    const entradasProducto = this.todasLasEntradas
+      .filter(e => e.product?.id === productId && this.esEntradaVigente(e))
+      .sort((a, b) => {
+        const fechaA = a.fechaIngreso ? new Date(a.fechaIngreso).getTime() : 0;
+        const fechaB = b.fechaIngreso ? new Date(b.fechaIngreso).getTime() : 0;
+        return fechaB - fechaA; // Más reciente primero
+      });
+    
+    // Retornar todas menos la más reciente (que sería la nueva entrada a crear)
+    // Si solo hay una, no hay pendientes
+    return entradasProducto;
+  }
+
+  /**
+   * Contar entradas vigentes
+   */
+  getConteoEntradasVigentes(): number {
+    return this.todasLasEntradas.filter(e => this.esEntradaVigente(e)).length;
+  }
+
+  /**
+   * Contar entradas finalizadas
+   */
+  getConteoEntradasFinalizadas(): number {
+    return this.todasLasEntradas.filter(e => !this.esEntradaVigente(e)).length;
+  }
+
+  /**
+   * Abrir formulario para nueva entrada
+   */
+  abrirFormularioNuevaEntrada(producto?: Product): void {
+    this.mostrarFormularioEntrada = true;
+    this.selectedProductIdEntradas = null;
+    this.productoEntradasBloqueado = false;
+    this.entradaForm.reset();
+    
+    if (producto) {
+      this.selectedProductIdEntradas = producto.id!;
+      this.productoEntradasBloqueado = true;
+      this.entradaForm.patchValue({ productId: producto.id });
+      this.cargarInventarioProductoSeleccionado(producto.id!);
+      this.cargarEntradasPorProducto(producto.id!);
+    }
+  }
+
+  /**
+   * Cerrar formulario de entrada
+   */
+  cerrarFormularioEntrada(): void {
+    this.mostrarFormularioEntrada = false;
+    this.selectedProductIdEntradas = null;
+    this.productoEntradasBloqueado = false;
+    this.entradaForm.reset();
+  }
+
+  /**
+   * Iniciar reposición desde el listado de entradas
+   */
+  reponerDesdeListado(entrada: InventarioEntrada): void {
+    if (entrada.product) {
+      this.abrirFormularioNuevaEntrada(entrada.product);
+    }
+  }
+
+  /**
+   * Verificar si una entrada está vencida
+   */
+  esVencida(entrada: InventarioEntrada): boolean {
+    if (!entrada.fechaVencimiento) return false;
+    const fechaVenc = new Date(entrada.fechaVencimiento);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return fechaVenc < hoy;
+  }
+
+  /**
+   * Verificar si una entrada está próxima a vencer (15 días)
+   */
+  esPorVencer(entrada: InventarioEntrada): boolean {
+    if (!entrada.fechaVencimiento) return false;
+    const fechaVenc = new Date(entrada.fechaVencimiento);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const limite = new Date(hoy);
+    limite.setDate(limite.getDate() + this.diasAlertaPorVencer);
+    return fechaVenc >= hoy && fechaVenc <= limite;
+  }
+
   private cargarMovimientosPorProducto(productId: number): void {
     this.invProductoService.listarMovimientos(productId).subscribe({
       next: (rows) => this.movimientosProducto = rows || [],
@@ -1753,6 +1967,27 @@ export class InventarioComponent implements OnInit {
       return;
     }
     const v = this.entradaForm.value;
+    
+    // VALIDACIÓN ESTRICTA: Verificar si hay entradas anteriores sin agotar
+    const productId = Number(v.productId);
+    const entradasPendientes = this.getEntradasPendientesDelProducto(productId);
+    
+    if (entradasPendientes.length > 0) {
+      const nombresEntradas = entradasPendientes.map(e => 
+        `Lote: ${e.codigoLote || 'Sin lote'} - Stock: ${(e.stockBaseRestante || 0).toFixed(2)} kg`
+      ).join('\n');
+      
+      const confirmar = confirm(
+        `⚠️ ATENCIÓN: Este producto tiene ${entradasPendientes.length} entrada(s) con stock pendiente de consumir:\n\n` +
+        `${nombresEntradas}\n\n` +
+        `Según FEFO, debe consumirse el stock anterior antes de agregar nueva recarga.\n\n` +
+        `¿Desea continuar de todas formas? (No recomendado)`
+      );
+      
+      if (!confirmar) {
+        return;
+      }
+    }
     const req: CrearEntradaRequest = {
       productId: v.productId,
       codigoLote: v.codigoLote || undefined,
@@ -1907,6 +2142,160 @@ export class InventarioComponent implements OnInit {
       localStorage.setItem('pc_recharge_requests', JSON.stringify(keep));
       this.loadRechargeRequestsFromStorage();
     } catch {}
+  }
+
+  // ===== Métodos para KPI de Costos en Entradas =====
+
+  /**
+   * Obtener productos que tienen inversión (costo inicial o entradas)
+   * Incluye todos los productos con price_unit > 0 o con entradas registradas
+   */
+  getProductosConEntradas(): Product[] {
+    const productosMap = new Map<number, Product>();
+    
+    // 1. Agregar productos que tienen entradas
+    if (this.todasLasEntradas && this.todasLasEntradas.length > 0) {
+      this.todasLasEntradas.forEach(entrada => {
+        if (entrada.product?.id && !productosMap.has(entrada.product.id)) {
+          productosMap.set(entrada.product.id, entrada.product as Product);
+        }
+      });
+    }
+    
+    // 2. Agregar productos que tienen costo inicial (price_unit * quantity > 0)
+    if (this.products && this.products.length > 0) {
+      this.products.forEach(producto => {
+        if (producto.id && !productosMap.has(producto.id)) {
+          const costoInicial = this.getCostoInicialProducto(producto);
+          if (costoInicial > 0) {
+            productosMap.set(producto.id, producto);
+          }
+        }
+      });
+    }
+    
+    return Array.from(productosMap.values());
+  }
+
+  /**
+   * Obtener el costo inicial del producto desde la tabla de productos.
+   * Regla requerida: usar SIEMPRE product.price_unit (sin multiplicar por quantity).
+   */
+  getCostoInicialProducto(producto: Product | any): number {
+    if (!producto) return 0;
+    return Number(producto?.price_unit || 0);
+  }
+
+  /**
+   * Calcular costo total invertido en un producto
+   * = Costo inicial (primera entrada o price_unit) + Suma de costos de recargas (todas las demás entradas)
+   */
+  getCostoTotalProducto(productId: number): number {
+    const producto = this.products.find(p => p.id === productId);
+    const costoInicial = producto ? this.getCostoInicialProducto(producto) : 0;
+    const costoEntradas = (this.todasLasEntradas || [])
+      .filter(e => e?.product?.id === productId)
+      .reduce((sum, e) => sum + this.getCostoEntrada(e), 0);
+    return costoInicial + costoEntradas;
+  }
+
+  /**
+   * Obtener el costo de una entrada individual
+   */
+  getCostoEntrada(entrada: InventarioEntrada): number {
+    const cantidad = Number((entrada as any)?.cantidadUnidades ?? 1);
+    const costoPorUnidadControl = Number((entrada as any)?.costoPorUnidadControl ?? 0);
+    if (costoPorUnidadControl > 0) {
+      return costoPorUnidadControl * cantidad;
+    }
+    // Fallback: costo unitario base por unidad base (ej: kg/ml) * total unidades base
+    const costoUnitarioBase = Number((entrada as any)?.costoUnitarioBase ?? 0);
+    const contenidoUnidad = Number((entrada as any)?.contenidoPorUnidad ?? (entrada as any)?.contenidoPorUnidadBase ?? 0);
+    if (costoUnitarioBase > 0 && contenidoUnidad > 0 && cantidad > 0) {
+      const totalUnidadesBase = cantidad * contenidoUnidad;
+      return costoUnitarioBase * totalUnidadesBase;
+    }
+    return 0;
+  }
+
+  /**
+   * Sumar costos de recargas (todas las entradas excepto la primera del producto)
+   */
+  private getCostoRecargasProducto(productId: number): number {
+    const entradas = (this.todasLasEntradas || [])
+      .filter(e => e?.product?.id === productId)
+      .sort((a, b) => {
+        const fa = a?.fechaIngreso ? new Date(a.fechaIngreso).getTime() : 0;
+        const fb = b?.fechaIngreso ? new Date(b.fechaIngreso).getTime() : 0;
+        return fa - fb; // más antigua primero
+      });
+    if (entradas.length <= 1) return 0;
+    // Excluir la primera (inicial)
+    return entradas.slice(1).reduce((sum, e) => sum + this.getCostoEntrada(e), 0);
+  }
+
+  /**
+   * Contar recargas por producto (entradas posteriores a la inicial)
+   */
+  getConteoEntradasProducto(productId: number): number {
+    return (this.todasLasEntradas || []).filter(e => e?.product?.id === productId).length;
+  }
+
+  /**
+   * Obtener total invertido en general (todos los productos)
+   * = Suma de costo inicial (primera entrada o price_unit) + Suma de recargas (entradas posteriores)
+   */
+  getTotalInvertidoGeneral(): number {
+    const productos = this.products || [];
+    const costoInicialTotal = productos.reduce((sum, p) => sum + this.getCostoInicialProducto(p), 0);
+    const costoEntradasTotal = (this.todasLasEntradas || []).reduce((sum, e) => sum + this.getCostoEntrada(e), 0);
+    return costoInicialTotal + costoEntradasTotal;
+  }
+
+  /**
+   * Cache para última entrada por producto
+   */
+  private ultimasEntradasCache = new Map<number, number>();
+
+  /**
+   * Verificar si una entrada es la última del producto (por fecha de ingreso)
+   */
+  esUltimaEntradaDelProducto(entrada: InventarioEntrada): boolean {
+    if (!entrada?.id || !entrada?.product?.id) return false;
+    
+    const productId = entrada.product.id;
+    
+    // Buscar en cache
+    if (this.ultimasEntradasCache.has(productId)) {
+      return this.ultimasEntradasCache.get(productId) === entrada.id;
+    }
+    
+    // Calcular y guardar en cache
+    const entradasDelProducto = (this.todasLasEntradas || [])
+      .filter(e => e.product?.id === productId && e.activo);
+    
+    if (entradasDelProducto.length === 0) return false;
+    
+    // Ordenar por fecha de ingreso descendente (más reciente primero)
+    entradasDelProducto.sort((a, b) => {
+      const fechaA = a.fechaIngreso ? new Date(a.fechaIngreso).getTime() : 0;
+      const fechaB = b.fechaIngreso ? new Date(b.fechaIngreso).getTime() : 0;
+      return fechaB - fechaA;
+    });
+    
+    const ultimaEntradaId = entradasDelProducto[0]?.id;
+    if (ultimaEntradaId) {
+      this.ultimasEntradasCache.set(productId, ultimaEntradaId);
+    }
+    
+    return ultimaEntradaId === entrada.id;
+  }
+
+  /**
+   * Limpiar cache de últimas entradas (llamar cuando se agregan/eliminan entradas)
+   */
+  limpiarCacheUltimasEntradas(): void {
+    this.ultimasEntradasCache.clear();
   }
   
 }

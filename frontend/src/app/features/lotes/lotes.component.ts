@@ -289,6 +289,20 @@ export class LotesComponent implements OnInit {
         this.lotes = data || [];
         this.lotesFiltrados = this.lotes; // ya vienen solo activos desde backend
         this.identificarTiposAnimales(); // Identificar tipos de animales disponibles
+        
+        // Debug: verificar estructura de datos
+        console.log('[LotesComponent] Lotes cargados:', this.lotes.length);
+        console.log('[LotesComponent] Métricas Pollos:', this.getMetricasPollos());
+        console.log('[LotesComponent] Métricas Chanchos:', this.getMetricasChanchos());
+        if (this.lotes.length > 0) {
+          console.log('[LotesComponent] Ejemplo de lote:', {
+            name: this.lotes[0].name,
+            quantity: this.lotes[0].quantity,
+            race: this.lotes[0].race,
+            animalName: this.lotes[0].race?.animal?.name
+          });
+        }
+        
         this.loading = false;
       },
       error: (error) => {
@@ -695,7 +709,32 @@ export class LotesComponent implements OnInit {
     });
   }
 
-  // Métodos auxiliares eliminados - ya están definidos arriba
+  // Métodos para calcular métricas por tipo de animal (Pollos y Chanchos)
+  getMetricasPollos(): { total: number; cantidad: number; inversion: number } {
+    const lotesPollos = this.lotes.filter(lote => {
+      const animalName = lote.race?.animal?.name?.toLowerCase() || '';
+      return animalName.includes('pollo') || animalName.includes('ave') || animalName.includes('gallina');
+    });
+    
+    return {
+      total: lotesPollos.length,
+      cantidad: lotesPollos.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0),
+      inversion: lotesPollos.reduce((sum, l) => sum + (Number(l.cost) || 0), 0)
+    };
+  }
+
+  getMetricasChanchos(): { total: number; cantidad: number; inversion: number } {
+    const lotesChanchos = this.lotes.filter(lote => {
+      const animalName = lote.race?.animal?.name?.toLowerCase() || '';
+      return animalName.includes('chancho') || animalName.includes('cerdo') || animalName.includes('porc');
+    });
+    
+    return {
+      total: lotesChanchos.length,
+      cantidad: lotesChanchos.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0),
+      inversion: lotesChanchos.reduce((sum, l) => sum + (Number(l.cost) || 0), 0)
+    };
+  }
 
   deleteLote(id: string): void {
     if (confirm('¿Está seguro de que desea eliminar este lote?')) {

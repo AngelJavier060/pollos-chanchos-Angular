@@ -9,11 +9,19 @@ import jakarta.validation.constraints.NotBlank;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginRequestDto {
-    @NotBlank(message = "El nombre de usuario es obligatorio")
+    // Campo principal: puede ser username o email
+    @NotBlank(message = "El usuario o email es obligatorio")
     private String username;
     
     @NotBlank(message = "La contraseña es obligatoria")
     private String password;
     
     private Boolean rememberMe;
+    
+    /**
+     * Determina si el campo username contiene un email
+     */
+    public boolean isEmail() {
+        return username != null && username.contains("@");
+    }
 }

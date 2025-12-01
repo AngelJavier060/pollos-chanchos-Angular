@@ -25,6 +25,9 @@ public interface InventarioEntradaProductoRepository extends JpaRepository<Inven
     Optional<java.math.BigDecimal> sumStockBaseRestante(@Param("productId") Long productId);
 
     // Global queries (todas las entradas)
+    @Query("SELECT e FROM InventarioEntradaProducto e LEFT JOIN FETCH e.product p WHERE (e.activo = true OR e.activo IS NULL) ORDER BY e.fechaIngreso DESC")
+    List<InventarioEntradaProducto> findAllActivas();
+
     @Query("SELECT e FROM InventarioEntradaProducto e WHERE (e.activo = true OR e.activo IS NULL) AND e.fechaVencimiento IS NOT NULL AND e.fechaVencimiento < :hoy")
     List<InventarioEntradaProducto> findVencidasGlobal(@Param("hoy") LocalDate hoy);
 

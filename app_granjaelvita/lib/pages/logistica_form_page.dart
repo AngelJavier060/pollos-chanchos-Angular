@@ -243,31 +243,26 @@ class _LogisticaFormPageState extends State<LogisticaFormPage> {
               ),
             ),
             const SizedBox(height: 18),
-            Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                TextFormField(
-                  controller: _unitCostController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _inputDecoration(
-                    'Costo unitario',
-                    hintText: 'Ejemplo: 1.50 por kg',
-                  ).copyWith(prefixIcon: null),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const Positioned(
-                  left: 18,
+            TextFormField(
+              controller: _unitCostController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: _inputDecoration(
+                'Costo unitario',
+                icon: const Padding(
+                  padding: EdgeInsets.only(left: 12),
                   child: Text(
                     'S/',
                     style: TextStyle(
-                      color: Color(0xFF6B7280),
+                      color: Color(0xFFEA580C),
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
                   ),
                 ),
-              ],
+                hintText: 'Ejemplo: 1.50 por kg',
+              ),
+              onChanged: (_) => setState(() {}),
             ),
           ],
         );
@@ -447,9 +442,29 @@ class _LogisticaFormPageState extends State<LogisticaFormPage> {
                 ),
               ],
             ),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Botón "Agregar lote" ARRIBA
+                ElevatedButton.icon(
+                  onPressed: _applyToAll ? null : _showLoteSelector,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Agregar lote'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Checkbox "Aplicar a todos" ABAJO
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Checkbox(
                       value: _applyToAll,
@@ -471,22 +486,6 @@ class _LogisticaFormPageState extends State<LogisticaFormPage> {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _applyToAll ? null : _showLoteSelector,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Agregar lote'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 6,
-                  ),
                 ),
               ],
             ),
@@ -779,6 +778,27 @@ class _LogisticaFormPageState extends State<LogisticaFormPage> {
     setState(() => _guardando = true);
 
     try {
+      // LÓGICA DE DIVISIÓN DE COSTOS:
+      // - Si "Aplicar a todos" está activo: el costo total se DIVIDE entre todos los lotes
+      // - Si se selecciona un lote específico: el costo completo va a ese lote
+      
+      final costoTotal = cantidad * costoUnit;
+      final numLotes = lotes.length;
+      
+      // Calcular el costo por lote según la lógica
+      final double costoUnitarioPorLote;
+      final double cantidadPorLote;
+      
+      if (_applyToAll && numLotes > 1) {
+        // Dividir el costo total entre todos los lotes
+        costoUnitarioPorLote = costoUnit / numLotes;
+        cantidadPorLote = cantidad / numLotes;
+      } else {
+        // Costo completo para el lote seleccionado
+        costoUnitarioPorLote = costoUnit;
+        cantidadPorLote = cantidad;
+      }
+
       // Guardar para cada lote seleccionado
       for (final lote in lotes) {
         await LogisticaServiceMobile.crear(
@@ -788,18 +808,28 @@ class _LogisticaFormPageState extends State<LogisticaFormPage> {
           tipoTransporte: _transportTypeController.text.trim(),
           concepto: _conceptController.text.trim(),
           unidad: _unitController.text.trim(),
-          cantidadTransportada: cantidad,
-          costoUnitario: costoUnit,
+          cantidadTransportada: cantidadPorLote,
+          costoUnitario: costoUnitarioPorLote,
           observaciones: _observationsController.text.trim(),
         );
       }
 
       if (!mounted) return;
 
+      // Mensaje informativo sobre la distribución
+      String mensaje;
+      if (_applyToAll && numLotes > 1) {
+        final costoPorLote = costoTotal / numLotes;
+        mensaje = 'Costo dividido: S/ ${costoPorLote.toStringAsFixed(2)} por cada uno de los ${lotes.length} lotes';
+      } else {
+        mensaje = 'Registro guardado para ${lotes.length} lote(s)';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Registro guardado para ${lotes.length} lote(s)'),
+          content: Text(mensaje),
           backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
         ),
       );
 

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../models/mano_obra_model.dart';
+import '../services/lote_service.dart';
+import '../services/mano_obra_service.dart';
+
 class ManoObraFormPage extends StatefulWidget {
   const ManoObraFormPage({super.key});
 
@@ -17,13 +21,19 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _observationsController = TextEditingController();
 
-  final List<String> _batches = [];
+  final List<LoteDto> _lotes = [];
+  final List<String> _selectedLoteIds = [];
   bool _applyToAll = false;
+
+  bool _saving = false;
+  String? _error;
+  String? _success;
 
   @override
   void initState() {
     super.initState();
     _initDefaultValues();
+    _cargarLotesActivos();
   }
 
   void _initDefaultValues() {
@@ -32,6 +42,20 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
     final m = now.month.toString().padLeft(2, '0');
     final d = now.day.toString().padLeft(2, '0');
     _dateController.text = '$y-$m-$d';
+  }
+
+  Future<void> _cargarLotesActivos() async {
+    try {
+      final srv = LoteServiceMobile();
+      final lotes = await srv.getActivos();
+      setState(() {
+        _lotes
+          ..clear()
+          ..addAll(lotes.where((l) => l.quantity > 0));
+      });
+    } catch (_) {
+      // Si falla, dejamos la lista vacía
+    }
   }
 
   @override
@@ -69,11 +93,12 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
   }
 
   double get _estimatedTotalCost {
-    final hours = double.tryParse(_hoursController.text.replaceAll(',', '.')) ?? 0;
     final monthly =
         double.tryParse(_monthlyCostController.text.replaceAll(',', '.')) ?? 0;
-    if (hours <= 0 || monthly <= 0) return 0;
-    return (hours / 160.0) * monthly;
+    if (monthly <= 0) return 0;
+    // El costo mensual es el valor real total que se va a repartir.
+    // El estimado muestra ese monto total.
+    return monthly;
   }
 
   @override
@@ -438,7 +463,7 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
                         activeColor: const Color(0xFF2563EB),
                       ),
                       const Text(
-                        'Aplicar a todos los lotes',
+                        'Aplicar a todos los lotes activos',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF4B5563),
@@ -447,28 +472,12 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _addBatch,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Agregar lote'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 6,
-                  ),
-                ),
               ],
             ),
           ],
         ),
         const SizedBox(height: 14),
-        if (_batches.isNotEmpty)
+        if (_selectedLoteIds.isNotEmpty)
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -478,9 +487,12 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
               mainAxisSpacing: 10,
               childAspectRatio: 3.5,
             ),
-            itemCount: _batches.length,
+            itemCount: _selectedLoteIds.length,
             itemBuilder: (context, index) {
-              final batch = _batches[index];
+              final loteId = _selectedLoteIds[index];
+              final lote =
+                  _lotes.firstWhere((l) => l.id == loteId, orElse: () => _lotes.first);
+              final batch = lote.name.isNotEmpty ? lote.name : lote.codigo;
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -526,15 +538,38 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Seleccione lote',
                   style: TextStyle(
                     color: Color(0xFF9CA3AF),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down, color: Color(0xFF9CA3AF)),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.keyboard_arrow_down,
+                      color: Color(0xFF9CA3AF)),
+                  onSelected: (id) {
+                    setState(() {
+                      if (!_selectedLoteIds.contains(id)) {
+                        _selectedLoteIds.add(id);
+                      }
+                    });
+                  },
+                  itemBuilder: (context) {
+                    return _lotes
+                        .map(
+                          (l) => PopupMenuItem<String>(
+                            value: l.id,
+                            child: Text(
+                              (l.name.isNotEmpty ? l.name : l.codigo) +
+                                  '  (${l.quantity} vivos)',
+                            ),
+                          ),
+                        )
+                        .toList();
+                  },
+                ),
               ],
             ),
           ),
@@ -572,7 +607,7 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ElevatedButton(
-          onPressed: _onGuardar,
+          onPressed: _saving ? null : _onGuardar,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2563EB),
             foregroundColor: Colors.white,
@@ -608,15 +643,12 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
   }
 
   void _addBatch() {
-    setState(() {
-      final index = _batches.length + 1;
-      _batches.add('Lote $index');
-    });
+    // Ya no se usa el agregado manual sin datos reales.
   }
 
   void _removeBatch(int index) {
     setState(() {
-      _batches.removeAt(index);
+      _selectedLoteIds.removeAt(index);
     });
   }
 
@@ -627,8 +659,10 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
     _hoursController.clear();
     _monthlyCostController.clear();
     _observationsController.clear();
-    _batches.clear();
+    _selectedLoteIds.clear();
     _applyToAll = false;
+    _error = null;
+    _success = null;
     _initDefaultValues();
     setState(() {});
   }
@@ -638,6 +672,71 @@ class _ManoObraFormPageState extends State<ManoObraFormPage> {
       return;
     }
 
-    Navigator.pop(context, true);
+    final horas =
+        double.tryParse(_hoursController.text.replaceAll(',', '.')) ?? 0;
+    final montoMensual =
+        double.tryParse(_monthlyCostController.text.replaceAll(',', '.')) ?? 0;
+
+    if (montoMensual <= 0) {
+      setState(() {
+        _error = 'Ingrese un monto mensual válido.';
+        _success = null;
+      });
+      return;
+    }
+
+    if (horas <= 0) {
+      setState(() {
+        _error = 'Ingrese las horas trabajadas para registrar el pago.';
+        _success = null;
+      });
+      return;
+    }
+
+    List<String> lotesSeleccionados;
+    if (_applyToAll) {
+      lotesSeleccionados = _lotes.map((l) => l.id).toList();
+    } else {
+      lotesSeleccionados = List<String>.from(_selectedLoteIds);
+    }
+
+    if (lotesSeleccionados.isEmpty) {
+      setState(() {
+        _error =
+            'Seleccione al menos un lote o active "Aplicar a todos los lotes activos".';
+        _success = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+      _success = null;
+    });
+
+    ManoObraServiceMobile.crearProrrateado(
+      nombreTrabajador: _workerController.text.trim(),
+      cargo: _positionController.text.trim(),
+      horasTrabajadas: horas,
+      montoMensual: montoMensual,
+      fecha: _dateController.text.trim(),
+      loteIds: lotesSeleccionados,
+      aplicarPorIgual: _applyToAll,
+      observaciones: _observationsController.text.trim(),
+    ).then((_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _success = 'Registro guardado correctamente.';
+      });
+      Navigator.pop(context, true);
+    }).catchError((e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString();
+      });
+    });
   }
 }

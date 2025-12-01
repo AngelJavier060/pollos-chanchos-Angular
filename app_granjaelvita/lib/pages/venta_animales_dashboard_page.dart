@@ -20,6 +20,13 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
   bool _cargando = true;
   String? _error;
   DateTimeRange? _rangoFiltro;
+  
+  // Filtro por tipo de animal: null = todos, 'pollo' = pollos, 'chancho' = chanchos
+  String? _filtroAnimal;
+  
+  // Paginación
+  static const int _registrosPorPagina = 10;
+  int _paginaActual = 1;
 
   @override
   void initState() {
@@ -96,6 +103,32 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
   double get _montoTotal => _totalPollos + _totalChanchos;
 
   int get _totalAnimales => _pollosVendidos + _chanchosVendidos;
+
+  // Ventas filtradas por tipo de animal seleccionado
+  List<VentaAnimalModel> get _ventasFiltradas {
+    if (_filtroAnimal == null) return _ventas;
+    if (_filtroAnimal == 'pollo') {
+      return _ventas.where((v) => _esPollo(v)).toList();
+    }
+    if (_filtroAnimal == 'chancho') {
+      return _ventas.where((v) => _esChancho(v)).toList();
+    }
+    return _ventas;
+  }
+
+  // Ventas para la sección de "Ventas Recientes" con paginación
+  List<VentaAnimalModel> get _ventasRecientesPaginadas {
+    final filtradas = _ventasFiltradas;
+    final inicio = (_paginaActual - 1) * _registrosPorPagina;
+    final fin = inicio + _registrosPorPagina;
+    if (inicio >= filtradas.length) return [];
+    return filtradas.sublist(inicio, fin.clamp(0, filtradas.length));
+  }
+
+  int get _totalPaginas {
+    final total = _ventasFiltradas.length;
+    return (total / _registrosPorPagina).ceil().clamp(1, 999);
+  }
 
   // Datos para gráfica de barras por fecha
   Map<String, Map<String, double>> get _ventasPorFecha {
@@ -872,7 +905,7 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
   }
 
   Widget _buildRecentSalesSection() {
-    final recentSales = _ventas.take(5).toList();
+    final recentSales = _ventasRecientesPaginadas;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -890,11 +923,12 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Título y contador
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
+              Row(
+                children: const [
                   Icon(Icons.history, color: Color(0xFF2563EB), size: 22),
                   SizedBox(width: 8),
                   Text(
@@ -914,13 +948,39 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${_ventas.length} registros',
+                  '${_ventasFiltradas.length} registros',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF1D4ED8),
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Filtros por tipo de animal - DEBAJO del título
+          Row(
+            children: [
+              _buildAnimalFilterButton(
+                emoji: '🐔',
+                label: 'Pollos',
+                value: 'pollo',
+                color: const Color(0xFF3B82F6),
+              ),
+              const SizedBox(width: 8),
+              _buildAnimalFilterButton(
+                emoji: '🐷',
+                label: 'Chanchos',
+                value: 'chancho',
+                color: const Color(0xFFEC4899),
+              ),
+              const SizedBox(width: 8),
+              _buildAnimalFilterButton(
+                emoji: '📋',
+                label: 'Todos',
+                value: null,
+                color: const Color(0xFF6B7280),
               ),
             ],
           ),
@@ -934,17 +994,120 @@ class _VentaAnimalesDashboardPageState extends State<VentaAnimalesDashboardPage>
                     Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
                     const SizedBox(height: 12),
                     Text(
-                      'No hay ventas registradas',
+                      _filtroAnimal != null 
+                          ? 'No hay ventas de ${_filtroAnimal == 'pollo' ? 'pollos' : 'chanchos'}'
+                          : 'No hay ventas registradas',
                       style: TextStyle(color: Colors.grey.shade500),
                     ),
                   ],
                 ),
               ),
             )
-          else
-            ...recentSales.map((v) => _buildSaleItem(v)),
+          else ...[
+            // Lista con scroll para máximo 10 elementos visibles
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 600), // ~10 items
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: recentSales.length,
+                itemBuilder: (context, index) => _buildSaleItem(recentSales[index]),
+              ),
+            ),
+            // Paginación
+            if (_totalPaginas > 1) ...[
+              const SizedBox(height: 16),
+              _buildPaginationControls(),
+            ],
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAnimalFilterButton({
+    required String emoji,
+    required String label,
+    required String? value,
+    required Color color,
+  }) {
+    final isSelected = _filtroAnimal == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _filtroAnimal = value;
+          _paginaActual = 1; // Reset página al cambiar filtro
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Botón anterior
+        IconButton(
+          onPressed: _paginaActual > 1
+              ? () => setState(() => _paginaActual--)
+              : null,
+          icon: Icon(
+            Icons.chevron_left,
+            color: _paginaActual > 1 ? const Color(0xFF2563EB) : Colors.grey.shade300,
+          ),
+        ),
+        // Indicador de página
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            'Página $_paginaActual de $_totalPaginas',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1D4ED8),
+            ),
+          ),
+        ),
+        // Botón siguiente
+        IconButton(
+          onPressed: _paginaActual < _totalPaginas
+              ? () => setState(() => _paginaActual++)
+              : null,
+          icon: Icon(
+            Icons.chevron_right,
+            color: _paginaActual < _totalPaginas ? const Color(0xFF2563EB) : Colors.grey.shade300,
+          ),
+        ),
+      ],
     );
   }
 

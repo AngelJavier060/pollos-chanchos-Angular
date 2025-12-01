@@ -15,7 +15,7 @@ class _VentaHuevoFormPageState extends State<VentaHuevoFormPage> {
   final _loteSrv = LoteServiceMobile();
 
   String _animal = 'Pollos';
-  String _batch = 'Lote002 - Lote002';
+  String _batch = ''; // Se establece al cargar los lotes
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _unitPriceController = TextEditingController();
@@ -99,9 +99,10 @@ class _VentaHuevoFormPageState extends State<VentaHuevoFormPage> {
     return q * p;
   }
 
-  String _formatLoteLabel(LoteDto l) => l.codigo.isNotEmpty
-      ? '${l.codigo} - ${l.name}'
-      : l.name;
+  /// Formato del lote: priorizar NAME sobre codigo
+  String _formatLoteLabel(LoteDto l) => l.name.isNotEmpty
+      ? l.name
+      : l.codigo;
 
   InputDecoration _inputDecoration(String label,
       {Widget? icon, String? hintText}) {
@@ -277,12 +278,13 @@ class _VentaHuevoFormPageState extends State<VentaHuevoFormPage> {
                     ),
                   )
                 : DropdownButtonFormField<String>(
-                    value: _batch,
+                    value: _batch.isNotEmpty ? _batch : null,
                     decoration: _inputDecoration(
                       'Lote activo',
                       icon: const Icon(Icons.inventory_2,
                           color: Color(0xFFEA580C)),
                     ),
+                    hint: const Text('Seleccione un lote'),
                     items: _lotes
                         .map(
                           (l) => DropdownMenuItem<String>(
@@ -295,24 +297,22 @@ class _VentaHuevoFormPageState extends State<VentaHuevoFormPage> {
                         )
                         .toList(),
                     onChanged: (value) {
+                      if (value == null) return;
                       setState(() {
-                        _batch = value ?? _batch;
+                        _batch = value;
                         _loteSel = _lotes.firstWhere(
                           (l) => _formatLoteLabel(l) == _batch,
-                          orElse: () => _loteSel ??
-                              (_lotes.isNotEmpty
-                                  ? _lotes.first
-                                  : LoteDto(
-                                      id: '',
-                                      codigo: '',
-                                      name: '',
-                                      quantity: 0,
-                                      animalName: '',
-                                      raceName: '',
-                                      birthdate: null,
-                                      quantityOriginal: 0,
-                                      cost: 0.0,
-                                    )),
+                          orElse: () => _lotes.isNotEmpty ? _lotes.first : LoteDto(
+                            id: '',
+                            codigo: '',
+                            name: '',
+                            quantity: 0,
+                            animalName: '',
+                            raceName: '',
+                            birthdate: null,
+                            quantityOriginal: 0,
+                            cost: 0.0,
+                          ),
                         );
                       });
                     },
@@ -558,11 +558,20 @@ class _VentaHuevoFormPageState extends State<VentaHuevoFormPage> {
   void _clearForm() {
     _formKey.currentState?.reset();
     _animal = 'Pollos';
-    _batch = 'Lote002 - Lote002';
     _tipoCantidad = 'cubetas';
     _cubetasController.text = '1';
     _quantityController.clear();
     _unitPriceController.text = '0';
+    
+    // Seleccionar el primer lote disponible para evitar error de dropdown
+    if (_lotes.isNotEmpty) {
+      _loteSel = _lotes.first;
+      _batch = _formatLoteLabel(_loteSel!);
+    } else {
+      _loteSel = null;
+      _batch = '';
+    }
+    
     _initDefaultValues();
     setState(() {});
   }

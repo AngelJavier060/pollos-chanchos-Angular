@@ -234,6 +234,11 @@ public class InventarioEntradaProductoService {
     }
 
     @Transactional(readOnly = true)
+    public List<InventarioEntradaProducto> listarTodasActivas() {
+        return entradasRepo.findAllActivas();
+    }
+
+    @Transactional(readOnly = true)
     public List<InventarioEntradaProducto> listarVencidasPorProducto(Long productId) {
         return entradasRepo.findVencidasPorProducto(productId, LocalDate.now());
     }

@@ -1,8 +1,10 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { User } from '../../shared/models/user.model';
+import { NotificacionesInventarioService, ResumenAlertas } from '../../shared/services/notificaciones-inventario.service';
+import { Subscription, interval } from 'rxjs';
 
 @Component({
   selector: 'app-admin',
@@ -11,7 +13,7 @@ import { User } from '../../shared/models/user.model';
   templateUrl: './admin.component.html',
   styleUrls: ['./admin.component.scss']
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
 
   adminName: string = '';
   displayName: string = 'Usuario'; // Propiedad estable para el nombre
@@ -20,10 +22,19 @@ export class AdminComponent implements OnInit {
   avatarUrl: string = 'assets/img/default-avatar.png';
   inventarioOpen: boolean = false;
 
+  // Notificaciones de inventario
+  totalAlertas: number = 0;
+  sonidoHabilitado: boolean = true;
+  mostrarToastAlertas: boolean = false;
+  mensajeToast: string = '';
+  private alertasSub: Subscription | null = null;
+  private refreshSub: Subscription | null = null;
+
   constructor(
     private authService: AuthService,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private notificacionesService: NotificacionesInventarioService
   ) { }
 
   ngOnInit(): void {
@@ -41,6 +52,46 @@ export class AdminComponent implements OnInit {
         this.cdr.detectChanges();
       });
     });
+
+    // Inicializar sistema de notificaciones
+    this.sonidoHabilitado = this.notificacionesService.isSonidoHabilitado();
+    this.cargarAlertas();
+    
+    // Suscribirse a cambios en las alertas
+    this.alertasSub = this.notificacionesService.resumenAlertas$.subscribe(resumen => {
+      const anteriorTotal = this.totalAlertas;
+      this.totalAlertas = resumen.total;
+      
+      // Mostrar toast si hay nuevas alertas al iniciar sesión
+      if (this.notificacionesService.debeMostrarToast() && resumen.total > 0) {
+        this.mensajeToast = this.notificacionesService.generarMensajeToast();
+        if (this.mensajeToast) {
+          this.mostrarToastAlertas = true;
+          this.notificacionesService.marcarToastMostrado();
+          if (this.sonidoHabilitado) {
+            this.notificacionesService.reproducirSonido();
+          }
+          // Auto-cerrar después de 10 segundos
+          setTimeout(() => this.cerrarToast(), 10000);
+        }
+      }
+      
+      this.cdr.detectChanges();
+    });
+
+    // Refrescar alertas cada 5 minutos
+    this.refreshSub = interval(300000).subscribe(() => {
+      this.cargarAlertas();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.alertasSub?.unsubscribe();
+    this.refreshSub?.unsubscribe();
+  }
+
+  private cargarAlertas(): void {
+    this.notificacionesService.cargarAlertas(15);
   }
 
   private updateAvatarUrl(): void {
@@ -93,5 +144,19 @@ export class AdminComponent implements OnInit {
 
   toggleInventario(): void {
     this.inventarioOpen = !this.inventarioOpen;
+  }
+
+  // Métodos de notificaciones
+  toggleSonido(): void {
+    this.sonidoHabilitado = this.notificacionesService.toggleSonido();
+  }
+
+  cerrarToast(): void {
+    this.mostrarToastAlertas = false;
+  }
+
+  verAlertas(): void {
+    this.cerrarToast();
+    this.navegarAInventario('alertas');
   }
 }

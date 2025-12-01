@@ -190,56 +190,81 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ],
                           ),
                           const SizedBox(height: 24),
-                          // Campo Usuario
-                          Container(
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: TextField(
-                              controller: _userCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Usuario',
-                                prefixIcon: Icon(Icons.person_outline, color: Color(0xFF2E7D32)),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          // Campo Usuario o Email
+                          TextField(
+                            controller: _userCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Usuario o Email',
+                              labelText: 'Usuario o Email',
+                              labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
+                              floatingLabelStyle: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
+                              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF2E7D32)),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
                               ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                             ),
                           ),
                           const SizedBox(height: 16),
                           // Campo Contraseña
-                          Container(
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: TextField(
-                              controller: _passCtrl,
-                              obscureText: obscurePassword,
-                              decoration: InputDecoration(
-                                labelText: 'Contraseña',
-                                prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF2E7D32)),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                    color: Colors.grey[600],
-                                  ),
-                                  onPressed: () {
-                                    setInnerState(() {
-                                      obscurePassword = !obscurePassword;
-                                    });
-                                  },
+                          TextField(
+                            controller: _passCtrl,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              hintText: 'Contraseña',
+                              labelText: 'Contraseña',
+                              labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
+                              floatingLabelStyle: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
+                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF2E7D32)),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  color: Colors.grey[600],
                                 ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                onPressed: () {
+                                  setInnerState(() {
+                                    obscurePassword = !obscurePassword;
+                                  });
+                                },
                               ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 6),
+                          // Nota sobre case-sensitivity
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Text(
+                              'Usuario y contraseña distinguen mayúsculas/minúsculas',
+                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           // Error message
                           if (errorMsg.isNotEmpty)
                             Container(

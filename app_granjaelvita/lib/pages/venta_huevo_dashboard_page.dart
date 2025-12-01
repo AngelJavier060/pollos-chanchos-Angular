@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/venta_huevo_model.dart';
 import '../services/ventas_service.dart';
+import '../services/lote_service.dart';
 import 'venta_huevo_form_page.dart';
 
 class VentaHuevoDashboardPage extends StatefulWidget {
@@ -14,9 +15,15 @@ class VentaHuevoDashboardPage extends StatefulWidget {
 
 class _VentaHuevoDashboardPageState extends State<VentaHuevoDashboardPage> {
   final List<VentaHuevoModel> _ventas = [];
+  final List<LoteDto> _lotes = [];
+  final _loteSrv = LoteServiceMobile();
   bool _cargando = true;
   String? _error;
   DateTimeRange? _rangoFechas;
+  
+  // Paginación para la tabla de ventas
+  int _paginaActualTabla = 1;
+  static const int _registrosPorPagina = 10;
   
   // Selector de mes/año
   int _mesSeleccionado = DateTime.now().month;
@@ -36,6 +43,52 @@ class _VentaHuevoDashboardPageState extends State<VentaHuevoDashboardPage> {
   void initState() {
     super.initState();
     _cargarVentas();
+    _cargarLotes();
+  }
+
+  Future<void> _cargarLotes() async {
+    try {
+      final list = await _loteSrv.getAll();
+      if (!mounted) return;
+      setState(() {
+        _lotes
+          ..clear()
+          ..addAll(list);
+      });
+    } catch (_) {
+      // Ignorar errores de carga de lotes
+    }
+  }
+
+  /// Formatea el nombre del lote para mostrar el nombre legible (columna name)
+  /// NO usar codigo, usar siempre name de la tabla lote
+  String _formatLoteName(String loteStr) {
+    if (loteStr.isEmpty) return 'Sin lote';
+    
+    // Buscar en la lista de lotes cargados
+    for (final lote in _lotes) {
+      // Comparar por ID o código
+      if (lote.id == loteStr || lote.codigo == loteStr) {
+        // PRIORIZAR: name sobre codigo
+        return lote.name.isNotEmpty ? lote.name : lote.codigo;
+      }
+    }
+    
+    // Si ya tiene formato de nombre (ej: "Lote01"), usarlo tal cual
+    if (loteStr.toLowerCase().startsWith('lote')) {
+      return loteStr;
+    }
+    
+    // Si el código parece ser un ID numérico largo, buscar en lotes
+    if (RegExp(r'^\d+$').hasMatch(loteStr)) {
+      for (final lote in _lotes) {
+        if (lote.codigo == loteStr) {
+          return lote.name.isNotEmpty ? lote.name : 'Lote $loteStr';
+        }
+      }
+    }
+    
+    return loteStr;
   }
 
   Future<void> _seleccionarRangoFechas() async {
@@ -1235,6 +1288,15 @@ class _VentaHuevoDashboardPageState extends State<VentaHuevoDashboardPage> {
   }
 
   Widget _buildTablaVentas(List<_VentaHuevo> ventas) {
+    // Calcular paginación
+    final totalPaginas = (ventas.length / _registrosPorPagina).ceil().clamp(1, 999);
+    if (_paginaActualTabla > totalPaginas) {
+      _paginaActualTabla = totalPaginas;
+    }
+    final inicio = (_paginaActualTabla - 1) * _registrosPorPagina;
+    final fin = (inicio + _registrosPorPagina).clamp(0, ventas.length);
+    final ventasPaginadas = ventas.sublist(inicio, fin);
+
     return _CardDashboard(
       titulo: 'Ventas guardadas',
       child: Column(
@@ -1274,20 +1336,18 @@ class _VentaHuevoDashboardPageState extends State<VentaHuevoDashboardPage> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('ID')),
-                DataColumn(label: Text('Fecha')),
                 DataColumn(label: Text('Lote')),
+                DataColumn(label: Text('Fecha')),
                 DataColumn(label: Text('Cantidad'), numeric: true),
                 DataColumn(label: Text('Precio Unit.'), numeric: true),
                 DataColumn(label: Text('Total'), numeric: true),
               ],
               rows: [
-                for (final v in ventas)
+                for (final v in ventasPaginadas)
                   DataRow(
                     cells: [
-                      DataCell(Text(v.id.toString())),
+                      DataCell(Text(_formatLoteName(v.lote))),
                       DataCell(Text(v.fecha)),
-                      DataCell(Text(v.lote)),
                       DataCell(Text(v.cantidad.toStringAsFixed(0))),
                       DataCell(Text('S/ ${v.precioUnit.toStringAsFixed(2)}')),
                       DataCell(Text('S/ ${v.total.toStringAsFixed(2)}',
@@ -1299,6 +1359,52 @@ class _VentaHuevoDashboardPageState extends State<VentaHuevoDashboardPage> {
               ],
             ),
           ),
+          // Controles de paginación
+          if (totalPaginas > 1) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: _paginaActualTabla > 1
+                      ? () => setState(() => _paginaActualTabla--)
+                      : null,
+                  icon: Icon(
+                    Icons.chevron_left,
+                    color: _paginaActualTabla > 1 
+                        ? const Color(0xFF2563EB) 
+                        : Colors.grey.shade300,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Página $_paginaActualTabla de $totalPaginas',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _paginaActualTabla < totalPaginas
+                      ? () => setState(() => _paginaActualTabla++)
+                      : null,
+                  icon: Icon(
+                    Icons.chevron_right,
+                    color: _paginaActualTabla < totalPaginas 
+                        ? const Color(0xFF2563EB) 
+                        : Colors.grey.shade300,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
