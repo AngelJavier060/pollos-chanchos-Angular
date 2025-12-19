@@ -1,35 +1,14 @@
-<div class="lotes-header mb-6">
-  <div class="flex items-center justify-between">
-    <div class="flex items-center space-x-4">
-      <div class="p-3 bg-blue-100 rounded-full">
-        <i class="fas fa-clipboard-list text-blue-600 text-2xl"></i>
-      </div>
-      <div>
-        <h1 class="text-3xl font-bold text-gray-800">Gestión de Lotes</h1>
-        <p class="text-gray-600 text-lg">Resumen completo de lotes de pollos registrados</p>
-      </div>
-    </div>
-    
-    <div class="flex items-center space-x-3">
-      <button 
-        (click)="exportarDatos()"
-        class="btn-professional bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-download mr-2"></i>
-        Exportar
-      </button>
-      <button 
-        (click)="cargarDatosIniciales()" 
-        class="btn-professional bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-sync mr-2"></i>
-        Actualizar
-      </button>
-    </div>
+<!-- Encabezado -->
+<div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+  <div>
+    <h1 style="margin: 0; font-size: 32px; font-weight: bold; color: #1f2937;">🐔 Gestión de Lotes</h1>
+    <p style="margin: 5px 0 0 0; color: #6b7280;">Control de consumo por lote</p>
   </div>
 </div>
 
 <!-- Indicador de carga -->
-<div *ngIf="loading" class="flex justify-center items-center py-12">
-  <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-400"></div>
+<div *ngIf="loading" style="text-align: center; padding: 40px;">
+  <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 2s linear infinite;"></div>
 </div>
 
 <ng-container *ngIf="!loading">
@@ -163,137 +142,113 @@
   </div>
 
   <!-- Lista de Lotes -->
-  <div class="space-y-4">
-    <div *ngIf="lotesFiltrados.length > 0" class="grid grid-cols-1 gap-6">
-      <div *ngFor="let lote of lotesFiltrados; trackBy: trackByLote" 
-           class="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+  <div style="margin-bottom: 20px;">
+    <!-- Lotes Expandibles -->
+    <div *ngFor="let lote of lotesFiltrados; trackBy: trackByLote" 
+         style="background: white; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;">
+      
+      <!-- Header clickeable -->
+      <div (click)="toggleExpand(lote)" 
+           style="background: #fef3c7; color: #92400e; padding: 20px; border-radius: 12px 12px 0 0; cursor: pointer;">
+        <h2 style="font-size: 24px; margin: 0;">{{ lote.codigo }} - {{ lote.name }}</h2>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">
+          {{ lote.quantity }} animales - Total: {{ getConsumoTotal(lote) | number:'1.2-2' }} kg
+        </p>
+      </div>
+
+      <!-- Contenido expandible -->
+      <div *ngIf="isExpanded(lote)" style="padding: 20px;">
+        <!-- KPIs principales -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <!-- Consumo Total -->
+          <div style="flex: 1; background: #fef3c7; padding: 20px; border-radius: 10px; border: 2px solid #fbbf24;">
+            <div style="font-size: 14px; margin-bottom: 5px;">Consumo Total</div>
+            <div style="font-size: 32px; font-weight: bold;">{{ getConsumoTotal(lote) | number:'1.2-2' }}</div>
+            <div style="font-size: 12px; margin-top: 5px;">kilogramos</div>
+          </div>
+
+          <!-- Animales -->
+          <div style="flex: 1; background: #dcfce7; padding: 20px; border-radius: 10px; border: 2px solid #86efac;">
+            <div style="font-size: 14px; margin-bottom: 5px;">Animales</div>
+            <div style="font-size: 32px; font-weight: bold;">{{ lote.quantity }}</div>
+            <div style="font-size: 12px; margin-top: 5px;">cabezas</div>
+          </div>
+
+          <!-- Promedio -->
+          <div style="flex: 1; background: #dbeafe; padding: 20px; border-radius: 10px; border: 2px solid #93c5fd;">
+            <div style="font-size: 14px; margin-bottom: 5px;">Promedio</div>
+            <div style="font-size: 32px; font-weight: bold;">{{ getPromedioPorAnimal(lote) | number:'1.2-2' }}</div>
+            <div style="font-size: 12px; margin-top: 5px;">kg/animal</div>
+          </div>
+
+          <!-- KPI por producto (primeros 3) -->
+          <ng-container *ngFor="let producto of getProductosDelLote(lote) | slice:0:3; let i = index">
+            <div [ngStyle]="getKPIStyle(producto.nombre, i)" 
+                 style="flex: 1; padding: 20px; border-radius: 10px;">
+              <div style="font-size: 14px; margin-bottom: 5px; font-weight: 600; opacity: .9;">{{ producto.nombre }}</div>
+              <div style="font-size: 32px; font-weight: bold;">{{ producto.cantidad | number:'1.2-2' }}</div>
+              <div style="font-size: 12px; margin-top: 5px;">kilogramos</div>
+              <div style="background: rgba(255,255,255,.5); height: 8px; border-radius: 10px; margin-top: 10px;">
+                <div [style.width.%]="getPorcentajeProducto(lote, producto)" 
+                     style="height: 8px; border-radius: 10px; background: rgba(16,185,129,.8);"></div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Tipos de Alimento (KPI por producto) -->
+        <h3 style="margin-top: 30px; margin-bottom: 15px;">Tipos de Alimento</h3>
+        <div *ngIf="getProductosDelLote(lote)?.length; else sinAlimentos" 
+             style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+          <div *ngFor="let producto of getProductosDelLote(lote); let i = index" 
+               [ngStyle]="getKPIStyle(producto.nombre, i)"
+               style="flex: 1 1 220px; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 14px; margin-bottom: 5px; font-weight: 600; opacity: .9;">
+              {{ producto.nombre | uppercase }}
+            </div>
+            <div style="font-size: 28px; font-weight: bold;">{{ producto.cantidad | number:'1.2-2' }} kg</div>
+            <div style="background: rgba(255,255,255,.5); height: 8px; border-radius: 10px; margin-top: 10px;">
+              <div [style.width.%]="getPorcentajeProducto(lote, producto)"
+                   style="height: 8px; border-radius: 10px; background: rgba(16,185,129,.8);"></div>
+            </div>
+            <div style="font-size: 12px; margin-top: 5px;">{{ getPorcentajeProducto(lote, producto) }}% del total</div>
+          </div>
+        </div>
         
-        <!-- Header del Lote -->
-        <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-          <div class="flex justify-between items-start">
-            <div class="flex-1">
-              <div class="flex items-center space-x-3 mb-3">
-                <h3 class="text-xl font-bold text-gray-800">{{ lote.codigo }}</h3>
-                <span class="text-lg text-gray-600">{{ lote.name }}</span>
-                <span [class]="getEstadoLote(lote).clase" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border">
-                  <i [class]="getEstadoLote(lote).icono" class="mr-2"></i>
-                  {{ getEstadoLote(lote).texto }}
-                </span>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
-                <div class="flex items-center space-x-2">
-                  <i class="fas fa-dna text-blue-600"></i>
-                  <div>
-                    <p class="text-gray-500">Raza</p>
-                    <p class="font-medium text-gray-800">{{ lote.race?.name || 'No asignada' }}</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center space-x-2">
-                  <i class="fas fa-calendar text-green-600"></i>
-                  <div>
-                    <p class="text-gray-500">Nacimiento</p>
-                    <p class="font-medium text-gray-800">{{ formatearFecha(lote.birthdate) }}</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center space-x-2">
-                  <i class="fas fa-clock text-yellow-600"></i>
-                  <div>
-                    <p class="text-gray-500">Días de vida</p>
-                    <p class="font-medium text-gray-800">{{ calcularDiasDeVida(lote.birthdate) }} días</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center space-x-2">
-                  <i class="fas fa-users text-purple-600"></i>
-                  <div>
-                    <p class="text-gray-500">Cantidad actual</p>
-                    <p class="font-medium text-gray-800">{{ lote.quantity }} pollos</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center space-x-2">
-                  <i class="fas fa-chart-bar text-red-600"></i>
-                  <div>
-                    <p class="text-gray-500">Rendimiento</p>
-                    <p class="font-medium text-gray-800">{{ simularRendimiento(lote) | number:'1.1-1' }}%</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="flex space-x-2">
-              <button 
-                (click)="verDetalleLote(lote)"
-                class="btn-professional bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
-                <i class="fas fa-eye mr-2"></i>
-                Ver Detalles
-              </button>
-            </div>
+        <ng-template #sinAlimentos>
+          <div style="background: #f9fafb; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e5e7eb; text-align: center; color: #666;">
+            No hay registros de alimentos para este lote
           </div>
+        </ng-template>
+
+        <!-- Historial -->
+        <h3 style="margin-top: 30px; margin-bottom: 15px;">Historial</h3>
+        <div *ngIf="getRegistrosDelLote(lote)?.length; else sinHistorial" style="background: #f9fafb; border-radius: 10px; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f9fafb;">
+                <th style="padding: 12px; text-align: left; font-size: 12px;">FECHA</th>
+                <th style="padding: 12px; text-align: left; font-size: 12px;">TIPO</th>
+                <th style="padding: 12px; text-align: left; font-size: 12px;">CANTIDAD</th>
+                <th style="padding: 12px; text-align: left; font-size: 12px;">RESPONSABLE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let registro of getRegistrosDelLote(lote) | slice:0:5">
+                <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.fecha | date:'yyyy-MM-dd HH:mm' }}</td>
+                <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ getNombreProductoRegistro(registro) }}</td>
+                <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.cantidad | number:'1.2-2' }} kg</td>
+                <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.usuarioNombre || 'Sistema' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-
-        <!-- Contenido del Lote -->
-        <div class="p-6">
-          <!-- Barra de Progreso -->
-          <div class="mb-4">
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm font-medium text-gray-700">Progreso del ciclo productivo</span>
-              <span class="text-sm text-gray-600">{{ calcularProgreso(calcularDiasDeVida(lote.birthdate)) }}%</span>
-            </div>
-            <div [class]="getColorProgreso(calcularDiasDeVida(lote.birthdate)).fondo" class="w-full rounded-full h-3">
-              <div 
-                [class]="getColorProgreso(calcularDiasDeVida(lote.birthdate)).barra"
-                class="h-3 rounded-full transition-all duration-500"
-                [style.width.%]="calcularProgreso(calcularDiasDeVida(lote.birthdate))">
-              </div>
-            </div>
+        
+        <ng-template #sinHistorial>
+          <div style="background: #f9fafb; padding: 15px; border-radius: 10px; border: 1px solid #e5e7eb; text-align: center; color: #666;">
+            No hay registros de historial para este lote
           </div>
-
-          <!-- Información adicional -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Información del Proveedor -->
-            <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <h4 class="font-semibold text-blue-800 mb-2 flex items-center">
-                <i class="fas fa-truck mr-2"></i>
-                Proveedor
-              </h4>
-              <div class="text-sm space-y-1">
-                <p><span class="text-gray-600">Nombre:</span> {{ lote.provider?.name || 'No asignado' }}</p>
-                <p><span class="text-gray-600">Teléfono:</span> {{ lote.provider?.phone || 'No registrado' }}</p>
-                <p><span class="text-gray-600">Email:</span> {{ lote.provider?.email || 'No registrado' }}</p>
-              </div>
-            </div>
-
-            <!-- Información de la Raza -->
-            <div class="bg-green-50 rounded-lg p-4 border border-green-100">
-              <h4 class="font-semibold text-green-800 mb-2 flex items-center">
-                <i class="fas fa-dna mr-2"></i>
-                Características
-              </h4>
-              <div class="text-sm space-y-1">
-                <p><span class="text-gray-600">Raza:</span> {{ lote.race?.name || 'No definida' }}</p>
-                <p><span class="text-gray-600">Animal:</span> {{ lote.race?.animal?.name || 'No definido' }}</p>
-                <p><span class="text-gray-600">Categoría:</span> {{ lote.race?.category?.name || 'No definida' }}</p>
-              </div>
-            </div>
-
-            <!-- Métricas del Lote -->
-            <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
-              <h4 class="font-semibold text-yellow-800 mb-2 flex items-center">
-                <i class="fas fa-chart-pie mr-2"></i>
-                Métricas
-              </h4>
-              <div class="text-sm space-y-1">
-                <p><span class="text-gray-600">Densidad:</span> {{ lote.quantity }} unidades</p>
-                <p><span class="text-gray-600">Ciclo:</span> {{ calcularDiasDeVida(lote.birthdate) }}/60 días</p>
-                <p><span class="text-gray-600">Estado:</span> {{ getEstadoLote(lote).texto }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        </ng-template>
       </div>
     </div>
 
@@ -324,4 +279,4 @@
       </div>
     </div>
   </div>
-</ng-container> 
+</ng-container>

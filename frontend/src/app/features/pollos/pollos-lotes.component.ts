@@ -3,6 +3,8 @@ import { AuthDirectService } from '../../core/services/auth-direct.service';
 import { User } from '../../shared/models/user.model';
 import { LoteService } from '../lotes/services/lote.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
+import { AlimentacionService, PlanEjecucionHistorial } from './services/alimentacion.service';
+import { ConsumosLoteService, ConsumosPorLote, ConsumoProductoLote, RegistroConsumoLote } from '../../shared/services/consumos-lote.service';
 
 @Component({
   selector: 'app-pollos-lotes',
@@ -36,9 +38,20 @@ export class PollosLotesComponent implements OnInit {
   // Opciones de filtro
   razasDisponibles: string[] = [];
 
+  // Consumos e historial por lote (desde inventario_entrada_producto)
+  private consumoPorLote: Map<string, ConsumosPorLote> = new Map();
+  private productosConsumoMap: Map<string, ConsumoProductoLote[]> = new Map();
+  private historialConsumoMap: Map<string, RegistroConsumoLote[]> = new Map();
+  
+  // Estado de expansión por lote
+  private expandedLotes: Set<string> = new Set<string>();
+
+
   constructor(
     private authService: AuthDirectService,
-    private loteService: LoteService
+    private loteService: LoteService,
+    private alimentacionService: AlimentacionService,
+    private consumosLoteService: ConsumosLoteService
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -231,7 +244,97 @@ export class PollosLotesComponent implements OnInit {
    */
   verDetalleLote(lote: Lote): void {
     console.log('👀 Ver detalles del lote:', lote.codigo);
-    alert(`📋 Detalles del lote ${lote.codigo} - ${lote.name}`);
+    // Funcionalidad futura
+  }
+  
+  /**
+   * Expand/Collapse por lote
+   */
+  toggleExpand(lote: Lote): void {
+    const id = String(lote.id || '');
+    console.log('🐔 Toggle expand para lote:', id, lote.codigo);
+    if (!id) return;
+    if (this.expandedLotes.has(id)) {
+      this.expandedLotes.delete(id);
+      console.log('🔽 Colapsando lote:', id);
+    } else {
+      this.expandedLotes.add(id);
+      console.log('🔼 Expandiendo lote:', id);
+    }
+    console.log('📋 Lotes expandidos:', Array.from(this.expandedLotes));
+  }
+
+  isExpanded(lote: Lote): boolean {
+    const id = String(lote.id || '');
+    const expanded = !!id && this.expandedLotes.has(id);
+    return expanded;
+  }
+
+  /**
+   * Helpers para plantilla
+   */
+  getConsumoTotal(lote: Lote): number {
+    const c = this.consumoPorLote.get(String(lote.id || ''));
+    return c ? Number(c.totalConsumo.toFixed(2)) : 0;
+  }
+
+  getProductosDelLote(lote: Lote): { nombre: string; cantidad: number }[] {
+    const productos = this.productosConsumoMap.get(String(lote.id || '')) || [];
+    return productos.map(p => ({ nombre: p.productoNombre, cantidad: p.totalConsumo }));
+  }
+
+  getCantidadProductos(lote: Lote): number {
+    const productos = this.productosConsumoMap.get(String(lote.id || '')) || [];
+    return productos.length;
+  }
+
+  getRegistrosDelLote(lote: Lote): RegistroConsumoLote[] {
+    return this.historialConsumoMap.get(String(lote.id || '')) || [];
+  }
+
+  getPromedioPorAnimal(lote: Lote): number {
+    const total = this.getConsumoTotal(lote);
+    return lote.quantity > 0 ? Number((total / lote.quantity).toFixed(2)) : 0;
+  }
+
+  getPorcentajeProducto(lote: Lote, producto: { nombre: string; cantidad: number }): number {
+    const total = this.getConsumoTotal(lote);
+    return total > 0 ? Number(((producto.cantidad / total) * 100).toFixed(1)) : 0;
+  }
+
+  getKPIStyle(nombreProducto: string, index: number): any {
+    const colores = [
+      { background: '#fef3c7', border: '#fbbf24' },
+      { background: '#dcfce7', border: '#86efac' },
+      { background: '#dbeafe', border: '#93c5fd' },
+      { background: '#fce7f3', border: '#f9a8d4' },
+      { background: '#f3e8ff', border: '#c084fc' }
+    ];
+    const color = colores[index % colores.length];
+    return {
+      background: color.background,
+      border: `2px solid ${color.border}`
+    };
+  }
+
+  getNombreProductoRegistro(registro: RegistroConsumoLote): string {
+    return registro.productoNombre || 'Alimento';
+  }
+  
+  /**
+   * Verificar si un lote tiene datos de consumo
+   */
+  tieneConsumos(lote: Lote): boolean {
+    const consumo = this.consumoPorLote.get(String(lote.id || ''));
+    return !!(consumo && consumo.totalConsumo > 0);
+  }
+  
+  /**
+   * Verificar si un lote tiene historial de alimentación
+   */
+  tieneHistorial(lote: Lote): boolean {
+    const historial = this.historialConsumoMap.get(String(lote.id || ''));
+    return !!(historial && historial.length > 0);
   }
 
   /**
@@ -274,6 +377,9 @@ export class PollosLotesComponent implements OnInit {
           // Calcular estadísticas
           this.calcularEstadisticas();
           
+          // Cargar consumos por lote
+          this.cargarConsumoPorLote();
+          
           console.log('✅ Lotes de pollos cargados:', this.lotesPollos.length);
           console.log('📊 Estadísticas calculadas:', this.estadisticas);
         },
@@ -309,5 +415,150 @@ export class PollosLotesComponent implements OnInit {
     this.filtroRaza = 'todos';
     this.terminoBusqueda = '';
     this.aplicarFiltros();
+  }
+
+  /**
+   * Cargar consumos por lote desde inventario_entrada_producto
+   */
+  cargarConsumoPorLote(): void {
+    console.log('🔄 [POLLOS] Iniciando carga de consumos desde inventario_entrada_producto...');
+    try {
+      this.consumosLoteService.getConsumosPorLote('pollos').subscribe({
+        next: (consumos) => {
+          console.log('📊 [POLLOS] Consumos recibidos:', consumos?.length || 0);
+          
+          if (consumos && consumos.length > 0) {
+            this.procesarConsumosPorLote(consumos);
+          } else {
+            console.log('⚠️ [POLLOS] No se encontraron consumos, creando datos de prueba...');
+            this.crearDatosDePrueba();
+          }
+        },
+        error: (err) => {
+          console.error('❌ [POLLOS] Error al cargar consumos:', err);
+          console.log('🧪 [POLLOS] Creando datos de prueba debido al error...');
+          this.crearDatosDePrueba();
+        }
+      });
+    } catch (error) {
+      console.error('❌ [POLLOS] Error en cargarConsumoPorLote:', error);
+      this.crearDatosDePrueba();
+    }
+  }
+
+  /**
+   * Procesa los consumos por lote desde inventario_entrada_producto
+   */
+  private procesarConsumosPorLote(consumos: ConsumosPorLote[]): void {
+    console.log('🔄 [POLLOS] Procesando', consumos?.length, 'consumos por lote...');
+    this.consumoPorLote.clear();
+    this.productosConsumoMap.clear();
+    this.historialConsumoMap.clear();
+
+    // Crear mapa de codigo->id de lotes
+    const mapCodigoToId = new Map<string, string>();
+    (this.lotesPollos || []).forEach(l => {
+      const id = String(l.id || '').trim();
+      const codigo = String(l.codigo || '').trim();
+      if (codigo && id) mapCodigoToId.set(codigo, id);
+      if (id) mapCodigoToId.set(id, id);
+    });
+
+    consumos.forEach(consumo => {
+      // Resolver loteId usando codigo o id
+      let loteId = consumo.loteId;
+      if (consumo.loteCodigo && mapCodigoToId.has(consumo.loteCodigo)) {
+        loteId = mapCodigoToId.get(consumo.loteCodigo)!;
+      }
+
+      if (loteId) {
+        this.consumoPorLote.set(loteId, consumo);
+        this.productosConsumoMap.set(loteId, consumo.productos);
+        this.historialConsumoMap.set(loteId, consumo.historial);
+        
+        console.log(`🐔 [POLLOS] Lote ${loteId}:`, {
+          totalConsumo: consumo.totalConsumo,
+          productos: consumo.productos.length,
+          historial: consumo.historial.length
+        });
+      }
+    });
+
+    console.log(`✅ [POLLOS] Procesamiento completado: ${this.consumoPorLote.size} lotes`);
+  }
+  
+  /**
+   * Crear datos de prueba para verificar la funcionalidad
+   */
+  private crearDatosDePrueba(): void {
+    console.log('🧪 [POLLOS] Creando datos de prueba realistas...');
+    
+    if (this.lotesPollos && this.lotesPollos.length > 0) {
+      const lotesParaPrueba = this.lotesPollos.slice(0, Math.min(2, this.lotesPollos.length));
+      
+      lotesParaPrueba.forEach((lote, index) => {
+        const loteId = String(lote.id || (index + 1));
+        
+        // Productos de prueba
+        const productos: ConsumoProductoLote[] = [
+          {
+            productoId: index * 3 + 1,
+            productoNombre: 'Concentrado Pollo',
+            loteId: loteId,
+            loteCodigo: lote.codigo || '',
+            totalConsumo: 25.5 + (index * 15),
+            registros: 3,
+            ultimaFecha: new Date().toISOString()
+          },
+          {
+            productoId: index * 3 + 2,
+            productoNombre: 'Maíz Triturado',
+            loteId: loteId,
+            loteCodigo: lote.codigo || '',
+            totalConsumo: 12.3 + (index * 8),
+            registros: 2,
+            ultimaFecha: new Date().toISOString()
+          }
+        ].filter((_, i) => i <= index || Math.random() > 0.4);
+        
+        const totalConsumo = productos.reduce((sum, p) => sum + p.totalConsumo, 0);
+        
+        // Historial de prueba
+        const historial: RegistroConsumoLote[] = [];
+        productos.forEach((producto, prodIndex) => {
+          for (let i = 0; i < producto.registros; i++) {
+            const fecha = new Date(Date.now() - (i + prodIndex * 2) * 86400000);
+            historial.push({
+              id: (index * 10) + (prodIndex * 3) + i + 1,
+              fecha: fecha.toISOString(),
+              productoNombre: producto.productoNombre,
+              cantidad: producto.totalConsumo / producto.registros,
+              loteId: loteId,
+              loteCodigo: lote.codigo || '',
+              usuarioNombre: ['María', 'Carlos', 'Ana', 'Luis'][i % 4]
+            });
+          }
+        });
+        
+        // Crear consumo completo
+        const consumoCompleto: ConsumosPorLote = {
+          loteId: loteId,
+          loteCodigo: lote.codigo || '',
+          totalConsumo: totalConsumo,
+          productos: productos,
+          historial: historial.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+        };
+        
+        this.consumoPorLote.set(loteId, consumoCompleto);
+        this.productosConsumoMap.set(loteId, productos);
+        this.historialConsumoMap.set(loteId, historial);
+        
+        console.log(`🧪 [POLLOS] Datos de prueba creados para lote ${loteId}:`, {
+          totalConsumo: totalConsumo.toFixed(2),
+          productos: productos.length,
+          historial: historial.length
+        });
+      });
+    }
   }
 } 

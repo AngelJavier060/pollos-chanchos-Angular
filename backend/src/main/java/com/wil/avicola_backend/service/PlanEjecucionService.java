@@ -28,7 +28,9 @@ import com.wil.avicola_backend.repository.PlanDetalleRepository;
 import com.wil.avicola_backend.repository.PlanEjecucionRepository;
 import com.wil.avicola_backend.repository.UsuarioRepository;
 import com.wil.avicola_backend.repository.TypeFoodRepository;
+import com.wil.avicola_backend.repository.LoteRepository;
 import com.wil.avicola_backend.model.TypeFood;
+import com.wil.avicola_backend.model.Lote;
 
 @Service
 @Transactional
@@ -50,6 +52,9 @@ public class PlanEjecucionService {
     
     @Autowired
     private TypeFoodRepository typeFoodRepository;
+    
+    @Autowired
+    private LoteRepository loteRepository;
     
     @Autowired
     private InventarioAlimentoService inventarioAlimentoService;
@@ -541,10 +546,20 @@ public class PlanEjecucionService {
             // ✅ Resolver usuario ejecutor existente
             Usuario usuario = resolverUsuarioEjecutor(userId);
             
-            // Construir observaciones más informativas
+            // ✅ Obtener el nombre del lote desde la base de datos
+            String loteNombre = loteId;
+            String loteCodigo = "";
+            java.util.Optional<Lote> loteOpt = loteRepository.findById(loteId);
+            if (loteOpt.isPresent()) {
+                Lote lote = loteOpt.get();
+                loteNombre = lote.getName() != null ? lote.getName() : loteId;
+                loteCodigo = lote.getCodigo() != null ? lote.getCodigo() : "";
+            }
+            
+            // Construir observaciones más informativas con nombre del lote
             String observacionesCompletasBase = String.format(
-                "REGISTRO MANUAL SIN ASIGNACIÓN - Lote: %s | Fecha: %s | Cantidad: %.2f kg | Observaciones: %s",
-                loteId, fecha, cantidad, (observaciones != null ? observaciones : "Sin observaciones")
+                "Lote: %s (%s) | Fecha: %s | Cantidad: %.2f kg | Observaciones: %s",
+                loteNombre, loteCodigo, fecha, cantidad, (observaciones != null ? observaciones : "Sin observaciones")
             );
             StringBuilder obsExtra = new StringBuilder();
             if (animalesVivos != null && animalesVivos > 0) {

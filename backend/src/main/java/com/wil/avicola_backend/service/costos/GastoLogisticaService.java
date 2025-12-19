@@ -1,7 +1,11 @@
 package com.wil.avicola_backend.service.costos;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,5 +75,55 @@ public class GastoLogisticaService {
     public void eliminar(String id) {
         if (!repo.existsById(id)) throw new RequestException("gasto_logistica no encontrado: id=" + id);
         repo.deleteById(id);
+    }
+
+    @Transactional
+    public int migrarDistribucion() {
+        List<GastoLogistica> all = repo.findAll();
+        if (all.isEmpty()) return 0;
+
+        Map<String, List<GastoLogistica>> grupos = all.stream().collect(Collectors.groupingBy(g -> {
+            String fecha = g.getFecha() != null ? g.getFecha().toString() : "";
+            String t = g.getTipoTransporte() != null ? g.getTipoTransporte() : "";
+            String c = g.getConcepto() != null ? g.getConcepto() : "";
+            String u = g.getUnidad() != null ? g.getUnidad() : "";
+            LocalDateTime cd = g.getCreate_date();
+            String minuto = cd != null ? cd.withSecond(0).withNano(0).toString() : "";
+            return fecha + "|" + t + "|" + c + "|" + u + "|" + minuto;
+        }));
+
+        int updated = 0;
+        for (List<GastoLogistica> grupo : grupos.values()) {
+            if (grupo.size() < 2) continue;
+
+            double avgCosto = grupo.stream().mapToDouble(g -> g.getCostoUnitario() != null ? g.getCostoUnitario() : 0d).average().orElse(0d);
+            double sumCant = grupo.stream().mapToDouble(g -> g.getCantidadTransportada() != null ? g.getCantidadTransportada() : 0d).sum();
+            boolean costosParecidos = grupo.stream().allMatch(g -> Math.abs((g.getCostoUnitario() != null ? g.getCostoUnitario() : 0d) - avgCosto) < 1e-6);
+            boolean sumCantidadCasiUno = Math.abs(sumCant - 1d) <= 0.15d;
+            if (!costosParecidos || !sumCantidadCasiUno) continue;
+
+            int n = grupo.size();
+            int totalViajeCents = (int) Math.round(avgCosto * n * 100.0);
+            int baseCents = totalViajeCents / n;
+            int resto = totalViajeCents - (baseCents * n);
+
+            grupo.sort(Comparator.comparing(GastoLogistica::getId));
+
+            for (int i = 0; i < n; i++) {
+                GastoLogistica g = grupo.get(i);
+                int centsAsignados = baseCents + (i < resto ? 1 : 0);
+                double nuevoCostoUnit = centsAsignados / 100.0;
+                // cantidad por lote = 1
+                if (g.getCantidadTransportada() == null || Math.abs(g.getCantidadTransportada() - 1d) > 1e-6
+                    || Math.abs((g.getCostoUnitario() != null ? g.getCostoUnitario() : 0d) - nuevoCostoUnit) > 5e-4) {
+                    g.setCantidadTransportada(1d);
+                    g.setCostoUnitario(nuevoCostoUnit);
+                    // total se recalcula en preUpdate
+                    repo.save(g);
+                    updated++;
+                }
+            }
+        }
+        return updated;
     }
 }

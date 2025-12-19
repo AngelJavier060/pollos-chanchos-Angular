@@ -36,6 +36,13 @@ public class HistorialResponseDto {
     private String loteCodigo;
     private String loteDescripcion;
     
+    // Información del producto consumido
+    private String productoNombre;
+    private Long productoId;
+    
+    // Especie del lote (para filtrado)
+    private String especie;
+    
     // Constructores
     public HistorialResponseDto() {}
     
@@ -175,5 +182,29 @@ public class HistorialResponseDto {
     
     public void setLoteDescripcion(String loteDescripcion) {
         this.loteDescripcion = loteDescripcion;
+    }
+    
+    public String getProductoNombre() {
+        return productoNombre;
+    }
+    
+    public void setProductoNombre(String productoNombre) {
+        this.productoNombre = productoNombre;
+    }
+    
+    public Long getProductoId() {
+        return productoId;
+    }
+    
+    public void setProductoId(Long productoId) {
+        this.productoId = productoId;
+    }
+    
+    public String getEspecie() {
+        return especie;
+    }
+    
+    public void setEspecie(String especie) {
+        this.especie = especie;
     }
 }

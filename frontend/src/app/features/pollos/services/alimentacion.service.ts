@@ -38,6 +38,9 @@ export interface PlanEjecucionHistorial {
   usuarioId?: string;
   loteCodigo?: string;
   loteDescripcion?: string;
+  // Campos de producto consumido
+  productoNombre?: string;
+  productoId?: number;
 }
 
 export interface EstadisticasLoteHistorial {
@@ -103,13 +106,21 @@ export class AlimentacionService {
 
   /**
    * Obtener historial de alimentación
+   * @param fechaInicio Fecha inicio del rango
+   * @param fechaFin Fecha fin del rango
+   * @param especie Opcional: 'pollos' o 'chanchos' para filtrar por especie
    */
-  getHistorialAlimentacion(fechaInicio: string, fechaFin: string): Observable<PlanEjecucionHistorial[]> {
+  getHistorialAlimentacion(fechaInicio: string, fechaFin: string, especie?: string): Observable<PlanEjecucionHistorial[]> {
     // ✅ USAR ENDPOINT DEBUG PÚBLICO QUE NO REQUIERE AUTENTICACIÓN
     const url = `${this.apiUrl}/debug/historial`;
-    const params = { fechaInicio, fechaFin };
+    const params: any = { fechaInicio, fechaFin };
     
-    console.log('📚 Obteniendo historial de alimentación desde endpoint público:', { fechaInicio, fechaFin });
+    // Agregar filtro de especie si se especifica
+    if (especie) {
+      params.especie = especie;
+    }
+    
+    console.log('📚 Obteniendo historial de alimentación:', { fechaInicio, fechaFin, especie: especie || 'TODAS' });
     console.log('🔗 URL:', url);
     
     return this.http.get<PlanEjecucionHistorial[]>(url, { params });
@@ -134,9 +145,12 @@ export class AlimentacionService {
 
   /**
    * Obtener historial con rango de fechas personalizado
+   * @param fechaInicio Fecha inicio del rango
+   * @param fechaFin Fecha fin del rango
+   * @param especie Opcional: 'pollos' o 'chanchos' para filtrar por especie
    */
-  getHistorialConRango(fechaInicio: string, fechaFin: string): Observable<PlanEjecucionHistorial[]> {
-    return this.getHistorialAlimentacion(fechaInicio, fechaFin);
+  getHistorialConRango(fechaInicio: string, fechaFin: string, especie?: string): Observable<PlanEjecucionHistorial[]> {
+    return this.getHistorialAlimentacion(fechaInicio, fechaFin, especie);
   }
 
   /**

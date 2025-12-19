@@ -5,11 +5,28 @@ import { Lote } from '../lotes/interfaces/lote.interface';
 import { LoteService } from '../lotes/services/lote.service';
 import { CostosFijosService } from './services/costos-fijos.service';
 import { forkJoin } from 'rxjs';
+import { DateEsPipe } from '../../shared/pipes/date-es.pipe';
+
+interface GrupoFijo {
+  fecha: string;
+  nombre: string;
+  periodo: string;
+  metodo: string;
+  totalGrupo: number;
+  detalles: {
+    id: string;
+    lote: string;
+    loteId: string;
+    animalTipo: string;
+    monto: number;
+    observaciones: string;
+  }[];
+}
 
 @Component({
   selector: 'app-costos-fijos',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DateEsPipe],
   template: `
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
@@ -37,7 +54,7 @@ import { forkJoin } from 'rxjs';
           </svg>
           <span class="text-xs font-semibold opacity-80">TOTAL</span>
         </div>
-        <p class="text-2xl font-bold mt-2">$ {{ totalGastos | number:'1.2-2' }}</p>
+        <p class="text-2xl font-bold mt-2">S/ {{ totalGastos | number:'1.2-2' }}</p>
         <p class="text-xs opacity-80">Gastos registrados</p>
       </div>
       <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl p-4 text-white shadow-lg">
@@ -57,7 +74,7 @@ import { forkJoin } from 'rxjs';
           </svg>
           <span class="text-xs font-semibold opacity-80">PROMEDIO</span>
         </div>
-        <p class="text-2xl font-bold mt-2">$ {{ promedioGasto | number:'1.2-2' }}</p>
+        <p class="text-2xl font-bold mt-2">S/ {{ promedioGasto | number:'1.2-2' }}</p>
         <p class="text-xs opacity-80">Por registro</p>
       </div>
       <div class="bg-gradient-to-br from-rose-500 to-rose-700 rounded-xl p-4 text-white shadow-lg">
@@ -83,10 +100,10 @@ import { forkJoin } from 'rxjs';
             <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
               <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full flex items-center justify-end pr-2"
                    [style.width.%]="totalGastos > 0 ? (g.total / totalGastos * 100) : 0">
-                <span class="text-xs text-white font-semibold" *ngIf="(g.total / totalGastos * 100) > 15">$ {{ g.total | number:'1.2-2' }}</span>
+                <span class="text-xs text-white font-semibold" *ngIf="(g.total / totalGastos * 100) > 15">S/ {{ g.total | number:'1.2-2' }}</span>
               </div>
             </div>
-            <span class="w-20 text-sm font-semibold text-indigo-700 text-right">$ {{ g.total | number:'1.2-2' }}</span>
+            <span class="w-20 text-sm font-semibold text-indigo-700 text-right">S/ {{ g.total | number:'1.2-2' }}</span>
           </div>
         </div>
       </div>
@@ -103,7 +120,7 @@ import { forkJoin } from 'rxjs';
                 <span class="text-xs text-white font-semibold" *ngIf="(t.total / totalGastos * 100) > 15">{{ (t.total / totalGastos * 100) | number:'1.0-0' }}%</span>
               </div>
             </div>
-            <span class="w-20 text-sm font-semibold text-gray-700 text-right">$ {{ t.total | number:'1.2-2' }}</span>
+            <span class="w-20 text-sm font-semibold text-gray-700 text-right">S/ {{ t.total | number:'1.2-2' }}</span>
           </div>
         </div>
       </div>
@@ -146,9 +163,8 @@ import { forkJoin } from 'rxjs';
               </div>
             </div>
             <div *ngIf="form.get('aplicarTodosLotes')?.value" class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 mb-2">
-              <strong>Distribución equitativa:</strong> El monto de <strong>$ {{ form.get('montoTotal')?.value | number:'1.2-2' }}</strong> 
-              se dividirá entre <strong>{{ lotes.length }}</strong> lote(s) activos = 
-              <strong>$ {{ (form.get('montoTotal')?.value / lotes.length) | number:'1.2-2' }}</strong> por lote.
+              <strong>Distribución equitativa:</strong> El monto de <strong>S/ {{ form.get('montoTotal')?.value | number:'1.2-2' }}</strong> 
+              se dividirá entre <strong>{{ lotes.length }}</strong> lote(s) activos.
             </div>
             <div class="space-y-2" *ngIf="!form.get('aplicarTodosLotes')?.value">
               <div class="flex items-center gap-2" *ngFor="let ctrl of lotesFormArray.controls; let i = index">
@@ -176,48 +192,93 @@ import { forkJoin } from 'rxjs';
       </form>
     </div>
 
-    <!-- Tabla de registros -->
-    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm" *ngIf="registros.length > 0">
-      <h3 class="text-lg font-semibold text-gray-800 mb-3">Registros</h3>
-      <div class="overflow-x-auto">
+    <!-- Tabla resumida de registros -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-800 mb-1">Historial de Costos Fijos</h3>
+      <p class="text-gray-500 text-sm mb-4">Resumen agrupado por concepto - Click en una fila para ver detalle por lotes</p>
+      <div class="overflow-x-auto" *ngIf="registrosAgrupados.length > 0; else emptyFijos">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
+              <th class="w-10"></th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Lote</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nombre</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Monto</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Periodo</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Método</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Monto Total</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr *ngFor="let r of registros">
-              <td class="px-4 py-3 text-sm">{{ r.fecha }}</td>
-              <td class="px-4 py-3 text-sm">{{ getLoteNombre(r.lote?.id || r.loteId) }}</td>
-              <td class="px-4 py-3 text-sm">{{ r.nombreCosto }}</td>
-              <td class="px-4 py-3 text-sm font-semibold text-indigo-700">$ {{ r.montoTotal | number:'1.2-2' }}</td>
-              <td class="px-4 py-3 text-sm">{{ r.periodoProrrateo || '—' }}</td>
-              <td class="px-4 py-3 text-sm">{{ r.metodoProrrateo || '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  <button (click)="editarRegistro(r)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button (click)="eliminarRegistro(r)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <ng-container *ngFor="let row of registrosAgrupados; let i = index">
+              <tr (click)="toggleRow(i)" class="hover:bg-gray-50 cursor-pointer" [class.bg-blue-50]="expandedRowIndex === i">
+                <td class="px-2 py-3">
+                  <svg *ngIf="expandedRowIndex !== i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <svg *ngIf="expandedRowIndex === i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700 font-medium">{{ row.fecha | dateEs }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">{{ row.nombre }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ row.periodo || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ row.metodo || '—' }}</td>
+                <td class="px-4 py-3 text-right"><span class="font-bold text-indigo-700">S/ {{ row.totalGrupo | number:'1.2-2' }}</span></td>
+              </tr>
+              <tr *ngIf="expandedRowIndex === i">
+                <td colspan="6" class="bg-gray-50 px-6 py-4">
+                  <div class="pl-6">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Detalle por Lotes ({{ row.detalles.length }})</h4>
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <table class="w-full">
+                        <thead class="bg-gray-100">
+                          <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lote</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Observaciones</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Monto</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                          <tr *ngFor="let d of row.detalles" class="hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                              <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">{{ d.lote }}</span>
+                              <span *ngIf="getEtiquetaAnimal(d.animalTipo) as etq" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs" [ngClass]="{ 'bg-green-50 text-green-700': esPollo(etq), 'bg-rose-50 text-rose-700': esChancho(etq), 'bg-gray-100 text-gray-600': !esPollo(etq) && !esChancho(etq) }">{{ etq }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600">{{ d.observaciones || '—' }}</td>
+                            <td class="px-4 py-3 text-right"><span class="font-semibold text-gray-800">S/ {{ d.monto | number:'1.2-2' }}</span></td>
+                            <td class="px-4 py-3 text-center">
+                              <div class="flex items-center justify-center gap-2">
+                                <button (click)="editarRegistroPorId(d.id, d.loteId); $event.stopPropagation()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                </button>
+                                <button (click)="eliminarRegistroPorId(d.id); $event.stopPropagation()" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                          <tr>
+                            <td class="px-4 py-3 text-sm font-bold text-gray-700" colspan="2">Total del grupo</td>
+                            <td class="px-4 py-3 text-right"><span class="text-lg font-bold text-indigo-700">S/ {{ row.totalGrupo | number:'1.2-2' }}</span></td>
+                            <td class="px-4 py-3"></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
           </tbody>
         </table>
       </div>
+      <ng-template #emptyFijos>
+        <div class="text-center py-12 text-gray-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <p>No hay registros</p>
+        </div>
+      </ng-template>
     </div>
   </div>
   `
@@ -232,6 +293,7 @@ export class CostosFijosComponent implements OnInit {
   mostrarFormulario = false;
   editandoId: string | null = null;
   editandoLoteId: string | null = null;
+  expandedRowIndex: number | null = null;
 
   // KPIs
   totalGastos = 0;
@@ -335,18 +397,13 @@ export class CostosFijosComponent implements OnInit {
         .filter((x: any) => x !== null && x !== undefined && x !== '');
     }
 
-    // Calcular monto por lote (distribución equitativa si se seleccionan todos)
-    const cantidadLotes = lotesSel.length > 0 ? lotesSel.length : 1;
-    const montoPorLote = aplicarTodos && cantidadLotes > 1 ? montoTotal / cantidadLotes : montoTotal;
-
     const basePayload = {
       nombreCosto: String(v.nombreCosto || '').trim(),
-      montoTotal: montoPorLote,
       periodoProrrateo: v.periodoProrrateo || '',
       metodoProrrateo: v.metodoProrrateo || '',
       fecha: v.fecha,
       observaciones: v.observaciones || ''
-    };
+    } as any;
 
     // Si estamos editando, actualizar solo ese registro
     if (this.editandoId) {
@@ -371,10 +428,22 @@ export class CostosFijosComponent implements OnInit {
       return;
     }
 
-    // Crear nuevos registros
-    const peticiones = (lotesSel && lotesSel.length > 0)
-      ? lotesSel.map(lid => this.service.crear({ ...basePayload, loteId: String(lid) }))
-      : [this.service.crear({ ...basePayload })];
+    // Crear nuevos registros con distribución exacta en centavos si aplica a todos
+    let peticiones;
+    if (aplicarTodos && lotesSel.length > 1) {
+      const totalCents = Math.round(montoTotal * 100);
+      const baseCents = Math.floor(totalCents / lotesSel.length);
+      const resto = totalCents - (baseCents * lotesSel.length);
+      peticiones = lotesSel.map((lid, idx) => {
+        const centsAsignados = baseCents + (idx < resto ? 1 : 0);
+        const montoAsignado = centsAsignados / 100;
+        return this.service.crear({ ...basePayload, montoTotal: montoAsignado, loteId: String(lid) });
+      });
+    } else if (lotesSel && lotesSel.length > 0) {
+      peticiones = lotesSel.map(lid => this.service.crear({ ...basePayload, montoTotal, loteId: String(lid) }));
+    } else {
+      peticiones = [this.service.crear({ ...basePayload, montoTotal })];
+    }
 
     forkJoin(peticiones).subscribe({
       next: () => {
@@ -432,6 +501,72 @@ export class CostosFijosComponent implements OnInit {
       nombre,
       total
     })).sort((a, b) => b.total - a.total);
+  }
+
+  // ====== Tabla resumida (agrupada) ======
+  get registrosAgrupados(): GrupoFijo[] {
+    const groups: { [key: string]: GrupoFijo } = {};
+    for (const item of (this.registros || [])) {
+      const fechaStr = this.normalizarFecha(item?.fecha);
+      const nombre = String(item?.nombreCosto || '').trim();
+      const periodo = String(item?.periodoProrrateo || '').trim();
+      const metodo = String(item?.metodoProrrateo || '').trim();
+      const key = `${fechaStr}|${nombre}|${periodo}|${metodo}`;
+      if (!groups[key]) {
+        groups[key] = { fecha: fechaStr, nombre, periodo, metodo, totalGrupo: 0, detalles: [] };
+      }
+      const total = Number(item?.montoTotal ?? 0);
+      const animalTipo = (item?.lote?.race?.animal?.name)
+        || (this.lotes.find(l => String(l.id) === String(item?.lote?.id || item?.loteId))?.race?.animal?.name)
+        || '';
+      groups[key].totalGrupo += total;
+      groups[key].detalles.push({
+        id: String(item?.id ?? ''),
+        lote: item?.lote?.name || item?.lote?.codigo || this.getLoteNombre(item?.lote?.id || item?.loteId),
+        loteId: String(item?.lote?.id || item?.loteId || ''),
+        animalTipo: String(animalTipo || ''),
+        monto: total,
+        observaciones: item?.observaciones || ''
+      });
+    }
+    return Object.values(groups).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  }
+
+  toggleRow(index: number): void {
+    this.expandedRowIndex = this.expandedRowIndex === index ? null : index;
+  }
+
+  private normalizarFecha(f: any): string {
+    try {
+      if (!f) return '';
+      if (f instanceof Date) return f.toISOString().split('T')[0];
+      const s = String(f);
+      if (s.includes('T')) return s.split('T')[0];
+      return s.replace(/[./]/g, '-').replace(/,/g, '-');
+    } catch {
+      return String(f || '');
+    }
+  }
+
+  getEtiquetaAnimal(animalTipo?: string): string {
+    if (!animalTipo) return '';
+    const s = String(animalTipo).toLowerCase();
+    if (s.includes('pollo') || s.includes('ave') || s.includes('broiler')) return 'Pollos';
+    if (s.includes('chancho') || s.includes('cerdo') || s.includes('porcino')) return 'Chanchos';
+    return animalTipo;
+  }
+
+  esPollo(etq: string): boolean { return String(etq).toLowerCase() === 'pollos'; }
+  esChancho(etq: string): boolean { return String(etq).toLowerCase() === 'chanchos'; }
+
+  editarRegistroPorId(id: string, loteId: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) this.editarRegistro(registro);
+  }
+
+  eliminarRegistroPorId(id: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) this.eliminarRegistro(registro);
   }
 
   // ===== Helpers de lotes dinámicos =====

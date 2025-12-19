@@ -1,7 +1,9 @@
 package com.wil.avicola_backend.controller.costos;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -58,5 +60,13 @@ public class GastoLogisticaController {
     public ResponseEntity<Void> eliminar(@PathVariable String id) {
         service.eliminar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/migrar-distribucion")
+    public ResponseEntity<Map<String, Object>> migrarDistribucion() {
+        int updated = service.migrarDistribucion();
+        Map<String, Object> res = new HashMap<>();
+        res.put("updated", updated);
+        return ResponseEntity.ok(res);
     }
 }

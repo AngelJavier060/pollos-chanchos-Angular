@@ -31,6 +31,7 @@ export interface AnalisisRentabilidad {
 
 export interface AnimalesResumen {
   iniciales: number;
+  enfermos: number;
   muertos: number;
   vendidos: number;
   vivos: number;

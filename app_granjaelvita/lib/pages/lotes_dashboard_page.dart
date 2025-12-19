@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/lote_service.dart';
+import '../services/plan_nutricional_service.dart';
 
 class LotesDashboardPage extends StatefulWidget {
   const LotesDashboardPage({super.key});
@@ -11,12 +12,16 @@ class LotesDashboardPage extends StatefulWidget {
 
 class _LotesDashboardPageState extends State<LotesDashboardPage> {
   final LoteServiceMobile _loteService = LoteServiceMobile();
+  final PlanNutricionalService _planService = PlanNutricionalService();
   
   bool _loading = true;
   String? _error;
   List<LoteDto> _lotes = [];
   List<LoteDto> _lotesFiltrados = [];
   List<RazaDto> _razas = [];
+  
+  // Consumo por lote
+  Map<String, double> _consumoPorLote = {};
   
   // Tabs y filtros
   String _activeTab = 'activos'; // 'activos' | 'historico'
@@ -65,6 +70,10 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
           ? await _loteService.getActivos()
           : await _loteService.getHistorico();
       final razas = await _loteService.getRazas();
+      
+      // Cargar consumos por lote
+      await _cargarConsumosPorLote(lotes);
+      
       setState(() {
         _lotes = lotes;
         _razas = razas;
@@ -77,6 +86,40 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
         _loading = false;
       });
     }
+  }
+
+  /// Cargar consumos por lote desde el historial de alimentación
+  Future<void> _cargarConsumosPorLote(List<LoteDto> lotes) async {
+    try {
+      final fechaFin = DateTime.now();
+      final fechaInicio = DateTime.now().subtract(const Duration(days: 365));
+      final fechaInicioStr = DateFormat('yyyy-MM-dd').format(fechaInicio);
+      final fechaFinStr = DateFormat('yyyy-MM-dd').format(fechaFin);
+      
+      final datos = await _planService.obtenerHistorialAlimentacion(fechaInicioStr, fechaFinStr);
+      
+      // Agrupar consumos por loteId
+      final consumos = <String, double>{};
+      for (final item in datos) {
+        if (item is Map<String, dynamic>) {
+          final loteId = item['loteId']?.toString() ?? '';
+          final cantidad = (item['cantidad'] ?? 0).toDouble();
+          if (loteId.isNotEmpty) {
+            consumos[loteId] = (consumos[loteId] ?? 0) + cantidad;
+          }
+        }
+      }
+      
+      _consumoPorLote = consumos;
+    } catch (e) {
+      print('Error cargando consumos: $e');
+    }
+  }
+
+  /// Obtener consumo total de un lote
+  double getConsumoLote(String? loteId) {
+    if (loteId == null) return 0;
+    return _consumoPorLote[loteId] ?? 0;
   }
 
   void _aplicarFiltro() {
@@ -100,6 +143,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       'lotes': pollos.length,
       'animales': pollos.fold(0, (sum, l) => sum + l.quantity),
       'inversion': pollos.fold(0.0, (sum, l) => sum + l.cost),
+      'registrados': pollos.fold<int>(0, (sum, l) => sum + (l.quantityOriginal ?? l.quantity)),
     };
   }
 
@@ -109,6 +153,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       'lotes': chanchos.length,
       'animales': chanchos.fold(0, (sum, l) => sum + l.quantity),
       'inversion': chanchos.fold(0.0, (sum, l) => sum + l.cost),
+      'registrados': chanchos.fold<int>(0, (sum, l) => sum + (l.quantityOriginal ?? l.quantity)),
     };
   }
 
@@ -276,6 +321,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
             lotes: _metricasPollos['lotes'] as int,
             animales: _metricasPollos['animales'] as int,
             inversion: _metricasPollos['inversion'] as double,
+            registrados: _metricasPollos['registrados'] as int,
           ),
         ),
         const SizedBox(width: 12),
@@ -291,6 +337,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
             lotes: _metricasChanchos['lotes'] as int,
             animales: _metricasChanchos['animales'] as int,
             inversion: _metricasChanchos['inversion'] as double,
+            registrados: _metricasChanchos['registrados'] as int,
           ),
         ),
       ],
@@ -307,6 +354,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
     required int lotes,
     required int animales,
     required double inversion,
+    required int registrados,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -336,6 +384,14 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
               Container(width: 1, height: 40, color: colorBorde.withValues(alpha: 0.3)),
               Expanded(child: _buildMiniMetricaColumna('Inversión', '\$${inversion.toStringAsFixed(0)}', colorValor)),
             ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Registrados: $registrados',
+              style: TextStyle(fontSize: 10, color: colorTexto.withOpacity(0.9), fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -478,12 +534,12 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
               color: Color(0xFFF3F4F6),
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
-            child: Row(
-              children: const [
+            child: const Row(
+              children: [
                 Expanded(flex: 3, child: Text('Nombre', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
                 Expanded(flex: 2, child: Text('Animal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
                 Expanded(flex: 2, child: Text('Vivos', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)), textAlign: TextAlign.center)),
-                Expanded(flex: 2, child: Text('Fecha', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
+                Expanded(flex: 2, child: Text('Consumo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF97316)), textAlign: TextAlign.center)),
                 Expanded(flex: 2, child: Text('Costo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)), textAlign: TextAlign.right)),
               ],
             ),
@@ -496,8 +552,8 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   }
 
   Widget _buildFilaLote(LoteDto lote) {
-    final fechaStr = lote.birthdate != null ? DateFormat('dd/MM/yy').format(lote.birthdate!) : '-';
     final esPollo = lote.esPollo;
+    final consumo = getConsumoLote(lote.id);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -555,8 +611,26 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
               ],
             ),
           ),
-          // Fecha
-          Expanded(flex: 2, child: Text(fechaStr, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)))),
+          // Consumo
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: consumo > 0 ? const Color(0xFFFFF7ED) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                consumo > 0 ? '${consumo.toStringAsFixed(1)} kg' : '-',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: consumo > 0 ? FontWeight.w600 : FontWeight.normal,
+                  color: consumo > 0 ? const Color(0xFFF97316) : Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
           // Costo
           Expanded(
             flex: 2,

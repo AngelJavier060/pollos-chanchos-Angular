@@ -158,6 +158,23 @@
           </select>
         </div>
         
+        <!-- Nuevo: Buscador por fecha y hora de creación -->
+        <div class="filtro-group">
+          <label class="filtro-label">⏱️ Desde (fecha y hora)</label>
+          <input 
+            type="datetime-local" 
+            [(ngModel)]="filtroFechaHoraInicio"
+            class="filtro-input">
+        </div>
+
+        <div class="filtro-group">
+          <label class="filtro-label">⏱️ Hasta (fecha y hora)</label>
+          <input 
+            type="datetime-local" 
+            [(ngModel)]="filtroFechaHoraFin"
+            class="filtro-input">
+        </div>
+
         <div class="filtro-group">
           <label class="filtro-label">📊 Estado</label>
           <select [(ngModel)]="filtroStatus" class="filtro-select">
@@ -170,10 +187,16 @@
         
         <div class="filtro-group">
           <label class="filtro-label">&nbsp;</label>
-          <button (click)="limpiarFiltros()" class="btn btn-secondary">
-            <i class="fas fa-eraser"></i>
-            Limpiar
-          </button>
+          <div style="display:flex; gap:8px;">
+            <button (click)="aplicarFiltroFechaHora()" class="btn btn-primary">
+              <i class="fas fa-search"></i>
+              Buscar
+            </button>
+            <button class="btn btn-secondary" (click)="limpiarFiltros()">
+              <i class="fas fa-eraser"></i>
+              Limpiar
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -225,9 +248,6 @@
                   <div class="tipo-consumo" style="margin-top:4px; display:flex; align-items:center; gap:6px;">
                     <i [class]="getIconoTipoConsumo(registro)"></i>
                     <span class="tipo-label" style="font-size:12px; color:#475569;">{{ getEtiquetaTipoConsumo(registro) }}</span>
-                    <button (click)="abrirDetalleAlimento(registro)" class="btn-accion btn-detalles" title="Ver alimento" style="margin-left:6px; padding:4px 8px;">
-                      <i class="fas fa-eye"></i>
-                    </button>
                     <ng-container *ngIf="getTotalManiana(registro) as totalM; else sinTotalM">
                       <span *ngIf="totalM > 0" class="total-maniana" style="margin-left:8px;">
                         <i class="fas fa-sun" style="margin-right:6px;"></i>
@@ -437,6 +457,135 @@
       </div>
       <div class="p-4 border-t flex justify-end">
         <button (click)="cerrarDetalleAlimento()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Detalles del Registro -->
+  <div *ngIf="mostrarModalDetalles && registroSeleccionado" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-5 border-b bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-xl flex items-center justify-between">
+        <h3 class="text-lg font-semibold flex items-center gap-2">
+          <i class="fas fa-clipboard-list"></i>
+          DETALLES DEL REGISTRO #{{ registroSeleccionado.id }}
+        </h3>
+        <button (click)="cerrarModalDetalles()" class="text-white hover:text-gray-200 text-xl">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="p-5 space-y-4">
+        <!-- Información del Lote -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <i class="fas fa-tag text-green-600"></i>
+            <span class="font-semibold text-green-800">Lote</span>
+          </div>
+          <p class="text-lg font-bold text-green-900">{{ registroSeleccionado.loteDescripcion }}</p>
+          <p class="text-sm text-green-700">Código: {{ registroSeleccionado.codigoLote }}</p>
+        </div>
+
+        <!-- Fechas -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-blue-700 mb-1">
+              <i class="fas fa-calendar"></i>
+              <span class="text-sm font-medium">Fecha de Registro</span>
+            </div>
+            <p class="font-semibold text-blue-900">{{ formatearFecha(registroSeleccionado.fecha) }}</p>
+          </div>
+          <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-purple-700 mb-1">
+              <i class="fas fa-clock"></i>
+              <span class="text-sm font-medium">Fecha de Creación</span>
+            </div>
+            <p class="font-semibold text-purple-900">{{ formatearFechaHora(registroSeleccionado.fechaCreacion) }}</p>
+          </div>
+        </div>
+
+        <!-- Productos Consumidos -->
+        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i class="fas fa-utensils text-orange-600"></i>
+            <span class="font-semibold text-orange-800">Productos Consumidos</span>
+          </div>
+          <div *ngIf="productosConsumidos.length > 0; else sinProductos" class="space-y-2">
+            <div *ngFor="let producto of productosConsumidos" class="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-orange-100">
+              <div class="flex items-center gap-2">
+                <i class="fas fa-seedling text-green-500"></i>
+                <span class="font-medium text-gray-800">{{ producto.nombre }}</span>
+              </div>
+              <div class="text-right">
+                <span class="font-bold text-orange-700">{{ producto.cantidad | number:'1.2-2' }} kg</span>
+              </div>
+            </div>
+          </div>
+          <ng-template #sinProductos>
+            <p class="text-sm text-orange-600 italic">No se encontraron productos específicos en este registro.</p>
+          </ng-template>
+        </div>
+
+        <!-- Cantidad Total (suma de productos consumidos) -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <i class="fas fa-weight-hanging text-yellow-600"></i>
+            <span class="font-semibold text-yellow-800">Cantidad Total</span>
+          </div>
+          <p class="text-2xl font-bold text-yellow-900">{{ getTotalProductosConsumidos() | number:'1.2-2' }} kg</p>
+        </div>
+
+        <!-- Animales -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-green-700 mb-1">
+              <i class="fas fa-heart"></i>
+              <span class="text-sm font-medium">Animales Vivos</span>
+            </div>
+            <p class="text-xl font-bold text-green-900">{{ registroSeleccionado.animalesVivos || 'N/A' }}</p>
+          </div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-red-700 mb-1">
+              <i class="fas fa-skull-crossbones"></i>
+              <span class="text-sm font-medium">Animales Muertos</span>
+            </div>
+            <p class="text-xl font-bold text-red-900">{{ registroSeleccionado.animalesMuertos || 'N/A' }}</p>
+          </div>
+        </div>
+
+        <!-- Estado y Jornada -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-gray-700 mb-1">
+              <i class="fas fa-info-circle"></i>
+              <span class="text-sm font-medium">Estado</span>
+            </div>
+            <span class="px-3 py-1 rounded-full text-sm font-semibold" [class]="getColorStatus(registroSeleccionado.status)">
+              {{ registroSeleccionado.status }}
+            </span>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div class="flex items-center gap-2 text-gray-700 mb-1">
+              <i class="fas fa-sun"></i>
+              <span class="text-sm font-medium">Jornada</span>
+            </div>
+            <p class="font-semibold text-gray-900">{{ getJornada(registroSeleccionado) }}</p>
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div *ngIf="registroSeleccionado.observaciones" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <i class="fas fa-comment-alt text-gray-600"></i>
+            <span class="font-semibold text-gray-800">Observaciones</span>
+          </div>
+          <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ registroSeleccionado.observaciones }}</p>
+        </div>
+      </div>
+      
+      <div class="p-4 border-t flex justify-end">
+        <button (click)="cerrarModalDetalles()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+          Aceptar
+        </button>
       </div>
     </div>
   </div>

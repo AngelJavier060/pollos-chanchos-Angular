@@ -8,6 +8,7 @@ import { AnalisisInventarioService, InventarioAnalisis } from '../../shared/serv
 import { CostosIntegradosService } from '../../shared/services/costos-integrados.service';
 import { VentasService } from '../../shared/services/ventas.service';
 import { MortalidadBackendService } from '../../shared/services/mortalidad-backend.service';
+import { MorbilidadService } from '../pollos/services/morbilidad.service';
 import {
   MetodoProrrateo,
   ConfiguracionProrrateo,
@@ -69,13 +70,144 @@ export class AnalisisFinancieroComponent implements OnInit {
     private cSanidad: CostosSanidadService,
     private costosIntegrados: CostosIntegradosService,
     private ventasService: VentasService,
-    private mortalidadService: MortalidadBackendService
+    private mortalidadService: MortalidadBackendService,
+    private morbilidadService: MorbilidadService
   ) {}
 
   ngOnInit(): void {
     this.cargarAnalisisEspecies();
     this.cargarCostosIndirectos();
   }
+
+  getCostoPromedioPorAnimalEspecieActual(): number {
+    if (this.analisisCompletoPorLote.size === 0) return 0;
+    let totalCosto = 0;
+    let totalVivos = 0;
+    this.analisisCompletoPorLote.forEach(a => {
+      totalCosto += Number(a?.costoTotal || 0);
+      totalVivos += Number(a?.animales?.vivos || 0);
+    });
+    if (totalVivos <= 0) return 0;
+    return Math.round((totalCosto / totalVivos) * 100) / 100;
+  }
+
+  getNombreEspecieActual(): string {
+    return this.especieSeleccionada === 1 ? 'Pollos' : 'Chanchos';
+  }
+
+  exportarDetalleCSV(): void {
+    const filas: string[] = [];
+    const encabezados = [
+      'Lote','Especie','Dias','Iniciales','Enfermos','Muertos','Vendidos','Vivos',
+      'CompraAnimales','Alimentacion','SanidadPreventiva','Morbilidad',
+      'CI_Operacion','CI_ManoObra','CI_Fijos','CI_Logistica','CostoIndirectoTotal',
+      'CostoTotal','UnitarioVivo','Ingresos','Ganancia','MargenPct'
+    ];
+    filas.push(encabezados.join(','));
+    this.analisisCompletoPorLote.forEach((a, loteId) => {
+      const row = [
+        (a?.lote?.name || a?.lote?.codigo || `Lote ${loteId}`),
+        (a?.lote?.race?.animal?.name || ''),
+        String(a?.periodo?.dias || 0),
+        String(a?.animales?.iniciales || 0),
+        String(a?.animales?.enfermos || 0),
+        String(a?.animales?.muertos || 0),
+        String(a?.animales?.vendidos || 0),
+        String(a?.animales?.vivos || 0),
+        String(a?.costosDirectos?.compraAnimales || 0),
+        String(a?.costosDirectos?.alimentacion || 0),
+        String(a?.costosDirectos?.sanidadPreventiva || 0),
+        String(a?.costosDirectos?.morbilidad || 0),
+        String(a?.costosIndirectos?.operacion || 0),
+        String(a?.costosIndirectos?.manoObra || 0),
+        String(a?.costosIndirectos?.fijos || 0),
+        String(a?.costosIndirectos?.logistica || 0),
+        String(a?.costosIndirectos?.total || 0),
+        String(a?.costoTotal || 0),
+        String(a?.costos?.unitarioVivo || 0),
+        String(a?.rentabilidad?.ingresoTotal || 0),
+        String(a?.rentabilidad?.ganancia || 0),
+        String(a?.rentabilidad?.margen || 0)
+      ];
+      filas.push(row.map(v => typeof v === 'string' && v.includes(',') ? `"${v}"` : v).join(','));
+    });
+    const csv = filas.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const desde = this.periodoAnalisis.inicio ? (this.periodoAnalisis.inicio as Date).toISOString().slice(0,10) : '';
+    const hasta = this.periodoAnalisis.fin ? (this.periodoAnalisis.fin as Date).toISOString().slice(0,10) : '';
+    a.href = url;
+    a.download = `detalle_lotes_${this.getNombreEspecieActual()}_${desde}_a_${hasta}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  exportarDetallePDF(): void {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const filasHtml: string[] = [];
+    this.analisisCompletoPorLote.forEach((a, loteId) => {
+      filasHtml.push(
+        `<tr>
+          <td>${a?.lote?.name || a?.lote?.codigo || `Lote ${loteId}`}</td>
+          <td>${a?.lote?.race?.animal?.name || ''}</td>
+          <td>${a?.periodo?.dias || 0}</td>
+          <td>${a?.animales?.iniciales || 0}</td>
+          <td>${a?.animales?.enfermos || 0}</td>
+          <td>${a?.animales?.muertos || 0}</td>
+          <td>${a?.animales?.vendidos || 0}</td>
+          <td>${a?.animales?.vivos || 0}</td>
+          <td>${a?.costosDirectos?.compraAnimales || 0}</td>
+          <td>${a?.costosDirectos?.alimentacion || 0}</td>
+          <td>${a?.costosDirectos?.sanidadPreventiva || 0}</td>
+          <td>${a?.costosDirectos?.morbilidad || 0}</td>
+          <td>${a?.costosIndirectos?.total || 0}</td>
+          <td>${a?.costoTotal || 0}</td>
+          <td>${a?.costos?.unitarioVivo || 0}</td>
+          <td>${a?.rentabilidad?.ingresoTotal || 0}</td>
+          <td>${a?.rentabilidad?.ganancia || 0}</td>
+          <td>${a?.rentabilidad?.margen || 0}%</td>
+        </tr>`
+      );
+    });
+    const desde = this.periodoAnalisis.inicio ? (this.periodoAnalisis.inicio as Date).toISOString().slice(0,10) : '';
+    const hasta = this.periodoAnalisis.fin ? (this.periodoAnalisis.fin as Date).toISOString().slice(0,10) : '';
+    const html = `
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Detalle por Lote</title>
+        <style>
+          body { font-family: Arial, sans-serif; }
+          h2 { margin: 0 0 12px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ccc; padding: 6px 8px; font-size: 12px; }
+          th { background: #f3f4f6; }
+        </style>
+      </head>
+      <body>
+        <h2>Detalle por Lote — ${this.getNombreEspecieActual()} (${desde} a ${hasta})</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Lote</th><th>Especie</th><th>Días</th><th>Iniciales</th><th>Enfermos</th><th>Muertos</th><th>Vendidos</th><th>Vivos</th>
+              <th>Compra</th><th>Alimentación</th><th>Sanidad</th><th>Morbilidad</th><th>Indirectos</th><th>Costo Total</th><th>Unitario Vivo</th><th>Ingresos</th><th>Ganancia</th><th>Margen</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filasHtml.join('')}
+          </tbody>
+        </table>
+        <script>window.onload = function(){ window.print(); }</script>
+      </body>
+      </html>`;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  
 
   // ===== SANIDAD: Carga y agregaciones =====
   private cargarSanidad(): void {
@@ -301,6 +433,8 @@ export class AnalisisFinancieroComponent implements OnInit {
   }
 
   codigoLote(row: any): string {
+    const name = (row?.lote?.name || '').toString().trim();
+    if (name) return name;
     const cod = (row?.lote?.codigo || '').toString().trim();
     if (cod) return cod;
     const id = (row?.lote?.id || '').toString();
@@ -438,8 +572,10 @@ export class AnalisisFinancieroComponent implements OnInit {
     const term = (this.filtroCodigo || '').trim().toLowerCase();
     if (term) {
       lista = lista.filter((row: any) => {
-        const code = (row?.lote?.codigo || row?.lote?.id || '').toString().toLowerCase();
-        return code.includes(term);
+        const name = (row?.lote?.name || '').toString().toLowerCase();
+        const code = (row?.lote?.codigo || '').toString().toLowerCase();
+        const id = (row?.lote?.id || '').toString().toLowerCase();
+        return name.includes(term) || code.includes(term) || id.includes(term);
       });
     }
     const dir = this.sortDir === 'asc' ? 1 : -1;
@@ -447,8 +583,8 @@ export class AnalisisFinancieroComponent implements OnInit {
       let va: any;
       let vb: any;
       if (this.sortKey === 'lote') {
-        va = a?.lote?.codigo || a?.lote?.id || '';
-        vb = b?.lote?.codigo || b?.lote?.id || '';
+        va = this.codigoLote(a);
+        vb = this.codigoLote(b);
       } else {
         va = a?.[this.sortKey] ?? 0;
         vb = b?.[this.sortKey] ?? 0;
@@ -634,15 +770,16 @@ export class AnalisisFinancieroComponent implements OnInit {
       // Cargar ventas y mortalidad del lote
       forkJoin({
         ventas: this.ventasService.listarVentasAnimalesPorLoteEmitidas(loteId),
-        mortalidad: this.mortalidadService.obtenerRegistrosPorLote(loteId)
+        mortalidad: this.mortalidadService.obtenerRegistrosPorLote(loteId),
+        morbilidad: this.morbilidadService.getRegistrosPorLote(Number(loteId))
       }).subscribe({
-        next: ({ ventas, mortalidad }) => {
+        next: ({ ventas, mortalidad, morbilidad }) => {
           const analisisCompleto = this.costosIntegrados.calcularAnalisisCompleto(
             lote,
             analisisLote.costoTotalLote,
             analisisLote.detalleAlimentos || [],
             this.sanidadRegistros,
-            [], // Morbilidad - por implementar
+            morbilidad || [],
             costosIndirectosDesglosados, // Ahora pasamos el desglose completo
             ventas,
             mortalidad,
@@ -699,7 +836,7 @@ export class AnalisisFinancieroComponent implements OnInit {
 
       comparativo.push({
         loteId,
-        loteCodigo: analisis.lote.codigo || `Lote ${loteId}`,
+        loteCodigo: (analisis?.lote?.name && String(analisis.lote.name).trim()) ? String(analisis.lote.name).trim() : (analisis?.lote?.codigo || `Lote ${loteId}`),
         animalTipo: analisis.lote.race?.animal?.name || 'N/A',
         animales: `${iniciales}→${vivos + vendidos}`,
         costoAlimento: analisis.costosDirectos.alimentacion / Math.max(vivos + vendidos, 1),
@@ -728,11 +865,16 @@ export class AnalisisFinancieroComponent implements OnInit {
    * ACTUALIZADO: Verifica si realmente hay datos registrados
    */
   esImplementado(concepto: 'morbilidad' | 'operacion' | 'manoObra' | 'fijos' | 'logistica'): boolean {
+    if (concepto === 'morbilidad') {
+      // Considerar implementado si hay algún costo de morbilidad > 0 calculado
+      let total = 0;
+      this.analisisCompletoPorLote.forEach(a => total += Number(a?.costosDirectos?.morbilidad || 0));
+      return total > 0;
+    }
+
     if (!this.costosIndirectosPeriodo) return false;
 
     switch (concepto) {
-      case 'morbilidad':
-        return false; // Backend no tiene campo costo aún
       case 'operacion':
         return this.costosIndirectosPeriodo.totalOperacion > 0;
       case 'manoObra':
@@ -797,6 +939,25 @@ export class AnalisisFinancieroComponent implements OnInit {
    */
   actualizarPeriodo(): void {
     this.cargarAnalisisEspecies();
+  }
+
+  // ===== Controles de período (UI) =====
+  setPeriodoInicio(valor: string): void {
+    try {
+      this.periodoAnalisis.inicio = valor ? new Date(valor) : this.obtenerPrimerDiaMes();
+    } catch {
+      this.periodoAnalisis.inicio = this.obtenerPrimerDiaMes();
+    }
+    this.refrescarCompleto();
+  }
+
+  setPeriodoFin(valor: string): void {
+    try {
+      this.periodoAnalisis.fin = valor ? new Date(valor) : this.obtenerUltimoDiaMes();
+    } catch {
+      this.periodoAnalisis.fin = this.obtenerUltimoDiaMes();
+    }
+    this.refrescarCompleto();
   }
 
   /**

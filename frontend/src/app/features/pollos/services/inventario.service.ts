@@ -36,6 +36,7 @@ export interface RegistroConsumoRequest {
   productId?: number; // Opcional: descuento específico por producto
   cantidadKg: number;
   observaciones?: string;
+  fecha?: string; // yyyy-MM-dd (opcional) para registrar como fecha_movimiento
 }
 
 export interface RegistroConsumoResponse {
@@ -49,6 +50,13 @@ export interface RegistroConsumoResponse {
   bloqueoPorVencido?: boolean;
   detalles?: any;
   error?: string;
+}
+
+export interface ProductoConsumido {
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+  productoId?: number;
 }
 
 @Injectable({
@@ -94,6 +102,20 @@ export class InventarioService {
    */
   obtenerInventariosStockBajo(): Observable<InventarioAlimento[]> {
     return this.http.get<InventarioAlimento[]>(`${this.apiUrl}/inventarios/stock-bajo`);
+  }
+
+  /**
+   * Obtener detalle de productos consumidos por lote para un registro específico
+   * @param loteId ID del lote
+   * @param fechaHora Fecha/hora del registro (formato ISO: yyyy-MM-ddTHH:mm:ss)
+   */
+  obtenerConsumosDetallePorLote(loteId: string, fechaHora?: string): Observable<ProductoConsumido[]> {
+    let url = `${this.apiUrl}/consumos-detalle/lote/${loteId}`;
+    if (fechaHora) {
+      url += `?fechaHora=${encodeURIComponent(fechaHora)}`;
+    }
+    console.log('📦 Consultando consumos detalle:', { loteId, fechaHora });
+    return this.http.get<ProductoConsumido[]>(url);
   }
 
   /**

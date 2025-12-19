@@ -85,6 +85,11 @@ import { Animal } from '../../../shared/models/product.model';
               <option [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }} ({{ l.quantity || 0 }} animales)</option>
             </ng-container>
           </select>
+          <div class="mt-1" *ngIf="loteSeleccionado">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+              Stock: {{ loteSeleccionado.quantity || 0 }} animales
+            </span>
+          </div>
         </div>
         <div>
           <label class="block text-sm text-gray-600 mb-1">Fecha</label>
@@ -554,7 +559,11 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       return codigo.includes(q) || nombre.includes(q);
     };
 
-    this.lotesFiltrados = this.lotes.filter(l => coincideEspecie(l)).filter(l => coincideBusqueda(l));
+    // Solo lotes activos (animales vivos > 0)
+    this.lotesFiltrados = this.lotes
+      .filter(l => (l.quantity || 0) > 0)
+      .filter(l => coincideEspecie(l))
+      .filter(l => coincideBusqueda(l));
   }
 
   calcularEdad(date: Date | null): string {

@@ -1053,9 +1053,10 @@ export class PollosAlimentacionComponent implements OnInit {
         //    y sincronice a inventario_producto. Se calcula la cantidad por alimento.
         try {
           const loteIdStr = String(this.loteSeleccionado.id || this.loteSeleccionado.codigo || '');
+          const numAnimales = this.loteSeleccionado?.quantity || 1;
           const llamadas = this.alimentosSeleccionados.map(async (al) => {
-            // Cantidad por este alimento = cantidadPorAnimal * animales del lote
-            const cantidad = parseFloat(((al.quantityPerAnimal || 0) * (this.loteSeleccionado?.quantity || 0)).toFixed(3));
+            // Cantidad por este alimento = quantityPerAnimal * número de animales del lote
+            const cantidad = parseFloat(((al.quantityPerAnimal || 0) * numAnimales).toFixed(3));
             if (cantidad <= 0) return null;
 
             // Obtener producto para extraer typeFoodId (si tenemos productoId es directo)
@@ -1095,6 +1096,10 @@ export class PollosAlimentacionComponent implements OnInit {
               // ✅ Enviar nombre del producto (backend normaliza y resuelve Product correcto)
               nombreProducto: al.alimentoRecomendado
             };
+            // Enviar fecha del registro para que el movimiento quede asociado a la fecha indicada
+            if (this.registroCompleto?.fecha) {
+              payload.fecha = this.registroCompleto.fecha;
+            }
             // Priorizar consumo estricto por PRODUCTO cuando está disponible
             if (productId) {
               payload.productId = productId;
@@ -1453,19 +1458,15 @@ export class PollosAlimentacionComponent implements OnInit {
   }
 
   getCantidadTotalAlimentosSeleccionados(): number {
-    console.log('🧮 Calculando cantidad total de alimentos seleccionados...');
+    console.log('🧮 Calculando cantidad total de alimentos seleccionados (sin multiplicar por animales)...');
     console.log('🍽️ Alimentos seleccionados para cálculo:', this.alimentosSeleccionados.length);
-    console.log('🐔 Cantidad de animales en lote:', this.loteSeleccionado?.quantity || 0);
-    
-    const total = this.alimentosSeleccionados.reduce((total, alimento) => {
-      const cantidad = alimento.quantityPerAnimal || 0;
-      const subtotal = cantidad * (this.loteSeleccionado?.quantity || 0);
-      console.log(`  - ${alimento.alimentoRecomendado}: ${cantidad} kg/animal × ${this.loteSeleccionado?.quantity || 0} animales = ${subtotal.toFixed(2)} kg`);
-      return total + subtotal;
+    const total = this.alimentosSeleccionados.reduce((acc, alimento) => {
+      const cantidad = Number(alimento.quantityPerAnimal || 0);
+      console.log(`  - ${alimento.alimentoRecomendado}: ${cantidad.toFixed(2)} kg`);
+      return acc + cantidad;
     }, 0);
-    
-    const resultado = parseFloat(total.toFixed(2));
-    console.log(`🎯 TOTAL CALCULADO: ${resultado} kg`);
+    const resultado = Number(total.toFixed(2));
+    console.log(`🎯 TOTAL CALCULADO (selección): ${resultado} kg`);
     return resultado; // ✅ FORMATO X.XX
   }
 

@@ -1,10 +1,13 @@
 package com.wil.avicola_backend.controller;
 
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.wil.avicola_backend.model.MovimientoInventarioProducto;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -434,6 +437,18 @@ public class PlanAlimentacionController {
             }
             
             String observaciones = (String) requestData.get("observaciones");
+            // Fecha opcional del registro (yyyy-MM-dd)
+            java.time.LocalDate fechaRegistro = null;
+            if (requestData.containsKey("fecha") && requestData.get("fecha") != null) {
+                try {
+                    String f = requestData.get("fecha").toString();
+                    if (f != null && !f.isBlank()) {
+                        fechaRegistro = java.time.LocalDate.parse(f);
+                    }
+                } catch (Exception ex) {
+                    System.err.println("⚠️ Fecha inválida recibida en registrar-consumo: " + requestData.get("fecha"));
+                }
+            }
             String usuarioRegistro = principal != null ? principal.getName() : "Usuario desconocido";
             
             // productId opcional para descuento dirigido por producto
@@ -490,13 +505,13 @@ public class PlanAlimentacionController {
                 // ✅ USAR SERVICIO SIMPLIFICADO - RESUELVE EL ERROR 400
                 System.out.println("🔧 Usando servicio simplificado para evitar error de sanitización");
                 return planAlimentacionServiceSimplificado.registrarConsumoAlimentoPorProducto(
-                    loteId, tipoAlimentoId, productId, cantidadKg, usuarioRegistro, observaciones
+                    loteId, tipoAlimentoId, productId, cantidadKg, usuarioRegistro, observaciones, fechaRegistro
                 );
             } else {
                 // ✅ USAR SERVICIO SIMPLIFICADO TAMBIÉN PARA TIPO DE ALIMENTO
                 System.out.println("🔧 Usando servicio simplificado para registro por tipo");
                 return planAlimentacionServiceSimplificado.registrarConsumoAlimento(
-                    loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones
+                    loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones, fechaRegistro
                 );
             }
             
@@ -574,6 +589,89 @@ public class PlanAlimentacionController {
             System.err.println("❌ Error obteniendo total consumido: " + e.getMessage());
             return ResponseEntity.badRequest()
                 .body(Map.of("error", "Error obteniendo total consumido: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Obtener detalle de productos consumidos por lote para un registro específico
+     * Filtra por fecha/hora exacta del registro para mostrar SOLO los productos de ese registro
+     * @param loteId ID del lote
+     * @param fechaHora Fecha y hora del registro (formato ISO: yyyy-MM-ddTHH:mm:ss)
+     */
+    @GetMapping("/consumos-detalle/lote/{loteId}")
+    public ResponseEntity<?> obtenerConsumosDetallePorLote(
+            @PathVariable String loteId,
+            @RequestParam(required = false) String fechaHora) {
+        
+        System.out.println("📦 Consultando detalle de consumos para lote: " + loteId + " fechaHora: " + fechaHora);
+        
+        try {
+            var movimientos = planAlimentacionService.obtenerMovimientosPorLote(loteId);
+            
+            // Parsear fecha/hora si se proporcionó
+            java.time.LocalDateTime fechaHoraRegistro = null;
+            if (fechaHora != null && !fechaHora.isBlank()) {
+                try {
+                    // Intentar parsear como ISO datetime
+                    fechaHoraRegistro = java.time.LocalDateTime.parse(fechaHora.replace(" ", "T"));
+                } catch (Exception e1) {
+                    try {
+                        // Intentar parsear solo como fecha (agregar hora inicio)
+                        fechaHoraRegistro = java.time.LocalDate.parse(fechaHora).atStartOfDay();
+                    } catch (Exception e2) {
+                        System.err.println("⚠️ No se pudo parsear fechaHora: " + fechaHora);
+                    }
+                }
+            }
+            
+            // Lista para almacenar movimientos del registro específico
+            List<Map<String, Object>> resultado = new java.util.ArrayList<>();
+            
+            for (var mov : movimientos) {
+                if (mov.getTipoMovimiento() != MovimientoInventarioProducto.TipoMovimiento.CONSUMO_LOTE) {
+                    continue;
+                }
+                
+                // Si se especificó fechaHora, filtrar por ventana de tiempo (±2 minutos)
+                if (fechaHoraRegistro != null && mov.getFechaMovimiento() != null) {
+                    java.time.LocalDateTime movFecha = mov.getFechaMovimiento();
+                    java.time.LocalDateTime inicio = fechaHoraRegistro.minusMinutes(2);
+                    java.time.LocalDateTime fin = fechaHoraRegistro.plusMinutes(2);
+                    
+                    if (movFecha.isBefore(inicio) || movFecha.isAfter(fin)) {
+                        continue; // Fuera de la ventana de tiempo del registro
+                    }
+                }
+                
+                String nombreProducto = "Producto desconocido";
+                Long productoId = null;
+                
+                if (mov.getInventarioProducto() != null && mov.getInventarioProducto().getProduct() != null) {
+                    nombreProducto = mov.getInventarioProducto().getProduct().getName();
+                    productoId = mov.getInventarioProducto().getProduct().getId();
+                }
+                
+                // NO agrupar - cada movimiento es un producto consumido individual
+                Map<String, Object> datos = new java.util.HashMap<>();
+                datos.put("nombre", nombreProducto);
+                datos.put("productoId", productoId);
+                datos.put("cantidad", mov.getCantidad().setScale(2, java.math.RoundingMode.HALF_UP).doubleValue());
+                datos.put("unidad", "kg");
+                resultado.add(datos);
+            }
+            
+            // Ordenar por nombre
+            resultado.sort((a, b) -> ((String) a.get("nombre")).compareToIgnoreCase((String) b.get("nombre")));
+            
+            System.out.println("✅ Productos consumidos encontrados: " + resultado.size());
+            resultado.forEach(p -> System.out.println("   - " + p.get("nombre") + ": " + p.get("cantidad") + " kg"));
+            
+            return ResponseEntity.ok(resultado);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error obteniendo detalle de consumos: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(new java.util.ArrayList<>()); // Devolver lista vacía en lugar de error
         }
     }
     

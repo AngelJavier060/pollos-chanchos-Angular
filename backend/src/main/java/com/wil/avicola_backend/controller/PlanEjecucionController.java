@@ -21,8 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wil.avicola_backend.model.PlanEjecucion;
+import com.wil.avicola_backend.model.Lote;
 import com.wil.avicola_backend.repository.PlanEjecucionRepository;
+import com.wil.avicola_backend.repository.LoteRepository;
 import com.wil.avicola_backend.service.PlanEjecucionService;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.Optional;
 import com.wil.avicola_backend.dto.AlertaRapidaDto;
 // Nuevos imports para el sistema de corrección
 import com.wil.avicola_backend.service.CorreccionService;
@@ -45,6 +50,9 @@ public class PlanEjecucionController {
     
     @Autowired
     private PlanEjecucionRepository planEjecucionRepository;
+    
+    @Autowired
+    private LoteRepository loteRepository;
     
     /**
      * Endpoint de prueba con información del estado del sistema
@@ -314,15 +322,18 @@ public class PlanEjecucionController {
     /**
      * ✅ TEMPORAL: Endpoint público para obtener historial (sin autenticación)
      * 🔥 SOLUCIONADO: Usa DTO para evitar lazy initialization exception
+     * 🐔 Soporta filtro por especie (pollos, chanchos)
      */
     @GetMapping("/debug/historial")
     public ResponseEntity<List<HistorialResponseDto>> getHistorialPublico(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
+            @RequestParam(required = false) String especie) {
         
         System.out.println("📚 === OBTENER HISTORIAL (ENDPOINT DEBUG PÚBLICO) ===");
         System.out.println("Fecha inicio: " + fechaInicio);
         System.out.println("Fecha fin: " + fechaFin);
+        System.out.println("Especie filtro: " + (especie != null ? especie : "TODAS"));
         
         try {
             // Si no se proporcionan fechas, usar últimos 6 meses
@@ -344,6 +355,9 @@ public class PlanEjecucionController {
             
             System.out.println("✅ Registros obtenidos con JOIN FETCH: " + registros.size());
             
+            // Variable final para usar en el stream
+            final String especieFiltro = especie;
+            
             List<HistorialResponseDto> registrosFiltrados = registros.stream()
                 .map(pe -> {
                     // Convertir a DTO para evitar lazy initialization
@@ -361,16 +375,36 @@ public class PlanEjecucionController {
                         pe.getUpdateDate()
                     );
                     
+                    // Variable para guardar la especie del lote
+                    String especieLote = null;
+                    
                     // Mapear información del lote y usuario usando las relaciones cargadas
-                    if (pe.getPlanAsignacion() != null) {
-                        if (pe.getPlanAsignacion().getLote() != null) {
-                            dto.setLoteId(pe.getPlanAsignacion().getLote().getId());
-                            dto.setLoteCodigo(pe.getPlanAsignacion().getLote().getCodigo());
-                            dto.setLoteDescripcion(pe.getPlanAsignacion().getLote().getName());
-                        } else {
-                            dto.setLoteId("LOT-MANUAL");
-                            dto.setLoteCodigo("MANUAL");
-                            dto.setLoteDescripcion("Registro Manual");
+                    if (pe.getPlanAsignacion() != null && pe.getPlanAsignacion().getLote() != null) {
+                        Lote lote = pe.getPlanAsignacion().getLote();
+                        dto.setLoteId(lote.getId());
+                        dto.setLoteCodigo(lote.getCodigo());
+                        dto.setLoteDescripcion(lote.getName());
+                        
+                        // Obtener especie del lote
+                        if (lote.getRace() != null && lote.getRace().getAnimal() != null) {
+                            var animal = lote.getRace().getAnimal();
+                            // Normalizar: si es ID=1 (pollos), etiquetar como 'pollos'
+                            if (animal.getId() == 1L) {
+                                especieLote = "pollos";
+                            } else {
+                                String nombreAnimal = animal.getName();
+                                if (nombreAnimal != null) {
+                                    String n = nombreAnimal.toLowerCase();
+                                    // Sinónimos básicos
+                                    if (n.contains("pollo") || n.contains("gallin") || n.contains("ave")) {
+                                        especieLote = "pollos";
+                                    } else if (n.contains("cerd") || n.contains("chancho")) {
+                                        especieLote = "chanchos";
+                                    } else {
+                                        especieLote = nombreAnimal;
+                                    }
+                                }
+                            }
                         }
                         
                         if (pe.getPlanAsignacion().getAssignedUser() != null) {
@@ -378,10 +412,58 @@ public class PlanEjecucionController {
                             dto.setUsuarioId(pe.getPlanAsignacion().getAssignedUser().getId().toString());
                         }
                     } else {
-                        // Para registros manuales sin asignación
-                        dto.setLoteId("LOT-MANUAL");
-                        dto.setLoteCodigo("MANUAL");
-                        dto.setLoteDescripcion("Registro Manual");
+                        // Para registros manuales: extraer loteId de observaciones y buscar nombre real
+                        String loteIdExtraido = extraerLoteIdDeObservaciones(pe.getObservations());
+                        if (loteIdExtraido != null && !loteIdExtraido.isEmpty()) {
+                            Optional<Lote> loteOpt = loteRepository.findById(loteIdExtraido);
+                            if (loteOpt.isPresent()) {
+                                Lote lote = loteOpt.get();
+                                dto.setLoteId(lote.getId());
+                                dto.setLoteCodigo(lote.getCodigo() != null ? lote.getCodigo() : "S/C");
+                                dto.setLoteDescripcion(lote.getName());
+                                
+                                // Obtener especie del lote manual
+                                if (lote.getRace() != null && lote.getRace().getAnimal() != null) {
+                                    var animal = lote.getRace().getAnimal();
+                                    if (animal.getId() == 1L) {
+                                        especieLote = "pollos";
+                                    } else {
+                                        String nombreAnimal = animal.getName();
+                                        if (nombreAnimal != null) {
+                                            String n = nombreAnimal.toLowerCase();
+                                            if (n.contains("pollo") || n.contains("gallin") || n.contains("ave")) especieLote = "pollos";
+                                            else if (n.contains("cerd") || n.contains("chancho")) especieLote = "chanchos";
+                                            else especieLote = nombreAnimal;
+                                        }
+                                    }
+                                }
+                                
+                                System.out.println("✅ Lote encontrado para registro manual: " + lote.getName() + " (Especie: " + especieLote + ")");
+                            } else {
+                                dto.setLoteId(loteIdExtraido);
+                                dto.setLoteCodigo("MANUAL");
+                                dto.setLoteDescripcion("Lote no encontrado: " + loteIdExtraido.substring(0, Math.min(8, loteIdExtraido.length())));
+                            }
+                        } else {
+                            dto.setLoteId("LOT-MANUAL");
+                            dto.setLoteCodigo("MANUAL");
+                            dto.setLoteDescripcion("Registro Manual");
+                        }
+                    }
+                    
+                    // Guardar la especie en el DTO para filtrar después
+                    dto.setEspecie(especieLote);
+                    
+                    // Mapear información del producto desde PlanDetalle
+                    if (pe.getPlanDetalle() != null && pe.getPlanDetalle().getProduct() != null) {
+                        dto.setProductoNombre(pe.getPlanDetalle().getProduct().getName());
+                        dto.setProductoId(pe.getPlanDetalle().getProduct().getId());
+                    } else {
+                        // Intentar extraer producto de observaciones
+                        String productoExtraido = extraerProductoDeObservaciones(pe.getObservations());
+                        if (productoExtraido != null) {
+                            dto.setProductoNombre(productoExtraido);
+                        }
                     }
                     
                     // Mapear usuario ejecutor
@@ -393,13 +475,33 @@ public class PlanEjecucionController {
                         dto.setUsuarioId("N/A");
                     }
                     
-                    System.out.println("✅ Registro mapeado - ID: " + dto.getId() + ", Lote: " + dto.getLoteCodigo() + ", Usuario: " + dto.getUsuarioNombre());
+                    System.out.println("✅ Registro mapeado - ID: " + dto.getId() + ", Lote: " + dto.getLoteCodigo() + ", Especie: " + dto.getEspecie());
                     
                     return dto;
                 })
+                // Filtrar por especie si se especificó
+                .filter(dto -> {
+                    if (especieFiltro == null || especieFiltro.isEmpty()) {
+                        return true; // Sin filtro, devolver todos
+                    }
+                    String especieDto = dto.getEspecie();
+                    if (especieDto == null) {
+                        // Si no tiene especie pero hay observaciones que mencionan "pollo", incluirlo
+                        String obs = dto.getObservations() != null ? dto.getObservations().toLowerCase() : "";
+                        String filtroNorm = especieFiltro.toLowerCase();
+                        if (filtroNorm.contains("pollo") && (obs.contains("pollo") || obs.contains("lote") || dto.getLoteCodigo() != null)) {
+                            return true; // Incluir registros manuales de pollos
+                        }
+                        return false; // Si no tiene especie y no hay indicios, excluir
+                    }
+                    // Comparar ignorando mayúsculas y acentos
+                    String filtroNorm = especieFiltro.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+                    String especieNorm = especieDto.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+                    return especieNorm.contains(filtroNorm) || filtroNorm.contains(especieNorm);
+                })
                 .collect(Collectors.toList());
             
-            System.out.println("✅ Registros después del filtro de fechas: " + registrosFiltrados.size());
+            System.out.println("✅ Registros después de filtrar por especie '" + (especie != null ? especie : "TODAS") + "': " + registrosFiltrados.size());
             
             return ResponseEntity.ok(registrosFiltrados);
             
@@ -551,5 +653,51 @@ public class PlanEjecucionController {
             return String.format("AlimentacionRequest{loteId='%s', fecha='%s', cantidad=%.2f, vivos=%d, muertos=%d}", 
                 loteId, fecha, cantidadAplicada, animalesVivos, animalesMuertos);
         }
+    }
+    
+    // ========== MÉTODOS AUXILIARES PARA PARSING ==========
+    
+    /**
+     * Extrae el loteId (UUID) desde el campo de observaciones
+     * Formato esperado: "... - Lote: UUID | ..." o "Lote: nombre (codigo)"
+     */
+    private String extraerLoteIdDeObservaciones(String observations) {
+        if (observations == null || observations.isEmpty()) {
+            return null;
+        }
+        
+        // Patrón para UUID: 8-4-4-4-12 caracteres hex
+        Pattern uuidPattern = Pattern.compile("Lote:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        Matcher matcher = uuidPattern.matcher(observations);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        // Fallback: buscar cualquier UUID en las observaciones
+        Pattern anyUuidPattern = Pattern.compile("([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        Matcher anyMatcher = anyUuidPattern.matcher(observations);
+        if (anyMatcher.find()) {
+            return anyMatcher.group(1);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extrae el nombre del producto desde el campo de observaciones
+     * Formato esperado: "Producto: NombreProducto | ..."
+     */
+    private String extraerProductoDeObservaciones(String observations) {
+        if (observations == null || observations.isEmpty()) {
+            return null;
+        }
+        
+        Pattern productoPattern = Pattern.compile("Producto:\\s*([^|]+)");
+        Matcher matcher = productoPattern.matcher(observations);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        
+        return null;
     }
 }

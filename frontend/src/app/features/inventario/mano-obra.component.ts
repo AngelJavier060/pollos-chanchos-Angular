@@ -5,11 +5,30 @@ import { Lote } from '../lotes/interfaces/lote.interface';
 import { LoteService } from '../lotes/services/lote.service';
 import { CostosManoObraService } from './services/costos-mano-obra.service';
 import { forkJoin } from 'rxjs';
+import { DateEsPipe } from '../../shared/pipes/date-es.pipe';
+
+interface GrupoManoObra {
+  fecha: string;
+  trabajador: string;
+  cargo: string;
+  horasTotal: number;
+  costoTotal: number;
+  detalles: {
+    id: string;
+    lote: string;
+    loteId: string;
+    animalTipo: string;
+    cantidad: number;
+    costoUnit: number;
+    total: number;
+    observaciones: string;
+  }[];
+}
 
 @Component({
   selector: 'app-mano-obra',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DateEsPipe],
   template: `
   <div class="p-6 bg-gray-50 min-h-screen">
     <!-- Header -->
@@ -65,7 +84,7 @@ import { forkJoin } from 'rxjs';
             </svg>
           </div>
         </div>
-        <p class="text-xs text-gray-400 mt-2">{{ ultimoPagoFecha || 'Sin registros' }}</p>
+        <p class="text-xs text-gray-400 mt-2">{{ (ultimoPagoFecha | dateEs) || 'Sin registros' }}</p>
       </div>
       
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -190,68 +209,103 @@ import { forkJoin } from 'rxjs';
       </form>
     </div>
 
-    <!-- Tabla de Registros -->
+    <!-- Tabla de Registros resumida -->
     <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-      <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-gray-800 mb-1 flex items-center justify-between">
         <span class="flex items-center gap-2">
           <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
           Historial de Pagos
         </span>
-        <span class="text-sm font-normal text-gray-500">{{ registros.length }} registros</span>
+        <span class="text-sm font-normal text-gray-500">{{ registrosAgrupados.length }} grupos</span>
       </h3>
-      
-      <div *ngIf="registros.length === 0" class="text-center py-12 text-gray-500">
+      <p class="text-gray-500 text-sm mb-4">Resumen agrupado por trabajador - Click en una fila para ver detalle por lotes</p>
+
+      <div *ngIf="registrosAgrupados.length === 0" class="text-center py-12 text-gray-500">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
         <p>No hay registros de mano de obra</p>
         <p class="text-sm mt-1">Haz clic en "Ingresar mano de obra" para agregar el primer registro</p>
       </div>
-      
-      <div class="overflow-x-auto" *ngIf="registros.length > 0">
+
+      <div class="overflow-x-auto" *ngIf="registrosAgrupados.length > 0">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
+              <th class="w-10"></th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Lote</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trabajador</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cargo</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Horas</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Monto</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Horas Totales</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Costo Total</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-100">
-            <tr *ngFor="let r of registros" class="hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-3 text-sm text-gray-600">{{ r.fecha }}</td>
-              <td class="px-4 py-3 text-sm">
-                <span class="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
-                  {{ r.lote?.name || r.lote?.codigo || getLoteCodigo(r.lote?.id || r.loteId) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ r.nombreTrabajador }}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{{ r.cargo }}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{{ r.horasTrabajadas }}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">S/ {{ r.costoPorHora | number:'1.2-2' }}</td>
-              <td class="px-4 py-3 text-sm font-bold text-green-600">S/ {{ r.total | number:'1.2-2' }}</td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  <button (click)="editarRegistro(r)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button (click)="eliminarRegistro(r)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
+            <ng-container *ngFor="let row of registrosAgrupados; let i = index">
+              <tr (click)="toggleRow(i)" class="hover:bg-gray-50 cursor-pointer" [class.bg-blue-50]="expandedRowIndex === i">
+                <td class="px-2 py-3">
+                  <svg *ngIf="expandedRowIndex !== i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <svg *ngIf="expandedRowIndex === i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700 font-medium">{{ row.fecha | dateEs }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">{{ row.trabajador }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">{{ row.cargo }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 text-right">{{ row.horasTotal | number:'1.2-2' }}</td>
+                <td class="px-4 py-3 text-right"><span class="font-bold text-green-600">S/ {{ row.costoTotal | number:'1.2-2' }}</span></td>
+              </tr>
+              <tr *ngIf="expandedRowIndex === i">
+                <td colspan="6" class="bg-gray-50 px-6 py-4">
+                  <div class="pl-6">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Detalle por Lotes ({{ row.detalles.length }})</h4>
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <table class="w-full">
+                        <thead class="bg-gray-100">
+                          <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lote</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Horas</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Costo Unit.</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                          <tr *ngFor="let d of row.detalles" class="hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                              <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">{{ d.lote }}</span>
+                              <span *ngIf="getEtiquetaAnimal(d.animalTipo) as etq" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs" [ngClass]="{ 'bg-green-50 text-green-700': esPollo(etq), 'bg-rose-50 text-rose-700': esChancho(etq), 'bg-gray-100 text-gray-600': !esPollo(etq) && !esChancho(etq) }">{{ etq }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600 text-right font-medium">{{ d.cantidad | number:'1.2-2' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 text-right">S/ {{ d.costoUnit | number:'1.4-4' }}</td>
+                            <td class="px-4 py-3 text-right"><span class="font-semibold text-gray-800">S/ {{ d.total | number:'1.2-2' }}</span></td>
+                            <td class="px-4 py-3 text-center">
+                              <div class="flex items-center justify-center gap-2">
+                                <button (click)="editarRegistroPorId(d.id, d.loteId); $event.stopPropagation()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                </button>
+                                <button (click)="eliminarRegistroPorId(d.id); $event.stopPropagation()" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                          <tr>
+                            <td class="px-4 py-3 text-sm font-bold text-gray-700">Total del grupo</td>
+                            <td class="px-4 py-3 text-right text-sm font-semibold text-gray-700">{{ row.horasTotal | number:'1.2-2' }} h</td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3 text-right"><span class="text-lg font-bold text-green-600">S/ {{ row.costoTotal | number:'1.2-2' }}</span></td>
+                            <td class="px-4 py-3"></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
           </tbody>
         </table>
       </div>
@@ -278,6 +332,7 @@ export class ManoObraComponent implements OnInit {
   mostrarFormulario = false;
   editandoId: string | null = null;
   editandoLoteId: string | null = null;
+  expandedRowIndex: number | null = null;
 
   // KPIs
   totalPagado = 0;
@@ -359,6 +414,75 @@ export class ManoObraComponent implements OnInit {
     }));
   }
 
+  get registrosAgrupados(): GrupoManoObra[] {
+    const groups: { [key: string]: GrupoManoObra } = {};
+    this.registros.forEach(item => {
+      const fechaStr = this.normalizarFecha(item?.fecha);
+      const trabajador = String(item?.nombreTrabajador || '').trim();
+      const cargo = String(item?.cargo || '').trim();
+      const key = `${fechaStr}|${trabajador}|${cargo}`;
+      if (!groups[key]) {
+        groups[key] = { fecha: fechaStr, trabajador, cargo, horasTotal: 0, costoTotal: 0, detalles: [] };
+      }
+      const horas = Number(item?.horasTrabajadas ?? 0);
+      const costoUnit = Number(item?.costoPorHora ?? 0);
+      const total = Number(item?.total ?? (horas * costoUnit));
+      const animalTipo = (item?.lote?.race?.animal?.name)
+        || (this.lotes.find(l => String(l.id) === String(item?.lote?.id || item?.loteId))?.race?.animal?.name)
+        || '';
+      groups[key].horasTotal += horas;
+      groups[key].costoTotal += total;
+      groups[key].detalles.push({
+        id: String(item?.id ?? ''),
+        lote: item?.lote?.name || item?.lote?.codigo || this.getLoteCodigo(item?.lote?.id || item?.loteId),
+        loteId: String(item?.lote?.id || item?.loteId || ''),
+        animalTipo: String(animalTipo || ''),
+        cantidad: horas,
+        costoUnit,
+        total,
+        observaciones: item?.observaciones || ''
+      });
+    });
+    return Object.values(groups).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  }
+
+  toggleRow(index: number): void {
+    this.expandedRowIndex = this.expandedRowIndex === index ? null : index;
+  }
+
+  private normalizarFecha(f: any): string {
+    try {
+      if (!f) return '';
+      if (f instanceof Date) return f.toISOString().split('T')[0];
+      const s = String(f);
+      if (s.includes('T')) return s.split('T')[0];
+      return s.replace(/[./]/g, '-');
+    } catch {
+      return String(f || '');
+    }
+  }
+
+  getEtiquetaAnimal(animalTipo?: string): string {
+    if (!animalTipo) return '';
+    const s = String(animalTipo).toLowerCase();
+    if (s.includes('pollo') || s.includes('ave') || s.includes('broiler')) return 'Pollos';
+    if (s.includes('chancho') || s.includes('cerdo') || s.includes('porcino')) return 'Chanchos';
+    return animalTipo;
+  }
+
+  esPollo(etq: string): boolean { return String(etq).toLowerCase() === 'pollos'; }
+  esChancho(etq: string): boolean { return String(etq).toLowerCase() === 'chanchos'; }
+
+  editarRegistroPorId(id: string, loteId: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) this.editarRegistro(registro);
+  }
+
+  eliminarRegistroPorId(id: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) this.eliminarRegistro(registro);
+  }
+
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving = true; this.errorMessage = '';
@@ -431,9 +555,19 @@ export class ManoObraComponent implements OnInit {
 
     const numLotes = lotesSel.length;
 
-    const peticiones = lotesSel.map(lid => {
-      const totalLote = aplicarTodos ? (montoMensual / numLotes) : montoMensual;
-      const costoPorHoraLote = totalLote / horas;
+    let costosCentsPorLote: number[];
+    if (aplicarTodos && numLotes > 1) {
+      const totalCents = Math.round(montoMensual * 100);
+      const baseCents = Math.floor(totalCents / numLotes);
+      const resto = totalCents - (baseCents * numLotes);
+      costosCentsPorLote = Array.from({ length: numLotes }, (_, i) => baseCents + (i < resto ? 1 : 0));
+    } else {
+      costosCentsPorLote = Array.from({ length: numLotes }, () => Math.round(montoMensual * 100));
+    }
+
+    const peticiones = lotesSel.map((lid, idx) => {
+      const totalAsignado = costosCentsPorLote[idx] / 100;
+      const costoPorHoraLote = totalAsignado / horas;
       const payload = {
         ...basePayload,
         horasTrabajadas: horas,

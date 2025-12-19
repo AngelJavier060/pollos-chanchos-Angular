@@ -4,6 +4,7 @@ import { User } from '../../shared/models/user.model';
 import { AlimentacionService, PlanEjecucionHistorial, EstadisticasLoteHistorial, ResumenHistorialGeneral } from '../pollos/services/alimentacion.service';
 import { Lote } from '../lotes/interfaces/lote.interface';
 import { LoteService } from '../lotes/services/lote.service';
+import { InventarioService, ProductoConsumido } from '../pollos/services/inventario.service';
 
 interface RegistroHistorico {
   id: number;
@@ -62,6 +63,11 @@ export class ChanchosHistoricoComponent implements OnInit {
   mostrarDetalleAlimento = false;
   detalleAlimentos: { nombre: string; total: number }[] = [];
 
+  // Variables para el modal de detalles
+  mostrarModalDetalles = false;
+  registroSeleccionado: RegistroHistorico | null = null;
+  productosConsumidos: { nombre: string; cantidad: number; porAnimal?: number }[] = [];
+
   // Opciones de visualización
   stickyHeader = false;
   modoCompacto = false;
@@ -69,7 +75,8 @@ export class ChanchosHistoricoComponent implements OnInit {
   constructor(
     private authService: AuthDirectService,
     private alimentacionService: AlimentacionService,
-    private loteService: LoteService
+    private loteService: LoteService,
+    private inventarioService: InventarioService
   ) {
     this.user = this.authService.currentUserValue;
   }
@@ -220,6 +227,40 @@ export class ChanchosHistoricoComponent implements OnInit {
     this.registrosHistoricos = enriquecidos;
   }
 
+  private obtenerLoteIdPreferido(r: RegistroHistorico): string | null {
+    const lid = (r?.loteId || '').trim();
+    if (lid && lid !== 'LOT-MANUAL' && lid !== 'MANUAL' && lid !== 'N/A') return lid;
+    const obs = r?.observaciones || '';
+    const code = this.parseCodigoLoteDesdeObservaciones(obs);
+    if (code) return code;
+    const parsed = this.parseLoteDesdeObservaciones(obs) || '';
+    return parsed || null;
+  }
+
+  private resolverLoteDesdeIdOCodigo(idOCodigo?: string | null): Lote | undefined {
+    const key = (idOCodigo || '').trim();
+    if (!key) return undefined;
+    let lote = this.lotesChanchos.find(l => String(l.id) === key || (l.codigo || '') === key);
+    if (lote) return lote;
+    const cleanKey = this.sanitizeKey(key);
+    lote = this.lotesChanchos.find(l => {
+      const idC = this.sanitizeKey(String(l.id || ''));
+      const codC = this.sanitizeKey(String(l.codigo || ''));
+      const nameC = this.sanitizeKey(String(l.name || ''));
+      return idC === cleanKey || codC === cleanKey || nameC === cleanKey || (nameC && cleanKey.includes(nameC)) || (nameC && nameC.includes(cleanKey));
+    });
+    return lote;
+  }
+
+  private normalizarRegistroConLote(r: RegistroHistorico): RegistroHistorico {
+    const prefer = this.obtenerLoteIdPreferido(r);
+    const lote = this.resolverLoteDesdeIdOCodigo(prefer) || this.resolverLoteDesdeIdOCodigo(r.codigoLote);
+    if (lote) {
+      return { ...r, loteDescripcion: lote.name, codigoLote: lote.codigo || r.codigoLote, loteId: String(lote.id || r.loteId) };
+    }
+    return r;
+  }
+
   private parseAnimales(obs: string): { vivos?: number; muertos?: number } {
     const res: { vivos?: number; muertos?: number } = {};
     const mv = /Animales\s+vivos:\s*(\d+)/i.exec(obs || '');
@@ -235,6 +276,22 @@ export class ChanchosHistoricoComponent implements OnInit {
     return null;
   }
 
+  private parseCodigoLoteDesdeObservaciones(obs: string): string | null {
+    const m = /Lote:\s*[^()]*\(([^)]+)\)/i.exec(obs || '');
+    if (m && m[1]) return m[1].trim();
+    return null;
+  }
+
+  private parseNombreLoteDesdeObservaciones(obs: string): string | null {
+    const m = /Lote:\s*([^(|]+)/i.exec(obs || '');
+    if (m && m[1]) return m[1].trim();
+    return null;
+  }
+
+  private sanitizeKey(s?: string | null): string {
+    return (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
   private parseProductoDesdeObservaciones(obs: string): { nombre?: string; porAnimal?: number; vivos?: number; total?: number } {
     const o = obs || '';
     const nombre = (/Producto:\s*([^|]+)/i.exec(o) || [])[1]?.trim();
@@ -243,6 +300,17 @@ export class ChanchosHistoricoComponent implements OnInit {
     const totalS = (/total:\s*([0-9.,]+)/i.exec(o) || [])[1];
     const toNum = (s?: string) => (s ? parseFloat(s.replace(',', '.')) : undefined);
     return { nombre, porAnimal: toNum(porAnimalS), vivos: vivosS ? parseInt(vivosS, 10) : undefined, total: toNum(totalS) };
+  }
+
+  private intentarParsearProductosDeObservaciones(registro: RegistroHistorico): void {
+    const propio = this.parseProductoDesdeObservaciones(registro.observaciones || '');
+    if (propio?.nombre && this.esAlimento(propio.nombre)) {
+      this.productosConsumidos = [{
+        nombre: propio.nombre.trim(),
+        cantidad: propio.total ?? Number((registro.cantidadAplicada || 0).toFixed(3)),
+        porAnimal: propio.porAnimal
+      }];
+    }
   }
 
   private parsePesoPromedio(obs: string): number | undefined {
@@ -559,9 +627,53 @@ export class ChanchosHistoricoComponent implements OnInit {
     this.eliminarRegistroDelSistema(registro.id, motivoEliminacion);
   }
 
-  verDetalles(registro: any): void {
-    const cantidad = registro.cantidadAplicada || registro.cantidad || 0;
-    alert(`DETALLES DEL REGISTRO #${registro.id}\n\nLote: ${registro.loteDescripcion} (${registro.codigoLote})\nFecha de Registro: ${this.formatearFecha(registro.fecha)}\nFecha de Creación: ${this.formatearFechaHora(registro.fechaCreacion)}\nCantidad: ${cantidad} kg\nAnimales Vivos: ${registro.animalesVivos || 'N/A'}\nAnimales Muertos: ${registro.animalesMuertos || 'N/A'}\nEstado: ${registro.status}\nObservaciones: ${registro.observaciones || 'Sin observaciones'}\nUsuario: ${registro.usuarioId || 'N/A'}`);
+  verDetalles(registro: RegistroHistorico): void {
+    const normalizado = this.normalizarRegistroConLote(registro);
+    this.registroSeleccionado = normalizado;
+    this.productosConsumidos = [];
+    this.mostrarModalDetalles = true;
+    
+    const loteIdParaConsulta = normalizado.loteId || registro.loteId;
+    
+    if (!loteIdParaConsulta || loteIdParaConsulta === 'LOT-MANUAL' || loteIdParaConsulta === 'N/A') {
+      console.log('[Chanchos Histórico] No hay loteId válido para consultar consumos');
+      return;
+    }
+    
+    const fechaHoraCreacion = normalizado.fechaCreacion || registro.fechaCreacion;
+    console.log('[Chanchos Histórico] Consultando productos consumidos para lote:', loteIdParaConsulta, 'fechaHora:', fechaHoraCreacion);
+    
+    this.inventarioService.obtenerConsumosDetallePorLote(loteIdParaConsulta, fechaHoraCreacion).subscribe({
+      next: (productos: ProductoConsumido[]) => {
+        console.log('[Chanchos Histórico] Productos consumidos recibidos:', productos);
+        
+        if (productos && productos.length > 0) {
+          this.productosConsumidos = productos.map(p => ({
+            nombre: p.nombre,
+            cantidad: Number((p.cantidad || 0).toFixed(2))
+          }));
+        } else {
+          this.intentarParsearProductosDeObservaciones(normalizado);
+        }
+      },
+      error: (err) => {
+        console.error('[Chanchos Histórico] Error consultando productos consumidos:', err);
+        this.intentarParsearProductosDeObservaciones(normalizado);
+      }
+    });
+  }
+
+  cerrarModalDetalles(): void {
+    this.mostrarModalDetalles = false;
+    this.registroSeleccionado = null;
+    this.productosConsumidos = [];
+  }
+
+  getTotalProductosConsumidos(): number {
+    if (!this.productosConsumidos || this.productosConsumidos.length === 0) {
+      return this.registroSeleccionado?.cantidadAplicada || 0;
+    }
+    return this.productosConsumidos.reduce((sum, p) => sum + (p.cantidad || 0), 0);
   }
 
   private aplicarCorreccion(datosCorreccion: any): void {

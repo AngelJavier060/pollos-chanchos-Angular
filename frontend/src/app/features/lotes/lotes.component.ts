@@ -289,6 +289,8 @@ export class LotesComponent implements OnInit {
         this.lotes = data || [];
         this.lotesFiltrados = this.lotes; // ya vienen solo activos desde backend
         this.identificarTiposAnimales(); // Identificar tipos de animales disponibles
+        // Reaplicar el filtro actual una vez que los lotes estén cargados
+        this.filtrarPorTipoAnimal(this.filtroAnimalActual);
         
         // Debug: verificar estructura de datos
         console.log('[LotesComponent] Lotes cargados:', this.lotes.length);
@@ -618,22 +620,28 @@ export class LotesComponent implements OnInit {
   filtrarPorTipoAnimal(tipo: string): void {
     this.filtroAnimalActual = tipo;
     const base = this.lotes.filter(l => (Number(l.quantity) || 0) > 0);
-    
+
     if (tipo === 'all') {
       this.lotesFiltrados = base;
     } else {
-      // Filtrado flexible: busca coincidencias en el nombre del animal
-      this.lotesFiltrados = base.filter(lote => {
-        if (!lote.race?.animal?.name) return false;
-        
-        const animalName = lote.race.animal.name.toLowerCase();
-        const tipoLower = tipo.toLowerCase();
-        
-        // Coincidencia exacta o parcial
-        return animalName.includes(tipoLower) || tipoLower.includes(animalName);
-      });
+      const tipoLower = (tipo || '').toString().toLowerCase();
+      const tipoAsNumber = Number(tipoLower);
+      const esNumero = !isNaN(tipoAsNumber);
+
+      if (esNumero) {
+        this.lotesFiltrados = base.filter(lote => {
+          const idAnimal = Number(lote.race?.animal?.id || 0);
+          return idAnimal === tipoAsNumber;
+        });
+      } else {
+        this.lotesFiltrados = base.filter(lote => {
+          if (!lote.race?.animal?.name) return false;
+          const animalName = (lote.race.animal.name || '').toLowerCase();
+          return animalName.includes(tipoLower) || tipoLower.includes(animalName);
+        });
+      }
     }
-    
+
     console.log(`Filtrado por "${tipo}": ${this.lotesFiltrados.length} de ${base.length} lotes`);
   }
   

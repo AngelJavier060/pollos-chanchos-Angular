@@ -108,13 +108,15 @@ public interface PlanEjecucionRepository extends JpaRepository<PlanEjecucion, Lo
            "AND pe.status = 'EJECUTADO'")
     Long countCompletedExecutionsByAsignacion(@Param("asignacionId") Long asignacionId);
     
-    // 🔥 CONSULTA PERSONALIZADA PARA HISTORIAL CON JOIN FETCH
+    // 🔥 CONSULTA PERSONALIZADA PARA HISTORIAL CON JOIN FETCH (incluye Race y Animal para filtro por especie)
     @Query("SELECT pe FROM PlanEjecucion pe " +
            "LEFT JOIN FETCH pe.planAsignacion pa " +
            "LEFT JOIN FETCH pa.lote l " +
+           "LEFT JOIN FETCH l.race r " +
+           "LEFT JOIN FETCH r.animal a " +
            "LEFT JOIN FETCH pe.executedByUser u " +
            "WHERE pe.executionDate BETWEEN :fechaInicio AND :fechaFin " +
-           "ORDER BY pe.executionDate DESC")
+           "ORDER BY pe.createDate DESC, pe.executionDate DESC")
     List<PlanEjecucion> findHistorialWithDetails(@Param("fechaInicio") LocalDate fechaInicio, 
                                                  @Param("fechaFin") LocalDate fechaFin);
     
@@ -122,7 +124,9 @@ public interface PlanEjecucionRepository extends JpaRepository<PlanEjecucion, Lo
     @Query("SELECT pe FROM PlanEjecucion pe " +
            "LEFT JOIN FETCH pe.planAsignacion pa " +
            "LEFT JOIN FETCH pa.lote l " +
+           "LEFT JOIN FETCH l.race r " +
+           "LEFT JOIN FETCH r.animal a " +
            "LEFT JOIN FETCH pe.executedByUser u " +
-           "ORDER BY pe.executionDate DESC")
+           "ORDER BY pe.createDate DESC, pe.executionDate DESC")
     List<PlanEjecucion> findAllWithDetails();
 }

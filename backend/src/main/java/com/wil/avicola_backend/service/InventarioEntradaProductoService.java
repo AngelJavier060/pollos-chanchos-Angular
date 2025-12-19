@@ -111,6 +111,13 @@ public class InventarioEntradaProductoService {
     @Transactional
     public Map<String, Object> consumirPorProductoFefo(Long productId, BigDecimal cantidadBaseSolicitada,
                                                        String loteId, String usuario, String observaciones) {
+        return consumirPorProductoFefo(productId, cantidadBaseSolicitada, loteId, usuario, observaciones, null);
+    }
+
+    @Transactional
+    public Map<String, Object> consumirPorProductoFefo(Long productId, BigDecimal cantidadBaseSolicitada,
+                                                       String loteId, String usuario, String observaciones,
+                                                       java.time.LocalDate fechaRegistro) {
         if (cantidadBaseSolicitada == null || cantidadBaseSolicitada.compareTo(BigDecimal.ZERO) <= 0)
             throw new RequestException("cantidad debe ser > 0");
 
@@ -183,14 +190,21 @@ public class InventarioEntradaProductoService {
         // Registrar movimiento consolidado por lo realmente consumido (si > 0)
         Long movimientoId = null;
         if (consumido.compareTo(BigDecimal.ZERO) > 0) {
-            MovimientoInventarioProducto mov = inventarioProductoService.registrarMovimiento(
+            // Usar la hora actual para que coincida con createDate del PlanEjecucion
+            java.time.LocalDateTime fechaMov = java.time.LocalDateTime.now();
+            if (fechaRegistro != null && !fechaRegistro.equals(java.time.LocalDate.now())) {
+                // Solo usar hora fija si la fecha es diferente al día actual (registro histórico)
+                fechaMov = fechaRegistro.atTime(java.time.LocalTime.now());
+            }
+            MovimientoInventarioProducto mov = inventarioProductoService.registrarMovimientoConFecha(
                 productId,
                 MovimientoInventarioProducto.TipoMovimiento.CONSUMO_LOTE,
                 consumido,
                 null,
                 loteId,
                 usuario != null ? usuario : "Sistema",
-                observaciones != null ? observaciones : "Consumo FEFO"
+                observaciones != null ? observaciones : "Consumo FEFO",
+                fechaMov
             );
             movimientoId = mov.getId();
 
@@ -398,6 +412,14 @@ public class InventarioEntradaProductoService {
     public Map<String, Object> consumirPorTipoFefo(Long tipoAlimentoId, BigDecimal cantidadBaseSolicitada,
                                                    String loteId, String usuario, String observaciones,
                                                    boolean respetarBandera) {
+        return consumirPorTipoFefo(tipoAlimentoId, cantidadBaseSolicitada, loteId, usuario, observaciones, respetarBandera, null);
+    }
+
+    @Transactional
+    public Map<String, Object> consumirPorTipoFefo(Long tipoAlimentoId, BigDecimal cantidadBaseSolicitada,
+                                                   String loteId, String usuario, String observaciones,
+                                                   boolean respetarBandera,
+                                                   java.time.LocalDate fechaRegistro) {
         if (tipoAlimentoId == null) throw new RequestException("tipoAlimentoId requerido");
         if (cantidadBaseSolicitada == null || cantidadBaseSolicitada.compareTo(BigDecimal.ZERO) <= 0)
             throw new RequestException("cantidad debe ser > 0");
@@ -495,10 +517,17 @@ public class InventarioEntradaProductoService {
         // Registrar movimientos por producto y detalle por entrada
         Map<Long, MovimientoInventarioProducto> movPorProducto = new HashMap<>();
         for (Map.Entry<Long, BigDecimal> kv : consumoPorProducto.entrySet()) {
-            MovimientoInventarioProducto m = inventarioProductoService.registrarMovimiento(
+            // Usar la hora actual para que coincida con createDate del PlanEjecucion
+            java.time.LocalDateTime fechaMov = java.time.LocalDateTime.now();
+            if (fechaRegistro != null && !fechaRegistro.equals(java.time.LocalDate.now())) {
+                // Solo usar hora diferente si la fecha es diferente al día actual
+                fechaMov = fechaRegistro.atTime(java.time.LocalTime.now());
+            }
+            MovimientoInventarioProducto m = inventarioProductoService.registrarMovimientoConFecha(
                 kv.getKey(), MovimientoInventarioProducto.TipoMovimiento.CONSUMO_LOTE, kv.getValue(), null, loteId,
                 usuario != null ? usuario : "Sistema",
-                observaciones != null ? observaciones : "Consumo FEFO por tipo"
+                observaciones != null ? observaciones : "Consumo FEFO por tipo",
+                fechaMov
             );
             movPorProducto.put(kv.getKey(), m);
         }

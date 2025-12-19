@@ -6,6 +6,8 @@ import 'package:local_auth/local_auth.dart';
 import 'services/auth_service.dart';
 import 'pages/alimentacion_page.dart';
 import 'pages/admin_menu_page.dart';
+import 'pages/historico_alimentacion_page.dart';
+import 'pages/lotes_dashboard_page.dart';
 
 void main() => runApp(const GranjaElviataApp());
 
@@ -882,7 +884,16 @@ class HomePage extends StatelessWidget {
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0,2))]),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () { final label = e['label'] as String; if (label == 'Alimentación') { Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlimentacionPage())); } },
+                    onTap: () { 
+                      final label = e['label'] as String; 
+                      if (label == 'Alimentación') { 
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlimentacionPage())); 
+                      } else if (label == 'Histórico') {
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoricoAlimentacionPage()));
+                      } else if (label == 'Lotes') {
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LotesDashboardPage()));
+                      }
+                    },
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       CircleAvatar(backgroundColor: e['color'] as Color, radius: 26, child: Icon(e['icon'] as IconData, color: Colors.white)),
                       const SizedBox(height: 8),

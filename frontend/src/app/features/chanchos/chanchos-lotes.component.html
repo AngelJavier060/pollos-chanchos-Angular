@@ -1,305 +1,126 @@
-<!-- Header de la página -->
-<div class="dashboard-header flex items-center mb-6">
-  <img [src]="user?.profilePicture || 'assets/img/default-avatar.png'" alt="Avatar" class="h-14 w-14 rounded-full border-4 border-pink-400 mr-4">
-  <div>
-    <h1 class="text-2xl font-bold text-pink-700">Gestión de Lotes - Chanchos</h1>
-    <p class="text-gray-600">Administración y seguimiento de lotes de cerdos</p>
-  </div>
-</div>
-
-<!-- Indicador de carga -->
-<div *ngIf="loading" class="flex justify-center items-center py-8">
-  <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
-</div>
-
-<ng-container *ngIf="!loading">
-  <!-- Estadísticas Generales -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <!-- Total de lotes -->
-    <div class="bg-gradient-to-r from-pink-50 to-pink-100 border border-pink-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-pink-700 text-sm font-medium mb-1">Total Lotes</p>
-          <p class="text-3xl font-bold text-pink-800">{{ estadisticas.totalLotes }}</p>
-        </div>
-        <div class="p-3 bg-pink-200 rounded-xl">
-          <i class="fas fa-clipboard-list text-pink-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Lotes activos -->
-    <div class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-green-700 text-sm font-medium mb-1">Lotes Activos</p>
-          <p class="text-3xl font-bold text-green-800">{{ estadisticas.lotesActivos }}</p>
-        </div>
-        <div class="p-3 bg-green-200 rounded-xl">
-          <i class="fas fa-heart text-green-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Total animales -->
-    <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-blue-700 text-sm font-medium mb-1">Total Chanchos</p>
-          <p class="text-3xl font-bold text-blue-800">{{ estadisticas.totalAnimales }}</p>
-        </div>
-        <div class="p-3 bg-blue-200 rounded-xl">
-          <i class="fas fa-pig text-blue-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Promedio de edad -->
-    <div class="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-6 shadow-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-orange-700 text-sm font-medium mb-1">Promedio Edad</p>
-          <p class="text-3xl font-bold text-orange-800">{{ estadisticas.promedioEdad }} 
-            <span class="text-lg font-normal">días</span>
-          </p>
-        </div>
-        <div class="p-3 bg-orange-200 rounded-xl">
-          <i class="fas fa-calendar text-orange-600 text-xl"></i>
-        </div>
-      </div>
-    </div>
+﻿<!-- Header de la página -->
+<div style="padding: 20px; background: #f0f4f8; min-height: 100vh;">
+  <h1 style="font-size: 32px; margin-bottom: 10px;">🐷 Gestión de Lotes</h1>
+  <p style="color: #666; margin-bottom: 20px;">Control de consumo por lote</p>
+  
+  <!-- Botón temporal de debug -->
+  <div style="margin-bottom: 20px;">
+    <button (click)="debugBackendConnection()" 
+            style="background: #dc2626; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+      🔧 DEBUG: Probar Backend
+    </button>
+    <span style="margin-left: 10px; font-size: 12px; color: #666;">
+      Abre DevTools → Console para ver logs detallados
+    </span>
   </div>
 
-  <!-- Filtros y Controles -->
-  <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-xl font-semibold text-gray-800">
-        <i class="fas fa-filter mr-2 text-pink-600"></i>
-        Filtros de Búsqueda
-      </h2>
-      <button 
-        (click)="limpiarFiltros()"
-        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
-        <i class="fas fa-eraser mr-2"></i>
-        Limpiar Filtros
-      </button>
+  <!-- Lista de Lotes estilo React -->
+  <div *ngFor="let lote of lotesFiltrados; trackBy: trackByLote" 
+       style="background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    
+    <!-- Header del lote (clickeable) -->
+    <div (click)="toggleExpand(lote)"
+         style="background: #4a5568; color: white; padding: 20px; border-radius: 12px 12px 0 0; cursor: pointer;">
+      <h2 style="font-size: 24px; margin: 0;">{{ lote.codigo }} - {{ lote.name }}</h2>
+      <p style="margin: 5px 0 0 0; opacity: 0.9;">
+        {{ lote.quantity }} animales - Total: {{ getConsumoTotal(lote) | number:'1.2-2' }} kg
+      </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <!-- Filtro por estado -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Estado del Lote</label>
-        <select 
-          [(ngModel)]="filtros.estado"
-          (ngModelChange)="aplicarFiltros()"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-          <option value="todos">Todos los lotes</option>
-          <option value="activos">Solo activos</option>
-          <option value="cerrados">Solo cerrados</option>
-        </select>
+    <!-- Contenido expandible -->
+    <div *ngIf="isExpanded(lote)" style="padding: 20px;">
+      <!-- KPIs principales -->
+      <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <!-- Consumo Total -->
+        <div style="flex: 1; background: #dbeafe; padding: 20px; border-radius: 10px; border: 2px solid #93c5fd;">
+          <div style="font-size: 14px; margin-bottom: 5px;">Consumo Total</div>
+          <div style="font-size: 32px; font-weight: bold;">{{ getConsumoTotal(lote) | number:'1.2-2' }}</div>
+          <div style="font-size: 12px; margin-top: 5px;">kilogramos</div>
+        </div>
+
+        <!-- Animales -->
+        <div style="flex: 1; background: #dcfce7; padding: 20px; border-radius: 10px; border: 2px solid #86efac;">
+          <div style="font-size: 14px; margin-bottom: 5px;">Animales</div>
+          <div style="font-size: 32px; font-weight: bold;">{{ lote.quantity }}</div>
+          <div style="font-size: 12px; margin-top: 5px;">cabezas</div>
+        </div>
+
+        <!-- Promedio -->
+        <div style="flex: 1; background: #f3e8ff; padding: 20px; border-radius: 10px; border: 2px solid #d8b4fe;">
+          <div style="font-size: 14px; margin-bottom: 5px;">Promedio</div>
+          <div style="font-size: 32px; font-weight: bold;">{{ getPromedioPorAnimal(lote) | number:'1.2-2' }}</div>
+          <div style="font-size: 12px; margin-top: 5px;">kg/animal</div>
+        </div>
+
+        <!-- KPI por producto (primeros 3) -->
+        <ng-container *ngFor="let producto of getProductosDelLote(lote) | slice:0:3; let i = index">
+          <div [ngStyle]="getKPIStyle(producto.nombre, i)" 
+               style="flex: 1; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 14px; margin-bottom: 5px; font-weight: 600; opacity: .9;">{{ producto.nombre }}</div>
+            <div style="font-size: 32px; font-weight: bold;">{{ producto.cantidad | number:'1.2-2' }}</div>
+            <div style="font-size: 12px; margin-top: 5px;">kilogramos</div>
+            <div style="background: rgba(255,255,255,.5); height: 8px; border-radius: 10px; margin-top: 10px;">
+              <div [style.width.%]="getPorcentajeProducto(lote, producto)" 
+                   style="height: 8px; border-radius: 10px; background: rgba(16,185,129,.8);"></div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Tipos de Alimento (KPI por producto) -->
+      <h3 style="margin-top: 30px; margin-bottom: 15px;">Tipos de Alimento</h3>
+      <div *ngIf="getProductosDelLote(lote)?.length; else sinAlimentos" 
+           style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+        <div *ngFor="let producto of getProductosDelLote(lote); let i = index" 
+             [ngStyle]="getKPIStyle(producto.nombre, i)"
+             style="flex: 1 1 220px; padding: 20px; border-radius: 10px;">
+          <div style="font-size: 14px; margin-bottom: 5px; font-weight: 600; opacity: .9;">
+            {{ producto.nombre | uppercase }}
+          </div>
+          <div style="font-size: 28px; font-weight: bold;">{{ producto.cantidad | number:'1.2-2' }} kg</div>
+          <div style="background: #e5e7eb; height: 8px; border-radius: 10px; margin-top: 10px;">
+            <div [style.width.%]="getPorcentajeProducto(lote, producto)"
+                 style="height: 8px; border-radius: 10px; background: #3b82f6;"></div>
+          </div>
+          <div style="font-size: 12px; margin-top: 5px;">{{ getPorcentajeProducto(lote, producto) }}% del total</div>
+        </div>
       </div>
       
-      <!-- Filtro por raza -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Raza</label>
-        <select 
-          [(ngModel)]="filtros.raza"
-          (ngModelChange)="aplicarFiltros()"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-          <option value="">Todas las razas</option>
-          <option *ngFor="let raza of razasDisponibles" [value]="raza">{{ raza }}</option>
-        </select>
+      <ng-template #sinAlimentos>
+        <div style="background: #f9fafb; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e5e7eb; text-align: center; color: #666;">
+          No hay registros de alimentos para este lote
+        </div>
+      </ng-template>
+
+      <!-- Historial -->
+      <h3 style="margin-top: 30px; margin-bottom: 15px;">Historial</h3>
+      
+      <div *ngIf="getRegistrosDelLote(lote)?.length; else sinHistorial">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #f9fafb;">
+              <th style="padding: 12px; text-align: left; font-size: 12px;">FECHA</th>
+              <th style="padding: 12px; text-align: left; font-size: 12px;">TIPO</th>
+              <th style="padding: 12px; text-align: left; font-size: 12px;">CANTIDAD</th>
+              <th style="padding: 12px; text-align: left; font-size: 12px;">RESPONSABLE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let registro of getRegistrosDelLote(lote) | slice:0:5">
+              <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.fecha | date:'yyyy-MM-dd HH:mm' }}</td>
+              <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ getNombreProductoRegistro(registro) }}</td>
+              <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.cantidad | number:'1.2-2' }} kg</td>
+              <td style="padding: 12px; border-top: 1px solid #e5e7eb;">{{ registro.usuarioNombre || 'Sistema' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       
-      <!-- Búsqueda por texto -->
-      <div class="md:col-span-2">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Búsqueda</label>
-        <input 
-          type="text"
-          [(ngModel)]="filtros.busqueda"
-          (input)="aplicarFiltros()"
-          placeholder="Buscar por código, nombre o raza..."
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
-      </div>
+      <ng-template #sinHistorial>
+        <div style="background: #f9fafb; padding: 15px; border-radius: 10px; border: 1px solid #e5e7eb; text-align: center; color: #666;">
+          No hay registros de historial para este lote
+        </div>
+      </ng-template>
     </div>
   </div>
-
-  <!-- Lista de Lotes -->
-  <div class="bg-white rounded-xl shadow-lg p-6">
-    <div class="flex justify-between items-center mb-6">
-      <h3 class="text-lg font-semibold text-gray-800">
-        <i class="fas fa-list mr-2 text-pink-600"></i>
-        Lotes de Chanchos ({{ lotesFiltrados.length }})
-      </h3>
-    </div>
-
-    <!-- Mensaje cuando no hay lotes -->
-    <div *ngIf="lotesFiltrados.length === 0" class="text-center py-12">
-      <div class="text-gray-400 mb-4">
-        <i class="fas fa-pig text-6xl"></i>
-      </div>
-      <h4 class="text-xl font-semibold text-gray-600 mb-2">No se encontraron lotes</h4>
-      <p class="text-gray-500">No hay lotes que coincidan con los filtros aplicados.</p>
-    </div>
-
-    <!-- Grid de lotes -->
-    <div *ngIf="lotesFiltrados.length > 0" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <div *ngFor="let lote of lotesFiltrados; trackBy: trackByLote" 
-           class="bg-gradient-to-br from-white to-pink-50 border border-pink-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
-        
-        <!-- Header del lote -->
-        <div class="bg-gradient-to-r from-pink-500 to-pink-600 text-white p-4">
-          <div class="flex justify-between items-start">
-            <div>
-              <h4 class="font-bold text-lg">{{ lote.codigo }}</h4>
-              <p class="text-pink-100 text-sm">{{ lote.name }}</p>
-            </div>
-            <span [class]="getEstadoLote(lote).clase" 
-                  class="px-2 py-1 rounded-full text-xs font-semibold">
-              {{ getEstadoLote(lote).texto }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Contenido del lote -->
-        <div class="p-4 space-y-4">
-          <!-- Información básica real del lote -->
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="space-y-1">
-              <p class="text-gray-600 font-medium">Registrados:</p>
-              <p class="text-lg font-bold text-gray-800">
-                {{ getRegistrados(lote) }} chanchos
-              </p>
-              <p class="text-gray-600 font-medium mt-2">Vivos actuales:</p>
-              <p class="text-base font-semibold text-blue-800">
-                {{ lote.quantity }} chanchos
-              </p>
-            </div>
-            <div class="space-y-1">
-              <p class="text-gray-600 font-medium">Bajas totales:</p>
-              <p class="text-lg font-bold" [class]="getBajasTotales(lote) > 0 ? 'text-red-700' : 'text-gray-800'">
-                {{ getBajasTotales(lote) }}
-              </p>
-              <p class="text-gray-600 font-medium mt-2">% de bajas:</p>
-              <p class="text-base font-semibold" [class]="getPorcentajeBajas(lote) > 0 ? 'text-red-700' : 'text-gray-800'">
-                {{ getPorcentajeBajas(lote) }} %
-              </p>
-            </div>
-          </div>
-
-          <!-- Fechas y costo del lote -->
-          <div class="bg-gray-50 rounded-lg p-3">
-            <h5 class="font-semibold text-gray-800 text-sm mb-2">
-              <i class="fas fa-clipboard-list text-gray-600 mr-1"></i>
-              Información del Lote
-            </h5>
-            <div class="text-sm text-gray-600 space-y-1">
-              <p><strong>Nacimiento:</strong> {{ formatearFecha(lote.birthdate) }}</p>
-              <p *ngIf="lote.create_date"><strong>Creado:</strong> {{ formatearFecha(lote.create_date) }}</p>
-              <p *ngIf="lote.fechaCierre"><strong>Cierre:</strong> {{ formatearFecha(lote.fechaCierre) }}</p>
-              <p><strong>Costo total:</strong> ${{ lote.cost.toLocaleString('es-ES') }}</p>
-            </div>
-          </div>
-
-          <!-- Características de la raza -->
-          <div class="bg-blue-50 rounded-lg p-3" *ngIf="lote.race">
-            <h5 class="font-semibold text-blue-800 text-sm mb-2">
-              <i class="fas fa-dna text-blue-600 mr-1"></i>
-              Características de la Raza
-            </h5>
-            <div class="text-sm text-blue-700 space-y-1">
-              <p><strong>Raza:</strong> {{ lote.race.name }}</p>
-              <p><strong>Animal:</strong> {{ lote.race.animal?.name || 'Chancho' }}</p>
-            </div>
-          </div>
-
-          <!-- Distribución por sexo (solo si hay datos) -->
-          <div class="bg-purple-50 rounded-lg p-3" *ngIf="getTotalSexo(lote) > 0">
-            <h5 class="font-semibold text-purple-800 text-sm mb-3">
-              <i class="fas fa-venus-mars text-purple-600 mr-1"></i>
-              Distribución por sexo
-            </h5>
-            <div class="flex flex-col gap-2 text-xs font-semibold">
-              <div class="flex items-center justify-between">
-                <div class="inline-flex items-center px-2 py-0.5 rounded-full bg-pink-100 text-pink-800 border border-pink-200">
-                  <i class="fas fa-venus mr-1"></i>
-                  Hembras: {{ lote.femaleCount || 0 }}
-                </div>
-                <span class="text-pink-700" *ngIf="lote.femaleCount != null">
-                  {{ getPorcentajeSexo(lote.femaleCount || 0, getTotalSexo(lote)) }} %
-                  <span *ngIf="lote.femalePurpose" class="ml-1 text-[10px] font-normal italic">
-                    ({{ lote.femalePurpose }})
-                  </span>
-                </span>
-              </div>
-              <div class="flex items-center justify-between">
-                <div class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                  <i class="fas fa-mars mr-1"></i>
-                  Machos: {{ lote.maleCount || 0 }}
-                </div>
-                <span class="text-blue-700" *ngIf="lote.maleCount != null">
-                  {{ getPorcentajeSexo(lote.maleCount || 0, getTotalSexo(lote)) }} %
-                  <span *ngIf="lote.malePurpose" class="ml-1 text-[10px] font-normal italic">
-                    ({{ lote.malePurpose }})
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Métricas del lote -->
-          <div class="bg-green-50 rounded-lg p-3">
-            <h5 class="font-semibold text-green-800 text-sm mb-3">
-              <i class="fas fa-chart-line text-green-600 mr-1"></i>
-              Métricas del Lote
-            </h5>
-            <div class="space-y-2">
-              <!-- Etapa de crecimiento -->
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-green-700">Etapa:</span>
-                <span [class]="getColorEtapa(determinarEtapa(calcularDiasDeVida(lote.birthdate)))" 
-                      class="px-2 py-1 rounded-full text-xs font-semibold">
-                  {{ determinarEtapa(calcularDiasDeVida(lote.birthdate)) }}
-                </span>
-              </div>
-              
-              <!-- Progreso del ciclo -->
-              <div class="text-sm">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="text-green-700">Progreso del ciclo:</span>
-                  <span class="text-green-800 font-semibold">{{ calcularProgreso(calcularDiasDeVida(lote.birthdate)) }}%</span>
-                </div>
-                <div class="w-full bg-green-200 rounded-full h-2">
-                  <div class="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500" 
-                       [style.width.%]="calcularProgreso(calcularDiasDeVida(lote.birthdate))"></div>
-                </div>
-              </div>
-
-              <!-- Costo por animal (según registrados) -->
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-green-700">Costo por animal:</span>
-                <span class="text-green-800 font-semibold">
-                  ${{ (lote.cost / Math.max(1, getRegistrados(lote))).toLocaleString('es-ES', {maximumFractionDigits: 0}) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Estado visual -->
-          <div class="pt-2 border-t border-gray-200">
-            <div class="flex items-center justify-center space-x-2">
-              <div class="flex items-center space-x-1">
-                <div [class]="lote.quantity > 0 ? 'bg-green-400' : 'bg-red-400'" 
-                     class="w-3 h-3 rounded-full"></div>
-                <span class="text-sm font-medium" 
-                      [class]="lote.quantity > 0 ? 'text-green-700' : 'text-red-700'">
-                  {{ lote.quantity > 0 ? 'Lote Activo' : 'Lote Cerrado' }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</ng-container> 
+</div> 

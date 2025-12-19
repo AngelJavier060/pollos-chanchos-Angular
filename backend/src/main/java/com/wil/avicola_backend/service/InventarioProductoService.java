@@ -68,6 +68,19 @@ public class InventarioProductoService {
                                                             String loteId,
                                                             String usuario,
                                                             String observaciones) {
+        // Delegar a la versión con fecha explícita (null para usar @CreatedDate)
+        return registrarMovimientoConFecha(productId, tipo, cantidad, costoUnitario, loteId, usuario, observaciones, null);
+    }
+
+    @Transactional
+    public MovimientoInventarioProducto registrarMovimientoConFecha(Long productId,
+                                                                    MovimientoInventarioProducto.TipoMovimiento tipo,
+                                                                    BigDecimal cantidad,
+                                                                    BigDecimal costoUnitario,
+                                                                    String loteId,
+                                                                    String usuario,
+                                                                    String observaciones,
+                                                                    java.time.LocalDateTime fechaMovimiento) {
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RequestException("Cantidad debe ser > 0");
         }
@@ -130,6 +143,8 @@ public class InventarioProductoService {
             .loteId(loteId)
             .usuarioRegistro(usuario != null ? usuario : "API")
             .observaciones(observaciones)
+            // Si se especifica fechaMovimiento, usarla; de lo contrario, Auditing asignará @CreatedDate
+            .fechaMovimiento(fechaMovimiento)
             .build();
         MovimientoInventarioProducto saved = movimientoInventarioProductoRepository.save(mov);
         try {

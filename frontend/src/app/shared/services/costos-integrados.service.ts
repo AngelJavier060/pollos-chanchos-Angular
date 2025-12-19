@@ -97,7 +97,9 @@ export class CostosIntegradosService {
     lote: any,
     costoAlimentacion: number,
     registrosSanidad: any[],
-    registrosMorbilidad: any[]
+    registrosMorbilidad: any[],
+    periodoInicio?: Date,
+    periodoFin?: Date
   ): CostosDirectos {
     const compraAnimales = Number(lote?.cost || 0);
     const alimentacion = costoAlimentacion;
@@ -110,11 +112,22 @@ export class CostosIntegradosService {
         return sum + (isNaN(total) ? 0 : total);
       }, 0);
 
-    // Morbilidad (tratamientos curativos) - POR IMPLEMENTAR
-    const morbilidad = 0; // TODO: Implementar cuando el backend tenga el campo costo
-    // const morbilidad = registrosMorbilidad
-    //   .filter(r => String(r?.loteId) === String(lote.id))
-    //   .reduce((sum, r) => sum + Number(r?.costo || 0), 0);
+    // Morbilidad (tratamientos curativos)
+    const dentroDePeriodo = (fecha: any): boolean => {
+      if (!periodoInicio || !periodoFin) return true;
+      try {
+        const f = new Date(fecha);
+        return f >= periodoInicio && f <= periodoFin;
+      } catch { return true; }
+    };
+    const morbilidad = (registrosMorbilidad || [])
+      .filter(r => String(r?.loteId) === String(lote.id) && dentroDePeriodo(r?.fechaRegistro || r?.fecha))
+      .reduce((sum, r) => {
+        const costoTrat = Number(r?.tratamiento?.costo || 0);
+        const qty = Number(r?.cantidadEnfermos || 0);
+        const parcial = (isNaN(costoTrat) ? 0 : costoTrat) * (isNaN(qty) ? 0 : qty);
+        return sum + parcial;
+      }, 0);
 
     const total = compraAnimales + alimentacion + sanidadPreventiva + morbilidad;
 
@@ -176,7 +189,7 @@ export class CostosIntegradosService {
 
       detalles.push({
         loteId: String(lote.id),
-        loteCodigo: lote.codigo || `Lote ${lote.id}`,
+        loteCodigo: (lote?.name && String(lote.name).trim()) ? String(lote.name).trim() : (lote?.codigo || `Lote ${lote.id}`),
         diasAnimal: cantidad * diasActivos,
         cantidad,
         biomasa,
@@ -303,7 +316,9 @@ export class CostosIntegradosService {
       lote,
       costoAlimentacion,
       registrosSanidad,
-      registrosMorbilidad
+      registrosMorbilidad,
+      periodoInicio,
+      periodoFin
     );
 
     // Costos indirectos (ya vienen prorrateados y desglosados)
@@ -313,7 +328,7 @@ export class CostosIntegradosService {
     const costoTotal = costosDirectos.total + costosIndirectos.total;
 
     // Resumen de animales
-    const animales = this.calcularAnimalesResumen(lote, mortalidadLote, ventasLote);
+    const animales = this.calcularAnimalesResumen(lote, mortalidadLote, ventasLote, registrosMorbilidad);
 
     // Peso y conversión
     const peso = this.calcularPesoResumen(lote, ventasLote, costoAlimentacion, detalleAlimentos);
@@ -387,15 +402,25 @@ export class CostosIntegradosService {
     return 10; // Default
   }
 
-  private calcularAnimalesResumen(lote: any, mortalidad: any[], ventas: any[]): AnimalesResumen {
+  private calcularAnimalesResumen(lote: any, mortalidad: any[], ventas: any[], morbilidad: any[]): AnimalesResumen {
     const iniciales = Number(lote?.quantityOriginal || lote?.quantity || 0);
     const muertos = mortalidad.length;
     const vendidos = ventas.reduce((sum, v) => sum + Number(v?.cantidadAnimales || 0), 0);
     const vivos = Number(lote?.quantity || 0);
     const mortalidadPct = iniciales > 0 ? Math.round((muertos / iniciales) * 10000) / 100 : 0;
+    // Enfermos: sumar cantidadEnfermos de registros activos (no recuperados ni fallecidos)
+    let enfermos = 0;
+    try {
+      for (const r of (morbilidad || [])) {
+        const estado = (r?.estado?.nombre || '').toString().toLowerCase();
+        const activo = !r?.fechaRecuperacion && !r?.fechaMuerte && estado !== 'recuperado' && estado !== 'fallecido';
+        if (activo) enfermos += Number(r?.cantidadEnfermos || 0);
+      }
+    } catch {}
 
     return {
       iniciales,
+      enfermos,
       muertos,
       vendidos,
       vivos,

@@ -70,9 +70,9 @@ export class ChanchosMortalidadComponent implements OnInit, OnDestroy {
     const lotesSub = this.loteService.getLotes().subscribe({
       next: (lotes: Lote[]) => {
         this.lotes = lotes.filter((lote: Lote) =>
-          lote.race?.animal?.name?.toLowerCase().includes('chancho') ||
-          lote.race?.animal?.name?.toLowerCase().includes('cerdo') ||
-          lote.race?.animal?.id === 2
+          (lote.race?.animal?.name?.toLowerCase().includes('chancho') ||
+           lote.race?.animal?.name?.toLowerCase().includes('cerdo') ||
+           lote.race?.animal?.id === 2) && (Number(lote.quantity) || 0) > 0
         );
         this.cargarRegistrosMortalidad();
       },
@@ -202,9 +202,9 @@ export class ChanchosMortalidadComponent implements OnInit, OnDestroy {
     const lotesSub = this.loteService.getLotes().subscribe({
       next: (lotes: Lote[]) => {
         const lotesChanchos = lotes.filter((lote: Lote) =>
-          lote.race?.animal?.name?.toLowerCase().includes('chancho') ||
-          lote.race?.animal?.name?.toLowerCase().includes('cerdo') ||
-          lote.race?.animal?.id === 2
+          (lote.race?.animal?.name?.toLowerCase().includes('chancho') ||
+           lote.race?.animal?.name?.toLowerCase().includes('cerdo') ||
+           lote.race?.animal?.id === 2) && (Number(lote.quantity) || 0) > 0
         );
         this.lotes = lotesChanchos;
       },

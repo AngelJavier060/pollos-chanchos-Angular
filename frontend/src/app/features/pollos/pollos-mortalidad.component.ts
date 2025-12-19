@@ -88,7 +88,7 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     const lotesSub = this.loteService.getLotes().subscribe({
       next: (lotes: Lote[]) => {
         this.lotes = lotes.filter((lote: Lote) => 
-          lote.race?.animal?.name?.toLowerCase().includes('pollo')
+          lote.race?.animal?.name?.toLowerCase().includes('pollo') && (Number(lote.quantity) || 0) > 0
         );
         console.log('✅ Lotes filtrados para pollos:', this.lotes);
         
@@ -240,9 +240,9 @@ export class PollosMortalidadComponent implements OnInit, OnDestroy {
     
     const lotesSub = this.loteService.getLotes().subscribe({
       next: (lotes: Lote[]) => {
-        // Actualizar solo los lotes de pollos
+        // Actualizar solo los lotes de pollos con stock vivo
         const lotesPollos = lotes.filter((lote: Lote) => 
-          lote.race?.animal?.name?.toLowerCase().includes('pollo')
+          lote.race?.animal?.name?.toLowerCase().includes('pollo') && (Number(lote.quantity) || 0) > 0
         );
         
         // Encontrar el lote afectado para mostrar el cambio

@@ -1,6 +1,7 @@
 package com.wil.avicola_backend.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +48,17 @@ public class PlanAlimentacionServiceSimplificado {
             BigDecimal cantidadKg,
             String usuarioRegistro,
             String observaciones) {
+        return registrarConsumoAlimentoPorProducto(loteId, tipoAlimentoId, productId, cantidadKg, usuarioRegistro, observaciones, null);
+    }
+
+    public ResponseEntity<?> registrarConsumoAlimentoPorProducto(
+            String loteId,
+            Long tipoAlimentoId,
+            Long productId,
+            BigDecimal cantidadKg,
+            String usuarioRegistro,
+            String observaciones,
+            LocalDate fechaRegistro) {
         
         System.out.println("🍽️ [SIMPLIFICADO] Registrando consumo de alimento:");
         System.out.println("   - Lote ID: " + loteId);
@@ -96,7 +108,7 @@ public class PlanAlimentacionServiceSimplificado {
 
             // ✅ Nuevo flujo: intentar consumo FEFO por entradas de producto
             Map<String, Object> rfefo = inventarioEntradaProductoService.consumirPorProductoFefo(
-                productId, cantidadKg, loteId, usuarioRegistro, observaciones
+                productId, cantidadKg, loteId, usuarioRegistro, observaciones, fechaRegistro
             );
 
             BigDecimal consumido = (BigDecimal) rfefo.getOrDefault("cantidadConsumida", BigDecimal.ZERO);
@@ -173,6 +185,16 @@ public class PlanAlimentacionServiceSimplificado {
             BigDecimal cantidadKg,
             String usuarioRegistro,
             String observaciones) {
+        return registrarConsumoAlimento(loteId, tipoAlimentoId, cantidadKg, usuarioRegistro, observaciones, null);
+    }
+
+    public ResponseEntity<?> registrarConsumoAlimento(
+            String loteId,
+            Long tipoAlimentoId,
+            BigDecimal cantidadKg,
+            String usuarioRegistro,
+            String observaciones,
+            LocalDate fechaRegistro) {
         
         System.out.println("🍽️ [SIMPLIFICADO] Registrando consumo por tipo de alimento:");
         System.out.println("   - Lote ID: " + loteId);
@@ -202,7 +224,7 @@ public class PlanAlimentacionServiceSimplificado {
 
             // Intento FEFO por tipo: entradas válidas de todos los productos del tipo
             Map<String, Object> rfefoTipo = inventarioEntradaProductoService.consumirPorTipoFefo(
-                tipoAlimentoId, cantidadKg, loteId, usuarioRegistro, observaciones, true
+                tipoAlimentoId, cantidadKg, loteId, usuarioRegistro, observaciones, true, fechaRegistro
             );
 
             BigDecimal consumidoTipo = (BigDecimal) rfefoTipo.getOrDefault("cantidadConsumida", BigDecimal.ZERO);

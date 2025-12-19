@@ -186,5 +186,31 @@ class AuthService {
     await clearSession();
     await setBiometricEnabled(false);
   }
+
+  /// Obtiene el tipo de animal del usuario basado en su rol
+  /// Retorna 'pollos', 'chanchos', o 'admin' si es administrador
+  static Future<String> getTipoAnimal() async {
+    final session = await loadSavedSession();
+    if (session == null) return 'pollos'; // Default
+    
+    final roles = session.roles;
+    if (roles.contains('ROLE_ADMIN')) return 'admin';
+    if (roles.contains('ROLE_PORCINE')) return 'chanchos';
+    if (roles.contains('ROLE_POULTRY')) return 'pollos';
+    return 'pollos'; // Default
+  }
+
+  /// Verifica si el usuario es administrador
+  static Future<bool> isAdmin() async {
+    final session = await loadSavedSession();
+    if (session == null) return false;
+    return session.roles.contains('ROLE_ADMIN');
+  }
+
+  /// Obtiene los roles del usuario actual
+  static Future<List<String>> getRoles() async {
+    final session = await loadSavedSession();
+    return session?.roles ?? [];
+  }
 }
 

@@ -5,11 +5,31 @@ import { Lote } from '../lotes/interfaces/lote.interface';
 import { LoteService } from '../lotes/services/lote.service';
 import { CostosLogisticaService } from './services/costos-logistica.service';
 import { forkJoin } from 'rxjs';
+import { DateEsPipe } from '../../shared/pipes/date-es.pipe';
+
+// Interfaz para los datos agrupados
+interface RegistroAgrupado {
+  fecha: string;
+  transporte: string;
+  concepto: string;
+  unidad: string;
+  costoTotal: number;
+  detalles: {
+    id: string;
+    lote: string;
+    loteId: string;
+    animalTipo: string;
+    cantidad: number;
+    costoUnit: number;
+    total: number;
+    observaciones: string;
+  }[];
+}
 
 @Component({
   selector: 'app-logistica',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DateEsPipe],
   template: `
   <div class="p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
     <!-- Header -->
@@ -62,7 +82,7 @@ import { forkJoin } from 'rxjs';
         </div>
         <div class="text-2xl font-extrabold text-gray-800 mb-1">{{ totalMovilizaciones }}</div>
         <div class="text-sm text-gray-500 font-medium">Total de Movilizaciones</div>
-        <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">{{ hoyISO() }}</div>
+        <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">{{ hoyISO() | dateEs }}</div>
       </div>
 
       <!-- Costo Promedio -->
@@ -124,7 +144,7 @@ import { forkJoin } from 'rxjs';
           </div>
           <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Reciente</span>
         </div>
-        <div class="text-xl font-extrabold text-gray-800 mb-1">{{ ultimaMovilizacion || 'N/A' }}</div>
+        <div class="text-xl font-extrabold text-gray-800 mb-1">{{ (ultimaMovilizacion | dateEs) || 'N/A' }}</div>
         <div class="text-sm text-gray-500 font-medium">Última Movilización</div>
         <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">Fecha más reciente</div>
       </div>
@@ -212,66 +232,137 @@ import { forkJoin } from 'rxjs';
       </form>
     </div>
 
-    <!-- Tabla de Registros -->
+    <!-- Tabla de Registros Agrupados -->
     <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
       <div class="p-6 border-b border-gray-100">
         <h3 class="text-xl font-bold text-gray-800">Historial de Movilizaciones</h3>
+        <p class="text-gray-500 text-sm mt-1">Resumen agrupado por concepto - Click en una fila para ver detalle por lotes</p>
       </div>
-      <div class="overflow-x-auto" *ngIf="registros.length > 0">
+      <div class="overflow-x-auto" *ngIf="registrosAgrupados.length > 0">
         <table class="w-full">
           <thead>
-            <tr class="bg-gray-50">
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-10"></th>
               <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha</th>
-              <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Lote</th>
               <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Transporte</th>
               <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Concepto</th>
               <th class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Unidad</th>
-              <th class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Cantidad</th>
-              <th class="px-4 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Costo Unit.</th>
-              <th class="px-4 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
-              <th class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th class="px-4 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Costo Total</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr *ngFor="let r of registros" class="hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-3 text-sm text-gray-700">{{ r.fecha }}</td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">
-                  {{ r.lote?.name || r.lote?.codigo || getLoteCodigo(r.lote?.id || r.loteId) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-700">{{ r.tipoTransporte }}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{{ r.concepto }}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{{ r.unidad }}</td>
-              <td class="px-4 py-3 text-sm text-gray-700 text-center font-semibold">{{ r.cantidadTransportada }}</td>
-              <td class="px-4 py-3 text-sm text-gray-700 text-right">$ {{ r.costoUnitario | number:'1.2-2' }}</td>
-              <td class="px-4 py-3 text-right">
-                <span class="font-bold text-blue-600">$ {{ r.total | number:'1.2-2' }}</span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  <button (click)="editarRegistro(r)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button (click)="eliminarRegistro(r)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
+          <tbody>
+            <ng-container *ngFor="let row of registrosAgrupados; let i = index">
+              <!-- Fila Principal (Resumen) -->
+              <tr 
+                (click)="toggleRow(i)"
+                class="hover:bg-gray-50 cursor-pointer transition-colors duration-150 border-b border-gray-100"
+                [class.bg-blue-50]="expandedRowIndex === i">
+                <td class="px-4 py-4">
+                  <svg *ngIf="expandedRowIndex !== i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <svg *ngIf="expandedRowIndex === i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </td>
+                <td class="px-4 py-4 text-sm text-gray-700 font-medium">{{ row.fecha | dateEs }}</td>
+                <td class="px-4 py-4 text-sm text-gray-700">{{ row.transporte }}</td>
+                <td class="px-4 py-4 text-sm text-gray-700">{{ row.concepto }}</td>
+                <td class="px-4 py-4 text-sm text-gray-700">{{ row.unidad }}</td>
+                <td class="px-4 py-4 text-right">
+                  <span class="text-lg font-bold text-blue-600">$ {{ row.costoTotal | number:'1.2-2' }}</span>
+                </td>
+              </tr>
+
+              <!-- Detalle Expandible -->
+              <tr *ngIf="expandedRowIndex === i">
+                <td colspan="6" class="bg-gray-50 px-6 py-4">
+                  <div class="pl-8">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                      Detalle por Lotes ({{ row.detalles.length }} registro{{ row.detalles.length > 1 ? 's' : '' }})
+                    </h4>
+                    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                      <table class="w-full">
+                        <thead class="bg-gray-100">
+                          <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lote</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Cantidad</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Costo Unit.</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                          <tr *ngFor="let detalle of row.detalles" class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3">
+                              <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">
+                                {{ detalle.lote }}
+                              </span>
+                              <span *ngIf="getEtiquetaAnimal(detalle.animalTipo) as etq" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs" [ngClass]="{
+                                  'bg-green-50 text-green-700': esPollo(etq),
+                                  'bg-rose-50 text-rose-700': esChancho(etq),
+                                  'bg-gray-100 text-gray-600': !esPollo(etq) && !esChancho(etq)
+                                }">
+                                {{ etq }}
+                              </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600 text-right font-medium">{{ detalle.cantidad | number:'1.2-2' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 text-right">$ {{ detalle.costoUnit | number:'1.2-2' }}</td>
+                            <td class="px-4 py-3 text-right">
+                              <span class="font-semibold text-gray-800">$ {{ detalle.total | number:'1.2-2' }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                              <div class="flex items-center justify-center gap-2">
+                                <button (click)="editarRegistroPorId(detalle.id, detalle.loteId); $event.stopPropagation()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button (click)="eliminarRegistroPorId(detalle.id); $event.stopPropagation()" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                          <tr>
+                            <td class="px-4 py-3 text-sm font-bold text-gray-700">Total del grupo</td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3 text-right">
+                              <span class="text-lg font-bold text-blue-600">$ {{ row.costoTotal | number:'1.2-2' }}</span>
+                            </td>
+                            <td class="px-4 py-3"></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
           </tbody>
         </table>
       </div>
-      <div *ngIf="registros.length === 0" class="text-center py-12 text-gray-500">
+      <div *ngIf="registrosAgrupados.length === 0" class="text-center py-12 text-gray-500">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
         </svg>
         <p class="text-lg font-medium">No hay registros de movilización</p>
         <p class="text-sm mt-1">Haz clic en "Registrar Movilización" para agregar uno.</p>
+      </div>
+      
+      <!-- Footer Info -->
+      <div class="p-4 bg-gray-50 border-t border-gray-100 text-center text-sm text-gray-500" *ngIf="registrosAgrupados.length > 0">
+        <span class="font-medium">{{ registrosAgrupados.length }}</span> grupo{{ registrosAgrupados.length > 1 ? 's' : '' }} · 
+        <span class="font-medium">{{ registros.length }}</span> registro{{ registros.length > 1 ? 's' : '' }} totales · 
+        Click en cualquier fila para ver el detalle por lotes
       </div>
     </div>
   </div>
@@ -287,6 +378,9 @@ export class LogisticaComponent implements OnInit {
   mostrarFormulario = false;
   editandoId: string | null = null;
   editandoLoteId: string | null = null;
+  
+  // Nueva propiedad para controlar filas expandidas
+  expandedRowIndex: number | null = null;
 
   constructor(private fb: FormBuilder, private lotesService: LoteService, private service: CostosLogisticaService) {}
 
@@ -331,6 +425,57 @@ export class LogisticaComponent implements OnInit {
     if (this.registros.length === 0) return '';
     const fechas = this.registros.map(r => r.fecha).filter(f => f).sort().reverse();
     return fechas[0] || '';
+  }
+
+  // Getter para agrupar registros por fecha, transporte, concepto y unidad
+  get registrosAgrupados(): RegistroAgrupado[] {
+    const groups: { [key: string]: RegistroAgrupado } = {};
+
+    this.registros.forEach(item => {
+      const fechaStr = this.normalizarFecha(item?.fecha);
+      const transporte = item?.tipoTransporte || item?.transporte || 'Desconocido';
+      const concepto = item?.concepto || '—';
+      const unidad = item?.unidad || '—';
+      const key = `${fechaStr}|${transporte}|${concepto}|${unidad}`;
+
+      if (!groups[key]) {
+        groups[key] = {
+          fecha: fechaStr,
+          transporte,
+          concepto,
+          unidad,
+          costoTotal: 0,
+          detalles: []
+        };
+      }
+
+      const cantidad = Number(item?.cantidadTransportada ?? item?.cantidad ?? 0);
+      const costoUnitario = Number(item?.costoUnitario ?? item?.costoUnit ?? 0);
+      const totalRegistroCalc = cantidad * costoUnitario;
+      const totalRegistro = (isFinite(totalRegistroCalc) && totalRegistroCalc > 0) ? totalRegistroCalc : Number(item?.total ?? 0);
+      const animalTipo = (item?.lote?.race?.animal?.name)
+        || (this.lotes.find(l => String(l.id) === String(item?.lote?.id || item?.loteId))?.race?.animal?.name)
+        || '';
+      groups[key].costoTotal += totalRegistro;
+      groups[key].detalles.push({
+        id: String(item?.id ?? ''),
+        lote: item?.lote?.name || item?.lote?.codigo || this.getLoteCodigo(item?.lote?.id || item?.loteId),
+        loteId: String(item?.lote?.id || item?.loteId || ''),
+        animalTipo: String(animalTipo || ''),
+        cantidad,
+        costoUnit: costoUnitario,
+        total: totalRegistro,
+        observaciones: item?.observaciones || ''
+      });
+    });
+
+    // Ordenar por fecha descendente de forma segura
+    return Object.values(groups).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  }
+
+  // Método para toggle de fila expandida
+  toggleRow(index: number): void {
+    this.expandedRowIndex = this.expandedRowIndex === index ? null : index;
   }
 
   get lotesActivos(): Lote[] {
@@ -397,6 +542,21 @@ export class LogisticaComponent implements OnInit {
     });
   }
 
+  // Métodos para acciones desde el detalle expandido
+  editarRegistroPorId(id: string, loteId: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) {
+      this.editarRegistro(registro);
+    }
+  }
+
+  eliminarRegistroPorId(id: string): void {
+    const registro = this.registros.find(r => String(r.id) === id);
+    if (registro) {
+      this.eliminarRegistro(registro);
+    }
+  }
+
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving = true; this.errorMessage = '';
@@ -449,18 +609,27 @@ export class LogisticaComponent implements OnInit {
     let cantidadPorLote = basePayload.cantidadTransportada;
 
     if (aplicarTodos && numLotes > 1) {
-      // Dividir el costo y cantidad entre todos los lotes
+      // Dividir SOLO el costo entre los lotes. La cantidad se mantiene.
       costoUnitarioPorLote = basePayload.costoUnitario / numLotes;
-      cantidadPorLote = basePayload.cantidadTransportada / numLotes;
+      cantidadPorLote = basePayload.cantidadTransportada;
     }
 
-    const payloadPorLote = {
-      ...basePayload,
-      costoUnitario: costoUnitarioPorLote,
-      cantidadTransportada: cantidadPorLote
-    };
+    // Distribución justa en centavos para asegurar que la suma por lotes == costo total del viaje
+    const totalViajeCents = Math.round(Number(basePayload.costoUnitario) * 100);
+    const baseCents = Math.floor(totalViajeCents / numLotes);
+    const resto = totalViajeCents - (baseCents * numLotes);
 
-    const peticiones = lotesSel.map(lid => this.service.crear({ ...payloadPorLote, loteId: String(lid) }));
+    const costosCentsPorLote = Array.from({ length: numLotes }, (_, i) => baseCents + (i < resto ? 1 : 0));
+
+    const peticiones = lotesSel.map((lid, idx) => {
+      const costoAsignado = costosCentsPorLote[idx] / 100;
+      return this.service.crear({
+        ...basePayload,
+        costoUnitario: costoAsignado,
+        cantidadTransportada: cantidadPorLote,
+        loteId: String(lid)
+      });
+    });
     forkJoin(peticiones).subscribe({
       next: () => {
         this.cargarRegistros();
@@ -508,4 +677,29 @@ export class LogisticaComponent implements OnInit {
     this.form.reset({ fecha: this.hoyISO(), aplicarTodosLotes: false });
     this.resetLotes();
   }
+
+  // Normaliza la fecha a YYYY-MM-DD (acepta Date o string con T, /, .)
+  private normalizarFecha(f: any): string {
+    try {
+      if (!f) return '';
+      if (f instanceof Date) return f.toISOString().split('T')[0];
+      const s = String(f);
+      if (s.includes('T')) return s.split('T')[0];
+      return s.replace(/[./]/g, '-');
+    } catch {
+      return String(f || '');
+    }
+  }
+
+  // Etiqueta y estilos según tipo de animal
+  getEtiquetaAnimal(animalTipo?: string): string {
+    if (!animalTipo) return '';
+    const s = String(animalTipo).toLowerCase();
+    if (s.includes('pollo') || s.includes('ave') || s.includes('broiler')) return 'Pollos';
+    if (s.includes('chancho') || s.includes('cerdo') || s.includes('porcino')) return 'Chanchos';
+    return animalTipo;
+  }
+
+  esPollo(etq: string): boolean { return String(etq).toLowerCase() === 'pollos'; }
+  esChancho(etq: string): boolean { return String(etq).toLowerCase() === 'chanchos'; }
 }
