@@ -34,6 +34,54 @@
       </button>
     </div>
   </div>
+
+  <!-- Modal: Botiquín Recomendado Cerdos -->
+  <div *ngIf="showRecCerdosModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 rec-modal-boundary">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto" cdkDrag cdkDragBoundary=".rec-modal-boundary">
+      <!-- Header -->
+      <div class="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white z-10 p-5 border-b border-transparent flex items-center justify-between cursor-move" cdkDragHandle>
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🐷</span>
+          <div>
+            <h3 class="text-xl md:text-2xl font-bold text-white">Botiquín Recomendado: Cerdos</h3>
+            <p class="text-sm text-white/80">Elementos sugeridos y faltantes para tu botiquín veterinario</p>
+          </div>
+        </div>
+        <button (click)="closeRecCerdosModal()" class="text-white/90 hover:text-white hover:bg-white/10 p-2 rounded-full">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Contenido -->
+      <app-cerdos-botiquin></app-cerdos-botiquin>
+    </div>
+  </div>
+
+  <!-- Modal: Botiquín Recomendado Pollos -->
+  <div *ngIf="showRecPollosModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 rec-modal-boundary">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto" cdkDrag cdkDragBoundary=".rec-modal-boundary">
+      <!-- Header -->
+      <div class="sticky top-0 bg-gradient-to-r from-pink-500 to-red-500 text-white z-10 p-5 border-b border-transparent flex items-center justify-between cursor-move" cdkDragHandle>
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🐔</span>
+          <div>
+            <h3 class="text-xl md:text-2xl font-bold text-white">Botiquín Recomendado: Pollos</h3>
+            <p class="text-sm text-white/80">Guía veterinaria completa para pollos criollos de campo</p>
+          </div>
+        </div>
+        <button (click)="closeRecPollosModal()" class="text-white/90 hover:text-white hover:bg-white/10 p-2 rounded-full">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Contenido -->
+      <app-pollos-botiquin></app-pollos-botiquin>
+    </div>
+  </div>
   
   <!-- Vista de Botiquín -->
   <div *ngIf="vistaActual === 'productos' && botiquinOnly">
@@ -47,8 +95,9 @@
           </h1>
           <p class="text-gray-600 mt-2">Control de medicamentos e insumos de emergencia</p>
         </div>
-        <button (click)="openForm(false)" class="px-4 md:px-6 py-2 md:py-3 rounded-lg font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-          + Agregar Producto
+        <button (click)="goToProductosFormBotiquin()" class="px-4 md:px-6 py-2 md:py-3 rounded-lg font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg flex items-center gap-2" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <span class="text-lg">🏥</span>
+          + Agregar al Botiquín
         </button>
       </div>
     </div>
@@ -224,8 +273,16 @@
             <option value="bajo">⚠️ Bajo Stock</option>
             <option value="agotado">🔴 Agotados</option>
           </select>
-          <div class="ml-auto text-sm text-gray-600">
-            Mostrando {{ getProductosBotiquinFiltrados().length }} de {{ getProductosBotiquin().length }} productos
+          <div class="ml-auto flex items-center gap-2">
+            <button (click)="openRecCerdosModal()" class="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-semibold shadow-sm hover:shadow transition-all" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+              <span>🐷</span><span>Botiquín Rec. Cerdos</span>
+            </button>
+            <button (click)="openRecPollosModal()" class="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:shadow transition-all">
+              <span>🐔</span><span>Botiquín Rec. Pollos</span>
+            </button>
+            <div class="text-sm text-gray-600">
+              Mostrando {{ getProductosBotiquinFiltrados().length }} de {{ getProductosBotiquin().length }} productos
+            </div>
           </div>
         </div>
       </div>
@@ -830,9 +887,13 @@
     <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto" cdkDrag>
       <div class="p-6" cdkDragHandle>
         <div class="flex justify-between items-center mb-4 cursor-move">
-          <h3 class="text-xl font-semibold text-gray-900">
+          <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <span *ngIf="isEditMode">Editar Producto</span>
-            <span *ngIf="!isEditMode">Nuevo Producto</span>
+            <span *ngIf="!isEditMode && botiquinOnly" class="flex items-center gap-2">
+              <span class="text-2xl">🏥</span>
+              Agregar Producto al Botiquín
+            </span>
+            <span *ngIf="!isEditMode && !botiquinOnly">Nuevo Producto</span>
           </h3>
           <button (click)="closeForm()" class="text-gray-500 hover:text-gray-700">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -842,6 +903,24 @@
         </div>
 
         <form [formGroup]="productForm" (ngSubmit)="saveProduct()" class="space-y-6">
+          
+          <!-- ALERTA ESPECIAL PARA BOTIQUÍN -->
+          <div *ngIf="!isEditMode && botiquinOnly" class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-purple-500 rounded-lg p-4 mb-6">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl">🏥</span>
+              <div>
+                <h4 class="text-lg font-semibold text-purple-800">Registro para Botiquín Veterinario</h4>
+                <p class="text-sm text-purple-600 mt-1">
+                  Este producto será agregado automáticamente al botiquín y estará disponible para emergencias veterinarias.
+                  Complete la información médica específica para uso correcto.
+                </p>
+              </div>
+            </div>
+            <div class="mt-3 flex items-center gap-2 text-sm text-purple-700 bg-purple-100 rounded-lg p-2">
+              <span>✓</span>
+              <span>Se incluirá automáticamente en el Botiquín</span>
+            </div>
+          </div>
           
           <!-- SECCIÓN 1: INFORMACIÓN BÁSICA -->
           <div class="bg-white border-l-4 border-purple-500 rounded-lg p-6 shadow-sm">
@@ -1012,10 +1091,11 @@
           </div>
           
           <!-- Sección específica para Medicamentos -->
-          <div *ngIf="showMedicamentos" class="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-600 space-y-4">
+          <div *ngIf="showMedicamentos" class="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-600 space-y-4" [ngClass]="{'ring-2 ring-purple-300 shadow-lg': botiquinOnly && !isEditMode}">
             <div class="text-purple-700 font-semibold flex items-center gap-2">
               <span class="text-xl">💊</span>
               <span>Datos de Medicamento</span>
+              <span *ngIf="botiquinOnly && !isEditMode" class="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs font-medium">REQUERIDO PARA BOTIQUÍN</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="space-y-1">

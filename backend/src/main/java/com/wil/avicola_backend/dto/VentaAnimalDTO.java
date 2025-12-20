@@ -30,4 +30,5 @@ public class VentaAnimalDTO {
     private BigDecimal precioUnit;
 
     private BigDecimal total; // si no viene, se calcula
+    private String observaciones;
 }

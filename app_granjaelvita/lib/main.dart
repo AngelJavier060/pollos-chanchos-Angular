@@ -57,6 +57,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _biometricEnabled = false;
   bool _checkingBiometric = true;
   bool _hasSavedSession = false;
+  bool _autoBiometricLaunched = false;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -93,6 +94,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         _biometricEnabled = enabledFlag && hasSession;
         _checkingBiometric = false;
       });
+
+      // Autodisparar autenticación biométrica al abrir si está activada y hay sesión guardada
+      if (enabledFlag && hasSession && !_autoBiometricLaunched) {
+        _autoBiometricLaunched = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _openFingerprintAuth();
+          }
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -656,7 +667,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Granja Elviata',
+                  'Granja Elvita',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,

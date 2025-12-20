@@ -82,7 +82,10 @@ import { Animal } from '../../../shared/models/product.model';
           <select [(ngModel)]="venta.loteId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
             <option [ngValue]="null">Seleccione un lote</option>
             <ng-container *ngFor="let l of lotesFiltradosPorAnimal">
-              <option [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }} ({{ l.quantity || 0 }} animales)</option>
+              <option [ngValue]="l.id">
+                {{ formatLoteCodigo(l.codigo || l.id) }}<ng-container *ngIf="l.name && l.name !== formatLoteCodigo(l.codigo || l.id)"> - {{ l.name }}</ng-container>
+                ({{ l.quantity || 0 }} animales)
+              </option>
             </ng-container>
           </select>
           <div class="mt-1" *ngIf="loteSeleccionado">
@@ -103,6 +106,10 @@ import { Animal } from '../../../shared/models/product.model';
         <div>
           <label class="block text-sm text-gray-600 mb-1">Precio Unit.</label>
           <input [(ngModel)]="venta.precioUnit" (ngModelChange)="recalcularTotal()" type="number" step="0.01" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div class="md:col-span-5">
+          <label class="block text-sm text-gray-600 mb-1">Observaciones</label>
+          <textarea [(ngModel)]="venta.observaciones" rows="3" class="w-full border rounded px-3 py-2" placeholder="Notas adicionales sobre esta venta..."></textarea>
         </div>
       </div>
       <div class="flex items-center justify-between mt-3">
@@ -144,6 +151,7 @@ import { Animal } from '../../../shared/models/product.model';
                 <th class="px-4 py-3">Lote</th>
                 <th class="px-4 py-3">Animal</th>
                 <th class="px-4 py-3">Cantidad</th>
+                <th class="px-4 py-3">Observaciones</th>
                 <th class="px-4 py-3">Precio Unit.</th>
                 <th class="px-4 py-3">Total</th>
                 <th class="px-4 py-3">Acciones</th>
@@ -153,7 +161,7 @@ import { Animal } from '../../../shared/models/product.model';
               <tr *ngFor="let v of ventasAnimalesFiltradas" class="border-t hover:bg-gray-50 transition">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
-                <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
+                <td class="px-4 py-2">{{ displayLoteLabel(v) }}</td>
                 <td class="px-4 py-2">
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold" [ngClass]="animalTagClass(v)">{{ getAnimalNameVenta(v) }}</span>
                 </td>
@@ -162,6 +170,14 @@ import { Animal } from '../../../shared/models/product.model';
                     <input type="number" [(ngModel)]="editAnimModel.cantidad" min="0" class="w-24 border rounded px-2 py-1" />
                   </ng-container>
                   <ng-template #viewCantA>{{ v.cantidad }}</ng-template>
+                </td>
+                <td class="px-4 py-2 max-w-xs">
+                  <ng-container *ngIf="editingIdAnim===v.id; else viewObsA">
+                    <input type="text" [(ngModel)]="editAnimModel.observaciones" class="w-64 border rounded px-2 py-1" [attr.maxlength]="1000" />
+                  </ng-container>
+                  <ng-template #viewObsA>
+                    <span class="block truncate" [title]="v.observaciones || ''">{{ v.observaciones || '—' }}</span>
+                  </ng-template>
                 </td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingIdAnim===v.id; else viewPUA"> 
@@ -329,13 +345,14 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   // Flag para mostrar/ocultar el formulario de registro
   mostrarFormulario = false;
   // Borrador local de ventas de animales
-  borrador: Array<{ loteId: string; loteCodigo?: string; animal: string; fecha: string; cantidad: number; precioUnit: number; total: number; }>= [];
-  venta: { loteId: string | null; fecha: string; cantidad: number; precioUnit: number; total: number } = {
+  borrador: Array<{ loteId: string; loteCodigo?: string; animal: string; fecha: string; cantidad: number; precioUnit: number; total: number; observaciones?: string }>= [];
+  venta: { loteId: string | null; fecha: string; cantidad: number; precioUnit: number; total: number; observaciones?: string } = {
     loteId: null,
     fecha: VentasAnimalesWidgetComponent.hoyISO(),
     cantidad: 1,
     precioUnit: 0,
-    total: 0
+    total: 0,
+    observaciones: ''
   };
 
   especie: 'all' | 'pollos' | 'chanchos' = 'all';
@@ -355,14 +372,34 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
     this.cargarVentasAnimAcum();
   }
 
-  // Formatea código/ID de lote a 'Lote001', 'Lote002', etc.
+  // Formatea código/ID de lote a 'Lote 01', 'Lote 02', etc. (2 dígitos y con espacio)
   formatLoteCodigo(valor: any): string {
-    if (valor == null) return 'Lote001';
+    if (valor == null) return 'Lote 01';
     const raw = String(valor).trim();
     const digits = (raw.match(/\d+/g) || []).join('');
-    const last3 = (digits || '1').slice(-3);
-    const num = Number(last3) || 1;
-    return `Lote${num.toString().padStart(3, '0')}`;
+    const last2 = (digits || '1').slice(-2);
+    const num = Number(last2) || 1;
+    return `Lote ${num.toString().padStart(2, '0')}`;
+  }
+
+  // Obtiene etiqueta amigable del lote priorizando el nombre si existe
+  loteLabelFrom(l: Lote | null | undefined): string {
+    if (!l) return '—';
+    const name = (l.name || '').toString().trim();
+    if (name) return name;
+    return this.formatLoteCodigo(l.codigo || l.id);
+  }
+
+  // Busca por id o código y retorna etiqueta amigable para la tabla
+  displayLoteLabel(v: any): string {
+    const idStr = (v?.loteId != null) ? String(v.loteId) : '';
+    const code = v?.loteCodigo;
+    const byId = this.lotes.find(l => String(l.id) === idStr);
+    const byCode = !byId && code ? this.lotes.find(l => String(l.codigo) === String(code)) : null;
+    const lot = byId || byCode || null;
+    if (lot) return this.loteLabelFrom(lot);
+    // Fallback si no se encuentra en la lista local
+    return this.formatLoteCodigo(code || idStr);
   }
 
   // Helpers para mostrar el animal en ventas guardadas
@@ -377,13 +414,14 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   }
   // Estado y acciones de edición/eliminación (animales)
   editingIdAnim: number | null = null;
-  editAnimModel: { cantidad: number; precioUnit: number } = { cantidad: 0, precioUnit: 0 };
+  editAnimModel: { cantidad: number; precioUnit: number; observaciones: string } = { cantidad: 0, precioUnit: 0, observaciones: '' };
 
   startEditAnim(v: any): void {
     this.editingIdAnim = v.id;
     this.editAnimModel = {
       cantidad: Number(v.cantidad) || 0,
-      precioUnit: Number(v.precioUnit) || 0
+      precioUnit: Number(v.precioUnit) || 0,
+      observaciones: v.observaciones || ''
     };
   }
 
@@ -404,7 +442,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       animalName: v.animalName,
       cantidad,
       precioUnit,
-      total
+      total,
+      observaciones: (this.editAnimModel.observaciones || '').trim() || undefined
     };
     this.ventasService.actualizarVentaAnimal(v.id, body).subscribe({
       next: () => {
@@ -614,10 +653,20 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   }
 
   // Lotes filtrados por animal seleccionado desde configuración - solo lotes con stock disponible
+  // Evitar duplicados (mismos lotes repetidos por id/código)
   get lotesFiltradosPorAnimal(): Lote[] {
-    const lotesConStock = (this.lotes || []).filter(l => (l.quantity || 0) > 0);
-    if (this.animalSeleccionadoId == null) return lotesConStock;
-    return lotesConStock.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
+    let list = (this.lotes || []).filter(l => (l.quantity || 0) > 0);
+    if (this.animalSeleccionadoId != null) {
+      list = list.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
+    }
+    const map = new Map<string, Lote>();
+    for (const l of list) {
+      const key = String((l as any).id ?? (l as any).codigo ?? (l as any).name ?? '');
+      if (key && !map.has(key)) {
+        map.set(key, l);
+      }
+    }
+    return Array.from(map.values());
   }
 
   onSelectLote(): void {
@@ -654,7 +703,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       animalName: lote.race?.animal?.name,
       cantidad: cantidadNum,
       precioUnit: +precioNum.toFixed(2),
-      total: +((cantidadNum * precioNum)).toFixed(2)
+      total: +((cantidadNum * precioNum)).toFixed(2),
+      observaciones: (this.venta.observaciones || '').trim() || undefined
     };
 
     this.savingDirect = true;
@@ -669,7 +719,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
         } else {
           alert(`Venta de animales guardada (id=${id})`);
         }
-        this.cargarVentasAnimalesHoy();
+        // Refrescar según el filtro activo (evita que se muestre solo "hoy")
+        this.aplicarFiltroVentasAnim();
         this.cargarLotes();
         // Reset rápido manteniendo lote seleccionado
         const keepLote = this.venta.loteId;
@@ -678,7 +729,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
           fecha: VentasAnimalesWidgetComponent.hoyISO(),
           cantidad: 1,
           precioUnit: 0,
-          total: 0
+          total: 0,
+          observaciones: ''
         };
         this.savingDirect = false;
       },
@@ -711,7 +763,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       fecha: this.venta.fecha,
       cantidad: this.venta.cantidad,
       precioUnit: this.venta.precioUnit,
-      total: this.venta.total
+      total: this.venta.total,
+      observaciones: (this.venta.observaciones || '').trim()
     };
     this.borrador = [...this.borrador, item];
     this.guardarBorradorLocal();
@@ -736,7 +789,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       fecha: VentasAnimalesWidgetComponent.hoyISO(),
       cantidad: 1,
       precioUnit: 0,
-      total: 0
+      total: 0,
+      observaciones: ''
     };
   }
 
@@ -755,7 +809,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       animalName: it.animal,
       cantidad: it.cantidad,
       precioUnit: it.precioUnit,
-      total: it.total
+      total: it.total,
+      observaciones: (it.observaciones || '').trim() || undefined
     };
     this.ventasService.crearVentaAnimal(body).subscribe({
       next: () => {
@@ -769,8 +824,8 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
         } else {
           alert('Venta de animales guardada correctamente');
         }
-        // Refrescar listado de ventas guardadas y lotes
-        this.cargarVentasAnimalesHoy();
+        // Refrescar listado de ventas guardadas y lotes según filtro activo
+        this.aplicarFiltroVentasAnim();
         this.cargarLotes();
       },
       error: (err) => {

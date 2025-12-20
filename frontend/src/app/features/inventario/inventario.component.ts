@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -15,12 +15,15 @@ import {
 } from '../../shared/models/product.model';
 import { WebsocketService } from '../../shared/services/websocket.service';
 import { forkJoin } from 'rxjs';
+import { NotificacionesInventarioService, AlertaInventario } from '../../shared/services/notificaciones-inventario.service';
+import { CerdosBotiquinComponent } from './cerdos-botiquin.component';
+import { PollosBotiquinComponent } from './pollos-botiquin.component';
 
 @Component({
   selector: 'app-inventario',
   templateUrl: './inventario.component.html',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, HttpClientModule, DragDropModule],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, HttpClientModule, DragDropModule, CerdosBotiquinComponent, PollosBotiquinComponent],
   providers: [WebsocketService]
 })
 export class InventarioComponent implements OnInit {
@@ -69,6 +72,40 @@ export class InventarioComponent implements OnInit {
   botSearch: string = '';
   botFiltroCategoria: string = 'todos';
   botFiltroEstado: 'todos' | 'ok' | 'alerta' | 'bajo' | 'agotado' = 'todos';
+  // Recomendados Botiquín
+  showRecCerdosModal: boolean = false;
+  showRecPollosModal: boolean = false;
+  recommendedCerdos: string[] = [
+    'Difenhidramina',
+    'Clorfeniramina',
+    'Dexametasona',
+    'Oxitocina',
+    'Gluconato de Calcio 20%',
+    'Dextrosa 50%',
+    'Meloxicam 2% inyectable',
+    'Flunixin Meglumine',
+    'Shotapen LA',
+    'Oxitetraciclina LA',
+    'Clortetraciclina 12.5%',
+    'Hierro Dextrano 200 mg/ml',
+    'Ivermectina 1% inyectable',
+    'Levamisol',
+    'Fenbendazol',
+    'Complejo B inyectable',
+    'ADE inyectable',
+    'Electrolitos orales',
+    'Sulfato de Neomicina',
+    'Clorhexidina',
+    'Yodo povidona 10%',
+    'Amonio cuaternario',
+    'Sulfato de plata',
+    'Reverin',
+    'Terramicina spray',
+    'Cipermetrina',
+    'Permetrina',
+    'Alcohol 70%'
+  ];
+  faltantesCerdos: string[] = [];
 
   // Resumen de cantidad real por Tipo de Alimento (para pestaña Productos -> Cantidad Real)
   resumenCantidadReal: Array<{
@@ -136,7 +173,9 @@ export class InventarioComponent implements OnInit {
     private entradasService: InventarioEntradasService,
     private fb: FormBuilder,
     private route: ActivatedRoute,
-    private websocketService: WebsocketService
+    private router: Router,
+    private websocketService: WebsocketService,
+    private notificacionesService: NotificacionesInventarioService
   ) {
     this.productForm = this.fb.group({
       id: [null],
@@ -259,6 +298,65 @@ export class InventarioComponent implements OnInit {
     });
   }
 
+  // ==============================
+  // Botiquín recomendado (Cerdos/Pollos)
+  // ==============================
+  openRecCerdosModal(): void {
+    this.calcularFaltantesCerdos();
+    this.showRecCerdosModal = true;
+  }
+
+  closeRecCerdosModal(): void {
+    this.showRecCerdosModal = false;
+  }
+
+  openRecPollosModal(): void {
+    // Placeholder: se implementará con la guía de pollos
+    this.showRecPollosModal = true;
+  }
+
+  closeRecPollosModal(): void {
+    this.showRecPollosModal = false;
+  }
+
+  private esProductoCerdo(p: Product): boolean {
+    const nombreAnimal = this.normalizarTexto(p?.animal?.name);
+    return nombreAnimal.includes('chancho') || nombreAnimal.includes('cerd') || nombreAnimal.includes('porc');
+  }
+
+  private getPigAnimalId(): number | null {
+    const a = (this.animals || []).find(x => {
+      const n = this.normalizarTexto(x?.name);
+      return n.includes('chancho') || n.includes('cerd') || n.includes('porc');
+    });
+    return a?.id ?? null;
+  }
+
+  private calcularFaltantesCerdos(): void {
+    const existentes = (this.products || [])
+      .filter(p => (p as any)?.incluirEnBotiquin === true && this.esProductoCerdo(p))
+      .map(p => this.normalizarTexto(p?.name));
+
+    const faltantes: string[] = [];
+    for (const rec of this.recommendedCerdos) {
+      const target = this.normalizarTexto(rec);
+      const yaExiste = existentes.some(n => n.includes(target) || target.includes(n));
+      if (!yaExiste) faltantes.push(rec);
+    }
+    this.faltantesCerdos = faltantes;
+  }
+
+  agregarRecomendadoAlBotiquin(nombre: string, especie: 'cerdos' | 'pollos'): void {
+    // Prefill de producto para crear rápidamente
+    this.openForm(false);
+    const patch: any = { name: nombre, incluirEnBotiquin: true };
+    if (especie === 'cerdos') {
+      const pigId = this.getPigAnimalId();
+      if (pigId) patch.animal_id = pigId;
+    }
+    this.productForm.patchValue(patch);
+  }
+
   getEntradasGlobalFiltradas(): InventarioEntrada[] {
     const hoy = new Date(); hoy.setHours(0,0,0,0);
     const esVigente = (e: any) => this.esEntradaVigente(e, hoy);
@@ -309,6 +407,17 @@ export class InventarioComponent implements OnInit {
       this.pendingRechargeRequests = [];
       this.resolvedRechargeRequests = [];
     }
+  }
+  
+  /**
+   * Navega a la pestaña Productos y abre el formulario preconfigurado para Botiquín
+   */
+  goToProductosFormBotiquin(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: 'productos', openForm: 'botiquin' },
+      queryParamsHandling: 'merge'
+    });
   }
   
   getStockMinimoProductoSeleccionado(): number {
@@ -617,8 +726,9 @@ export class InventarioComponent implements OnInit {
         (this as any).stockValidoLoaded = true;
         // Clasificar solicitudes en pendientes/atendidas según stock vigente
         this.classifyRechargeRequests();
+        this.calcularAlertasProductos();
       },
-      error: () => { this.stockValidoMap = new Map<number, number>(); (this as any).stockValidoLoaded = true; this.classifyRechargeRequests(); }
+      error: () => { this.stockValidoMap = new Map<number, number>(); (this as any).stockValidoLoaded = true; this.classifyRechargeRequests(); this.calcularAlertasProductos(); }
     });
   }
 
@@ -676,6 +786,20 @@ export class InventarioComponent implements OnInit {
         this.filteredProducts = this.botiquinOnly
           ? this.products.filter(p => (p as any)?.incluirEnBotiquin === true)
           : this.products;
+      }
+
+      // Abrir formulario de botiquín si viene indicado por query param
+      const openFormParam = (params.get('openForm') || '').trim();
+      if (openFormParam === 'botiquin') {
+        // Asegurar que la vista objetivo es productos y luego abrir el formulario especializado
+        setTimeout(() => this.openBotiquinForm());
+        // Limpiar el query param para evitar reaperturas accidentales
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { openForm: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        });
       }
     });
 
@@ -1043,6 +1167,27 @@ export class InventarioComponent implements OnInit {
     this.productosAgotados = agotados;
     this.productosCriticos = criticos;
     console.log(`📊 Alertas: ${agotados.length} agotados, ${criticos.length} críticos`);
+    const alertas: AlertaInventario[] = [
+      ...agotados.map(p => ({
+        tipo: 'agotado' as const,
+        producto: p.name || 'Producto',
+        productId: p.id,
+        mensaje: `${p.name || 'Producto'} sin stock`,
+        prioridad: 'alta' as const,
+        stockActual: 0,
+        stockMinimo: Number(p.level_min ?? 0)
+      })),
+      ...criticos.map(p => ({
+        tipo: 'critico' as const,
+        producto: p.name || 'Producto',
+        productId: p.id,
+        mensaje: `${p.name || 'Producto'} con stock crítico`,
+        prioridad: 'media' as const,
+        stockActual: this.getCantidadRealProducto(p),
+        stockMinimo: Number(p.level_min ?? 0)
+      }))
+    ];
+    this.notificacionesService.actualizarContadoresStock(agotados.length, criticos.length, alertas);
   }
 
   /**
@@ -1242,6 +1387,45 @@ export class InventarioComponent implements OnInit {
       this.showAlimentos = false;
     }
   }
+
+  // Función específica para abrir el formulario en modo botiquín
+  openBotiquinForm(): void {
+    this.isEditMode = false;
+    this.showForm = true;
+    this.selectedProduct = null;
+    
+    // Reset del formulario
+    this.productForm.reset();
+    this.subcategories = [];
+    
+    // Pre-configurar para productos de botiquín
+    this.productForm.patchValue({
+      incluirEnBotiquin: true,
+      date_compra: new Date().toISOString().split('T')[0], // Fecha actual
+      quantity: 1, // Cantidad inicial
+      level_min: 1, // Nivel mínimo por defecto
+    });
+    
+    // Activar la sección de medicamentos por defecto
+    this.showMedicamentos = true;
+    this.showAlimentos = false;
+    
+    // Pre-seleccionar categoría "Medicinas" si existe
+    const medicinaCategory = this.typeFoods.find(tf => 
+      tf.name?.toLowerCase().includes('medicina') || 
+      tf.name?.toLowerCase().includes('medicamento') ||
+      tf.name?.toLowerCase().includes('veterinario')
+    );
+    
+    if (medicinaCategory) {
+      this.productForm.patchValue({
+        typeFood_id: medicinaCategory.id
+      });
+      this.onTypeFoodChange(medicinaCategory.id);
+    }
+    
+    console.log('🏥 Formulario abierto en modo Botiquín - incluirEnBotiquin: true, sección medicamentos activada');
+  }
   
   closeForm(): void {
     this.showForm = false;
@@ -1290,10 +1474,28 @@ export class InventarioComponent implements OnInit {
       // Asegurarse de que los tipos de datos son correctos
       this.convertFormDataTypes(productData);
       
+      // Logging especial para productos de botiquín
+      if (productData.incluirEnBotiquin) {
+        console.log('🏥 Creando producto para Botiquín:', {
+          nombre: productData.name,
+          categoria: productData.typeFood_id,
+          usoPrincipal: productData.usoPrincipal,
+          incluirEnBotiquin: productData.incluirEnBotiquin
+        });
+      }
+      
       console.log('Enviando producto:', productData);
       
       this.productService.createProduct(productData).subscribe({
         next: () => {
+          // Mensaje específico para productos de botiquín
+          if (productData.incluirEnBotiquin) {
+            console.log('✅ Producto agregado exitosamente al Botiquín');
+            // Mostrar mensaje de éxito específico para botiquín
+            if (this.botiquinOnly) {
+              alert('🏥 ¡Producto agregado exitosamente al Botiquín Veterinario!\n\nEl producto ya está disponible para uso en emergencias.');
+            }
+          }
           this.loadProducts();
           this.closeForm();
         },
@@ -1661,14 +1863,7 @@ export class InventarioComponent implements OnInit {
     // Llevar al usuario a Entradas con el producto preseleccionado para crear una entrada VIGENTE (FEFO)
     if (!product?.id) return;
     this.vistaActual = 'entradas';
-    this.selectedProductIdEntradas = product.id;
-    this.productoEntradasBloqueado = true; // ✅ Bloquear selector de producto
-    this.entradaForm.patchValue({ productId: product.id });
-    const provId = (product as any)?.provider?.id ?? (product as any)?.provider_id ?? null;
-    if (provId) this.entradaForm.patchValue({ providerId: provId });
-    this.cargarInventarioProductoSeleccionado(product.id);
-    this.cargarEntradasPorProducto(product.id);
-    this.cargarMovimientosPorProducto(product.id);
+    this.abrirFormularioNuevaEntrada(product);
   }
 
   // Acción rápida para la vista Productos: refrescar listado y cantidad real
@@ -1837,9 +2032,11 @@ export class InventarioComponent implements OnInit {
     if (producto) {
       this.selectedProductIdEntradas = producto.id!;
       this.productoEntradasBloqueado = true;
-      this.entradaForm.patchValue({ productId: producto.id });
+      const provId = (producto as any)?.provider?.id ?? (producto as any)?.provider_id ?? null;
+      this.entradaForm.patchValue({ productId: producto.id, providerId: provId });
       this.cargarInventarioProductoSeleccionado(producto.id!);
       this.cargarEntradasPorProducto(producto.id!);
+      this.cargarMovimientosPorProducto(producto.id!);
     }
   }
 

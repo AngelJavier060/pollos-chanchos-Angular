@@ -71,6 +71,9 @@ public class VentaAnimal {
     @Column(precision = 12, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "observaciones", length = 1000)
+    private String observaciones;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vendedor_id")
     private Usuario vendedor;

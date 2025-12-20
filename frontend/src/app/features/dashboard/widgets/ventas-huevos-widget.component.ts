@@ -35,6 +35,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <input *ngIf="filtroPeriodo==='rango'" [(ngModel)]="fechaHasta" type="date" class="border rounded px-2 py-1" />
           <button (click)="aplicarFiltroVentas()" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">Buscar</button>
         </div>
+        
         <div>
           <button (click)="exportVentasCSV()" [disabled]="!ventasHoy?.length" class="bg-white border-2 border-rose-500 text-rose-600 px-3 py-2 rounded hover:bg-rose-50 text-sm disabled:opacity-40">📊 Exportar CSV</button>
         </div>
@@ -82,7 +83,10 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <label class="block text-sm text-gray-600 mb-1">Lote activo (con pollos)</label>
           <select *ngIf="lotesFiltradosPorAnimal.length > 0; else sinLotes" [(ngModel)]="loteSeleccionadoId" (ngModelChange)="onSelectLote()" class="w-full border rounded px-3 py-2">
             <option [ngValue]="null">Seleccione un lote</option>
-            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">{{ formatLoteCodigo(l.codigo || l.id) }} - {{ l.name }} ({{ l.quantity }} pollos)</option>
+            <option *ngFor="let l of lotesFiltradosPorAnimal" [ngValue]="l.id">
+              {{ formatLoteCodigo(l.codigo || l.id) }}<ng-container *ngIf="l.name && l.name !== formatLoteCodigo(l.codigo || l.id)"> - {{ l.name }}</ng-container>
+              ({{ l.quantity }} pollos)
+            </option>
           </select>
           <ng-template #sinLotes>
             <div class="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
@@ -114,6 +118,10 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <label *ngIf="tipoCantidad === 'cubetas'" class="block text-sm text-gray-600 mb-1">Precio por cubeta</label>
           <label *ngIf="tipoCantidad === 'unidades'" class="block text-sm text-gray-600 mb-1">Precio por huevo</label>
           <input [(ngModel)]="precioReferencia" (ngModelChange)="recalcularLinea()" type="number" step="0.01" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div class="md:col-span-6">
+          <label class="block text-sm text-gray-600 mb-1">Observaciones</label>
+          <textarea [(ngModel)]="nuevoObservaciones" rows="3" class="w-full border rounded px-3 py-2" placeholder="Notas adicionales sobre esta venta..."></textarea>
         </div>
       </div>
       <div class="flex items-center justify-between mt-3">
@@ -184,6 +192,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
                 <th class="px-4 py-3">Fecha</th>
                 <th class="px-4 py-3">Lote</th>
                 <th class="px-4 py-3">Cantidad (cubetas / huevos)</th>
+                <th class="px-4 py-3">Observaciones</th>
                 <th class="px-4 py-3">Precio Unit.</th>
                 <th class="px-4 py-3">Total</th>
                 <th class="px-4 py-3">Acciones</th>
@@ -193,7 +202,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
               <tr *ngFor="let v of ventasHoy" class="border-t hover:bg-rose-50 transition">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
-                <td class="px-4 py-2"><span class="bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded text-xs font-semibold">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</span></td>
+                <td class="px-4 py-2"><span class="bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded text-xs font-semibold">{{ displayLoteLabel(v) }}</span></td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingId===v.id; else viewCant">
                     <div class="space-y-2">
@@ -215,6 +224,14 @@ import { VentasService } from '../../../shared/services/ventas.service';
                       <span class="text-base">🥚</span>
                       {{ formatCantidadHuevosValor(v.cantidad) }}
                     </span>
+                  </ng-template>
+                </td>
+                <td class="px-4 py-2 max-w-xs">
+                  <ng-container *ngIf="editingId===v.id; else viewObs">
+                    <input type="text" [(ngModel)]="editModel.observaciones" class="w-64 border rounded px-2 py-1" [attr.maxlength]="1000" />
+                  </ng-container>
+                  <ng-template #viewObs>
+                    <span class="block truncate" [title]="v.observaciones || ''">{{ v.observaciones || '—' }}</span>
                   </ng-template>
                 </td>
                 <td class="px-4 py-2">
@@ -427,6 +444,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
   nuevoCubetas: number = 1;
   nuevoHuevos: number = 0;
   precioReferencia: number = 0;
+  // Observaciones para creación
+  nuevoObservaciones: string = '';
 
   // Flag para mostrar el formulario/borrador (habilitado para permitir ingresar ventas)
   mostrarCaptura = false;
@@ -448,15 +467,33 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     this.sub?.unsubscribe();
   }
 
-  // Formatea código/ID de lote a 'LoteXYZ' usando SIEMPRE los últimos 3 dígitos (evita 'Lote3001').
+  // Formatea código/ID de lote a 'Lote 01', 'Lote 02' (dos dígitos con espacio) para unificar con Admin/Lotes.
   formatLoteCodigo(valor: any): string {
-    if (valor == null) return 'Lote001';
+    if (valor == null) return 'Lote 01';
     const raw = String(valor).trim();
-    // Extraer solo dígitos del valor (si ya viene como 'Lote003' también funciona)
     const digits = (raw.match(/\d+/g) || []).join('');
-    const last3 = (digits || '1').slice(-3); // por defecto '001'
-    const num = Number(last3) || 1;
-    return `Lote${num.toString().padStart(3, '0')}`;
+    const last2 = (digits || '1').slice(-2);
+    const num = Number(last2) || 1;
+    return `Lote ${num.toString().padStart(2, '0')}`;
+  }
+
+  // Etiqueta amigable del lote: prioriza nombre si existe, si no usa código formateado
+  private loteLabelFrom(l: Lote | null | undefined): string {
+    if (!l) return '—';
+    const name = (l.name || '').toString().trim();
+    if (name) return name;
+    return this.formatLoteCodigo(l.codigo || l.id);
+  }
+
+  // Busca por id o código y retorna etiqueta amigable para la tabla de ventas
+  displayLoteLabel(v: any): string {
+    const idStr = (v?.loteId != null) ? String(v.loteId) : '';
+    const code = v?.loteCodigo;
+    const byId = this.lotesAves.find(l => String(l.id) === idStr);
+    const byCode = !byId && code ? this.lotesAves.find(l => String(l.codigo) === String(code)) : null;
+    const lot = byId || byCode || null;
+    if (lot) return this.loteLabelFrom(lot);
+    return this.formatLoteCodigo(code || idStr);
   }
 
   // Formatea una cantidad de huevos a "X cubetas y Y huevos (Z huevos)"
@@ -552,8 +589,18 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
 
   // Lista de lotes filtrados por el animal seleccionado
   get lotesFiltradosPorAnimal(): Lote[] {
-    if (this.animalSeleccionadoId === 'all') return this.lotesAves || [];
-    return (this.lotesAves || []).filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
+    let list = this.lotesAves || [];
+    if (this.animalSeleccionadoId !== 'all') {
+      list = list.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
+    }
+    const map = new Map<string, Lote>();
+    for (const l of list) {
+      const key = String((l as any).id ?? (l as any).codigo ?? (l as any).name ?? '');
+      if (key && !map.has(key)) {
+        map.set(key, l);
+      }
+    }
+    return Array.from(map.values());
   }
 
   // Cambio de animal: limpiar selección de lote y recalcular filtros de productos
@@ -604,7 +651,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       animalName: this.loteSeleccionado?.race?.animal?.name,
       cantidad: cantidadNum,
       precioUnit: +precioNum.toFixed(2),
-      total: +((cantidadNum * precioNum)).toFixed(2)
+      total: +((cantidadNum * precioNum)).toFixed(2),
+      observaciones: (this.nuevoObservaciones || '').trim() || undefined
     };
     this.savingDirect = true;
     this.ventasService.crearVentaHuevo(body).subscribe({
@@ -620,6 +668,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
           precioUnit: 0,
           totalLinea: 0
         };
+        this.nuevoObservaciones = '';
         this.tipoCantidad = 'cubetas';
         this.nuevoCubetas = 1;
         this.nuevoHuevos = 0;
@@ -677,6 +726,7 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       precioUnit: 0,
       totalLinea: 0
     };
+    this.nuevoObservaciones = '';
     this.tipoCantidad = 'cubetas';
     this.nuevoCubetas = 1;
     this.nuevoHuevos = 0;
@@ -884,7 +934,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
     tipoCantidad: 'cubetas' | 'unidades';
     cubetas: number;
     precioReferencia: number;
-  } = { cantidad: 0, precioUnit: 0, tipoCantidad: 'cubetas', cubetas: 0, precioReferencia: 0 };
+    observaciones: string;
+  } = { cantidad: 0, precioUnit: 0, tipoCantidad: 'cubetas', cubetas: 0, precioReferencia: 0, observaciones: '' };
 
   startEdit(v: any): void {
     this.editingId = v.id;
@@ -901,7 +952,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       precioUnit: precioUnitHuevo,
       tipoCantidad: esCubetas ? 'cubetas' : 'unidades',
       cubetas: esCubetas ? cubetas : cantidadHuevos / this.HUEVOS_POR_CUBETA,
-      precioReferencia: esCubetas ? (precioUnitHuevo * this.HUEVOS_POR_CUBETA) : precioUnitHuevo
+      precioReferencia: esCubetas ? (precioUnitHuevo * this.HUEVOS_POR_CUBETA) : precioUnitHuevo,
+      observaciones: v.observaciones || ''
     };
   }
 
@@ -941,7 +993,8 @@ export class VentasHuevosWidgetComponent implements OnInit, OnDestroy {
       animalName: v.animalName,
       cantidad,
       precioUnit: +precioUnit.toFixed(4),
-      total
+      total,
+      observaciones: (this.editModel.observaciones || '').trim() || undefined
     };
     this.ventasService.actualizarVentaHuevo(v.id, body).subscribe({
       next: (res) => {

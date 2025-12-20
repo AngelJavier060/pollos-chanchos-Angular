@@ -41,6 +41,7 @@ public class VentaHuevoService {
                 .cantidad(dto.getCantidad())
                 .precioUnit(dto.getPrecioUnit())
                 .total(total)
+                .observaciones(dto.getObservaciones())
                 .vendedor(vendedor)
                 .build();
         VentaHuevo saved = ventaHuevoRepository.saveAndFlush(venta);
@@ -81,6 +82,8 @@ public class VentaHuevoService {
             total = v.getPrecioUnit().multiply(v.getCantidad());
         }
         if (total != null) v.setTotal(total);
+
+        if (dto.getObservaciones() != null) v.setObservaciones(dto.getObservaciones());
 
         return ventaHuevoRepository.saveAndFlush(v);
     }

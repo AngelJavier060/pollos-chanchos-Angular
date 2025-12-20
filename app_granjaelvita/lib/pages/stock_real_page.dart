@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/inventario_service.dart';
 import '../models/entrada_inventario_model.dart';
+import '../models/proveedor_model.dart';
+import '../services/producto_service.dart';
 
 /// Página de Stock Real por Producto (FEFO)
 /// Muestra el stock disponible calculado desde entradas vigentes no vencidas
@@ -16,11 +18,15 @@ class _StockRealPageState extends State<StockRealPage> {
   List<StockRealProducto> _productos = [];
   bool _isLoading = true;
   String? _error;
+  List<ProveedorModel> _proveedores = [];
+  static const Color _brandPrimary = Color(0xFF7A9BCB);
+  static const Color _brandSecondary = Color(0xFF9DBDD1);
 
   @override
   void initState() {
     super.initState();
     _cargarDatos();
+    _cargarProveedores();
   }
 
   Future<void> _cargarDatos() async {
@@ -43,6 +49,21 @@ class _StockRealPageState extends State<StockRealPage> {
     }
   }
 
+  Future<void> _cargarProveedores() async {
+    try {
+      final proveedores = await ProductoService.listarProveedores();
+      if (!mounted) return;
+      setState(() {
+        _proveedores = proveedores;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _proveedores = [];
+      });
+    }
+  }
+
   int get _totalProductos => _productos.length;
   int get _stockNormal => _productos.where((p) => p.estado == 'normal').length;
   int get _stockCritico => _productos.where((p) => p.estado == 'critico').length;
@@ -54,7 +75,7 @@ class _StockRealPageState extends State<StockRealPage> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Stock Real'),
-        backgroundColor: Colors.teal,
+        backgroundColor: _brandPrimary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -464,8 +485,21 @@ class _StockRealPageState extends State<StockRealPage> {
     final costoBaseCtrl = TextEditingController();
     final costoControlCtrl = TextEditingController();
     final loteCtrl = TextEditingController();
+    final observacionesCtrl = TextEditingController();
+    String? proveedorNombre;
+    int? providerIdSel;
     DateTime? fechaIngreso;
     DateTime? fechaVencimiento;
+    bool listenersAttached = false;
+
+    void _syncCostoControl() {
+      final contenido = double.tryParse(contenidoCtrl.text.trim());
+      final costoBase = double.tryParse(costoBaseCtrl.text.trim());
+      if (contenido != null && contenido > 0 && costoBase != null) {
+        final calc = costoBase * contenido; // costo por unidad de control = costo base (kg/ml) * contenido
+        costoControlCtrl.text = calc.toStringAsFixed(4);
+      }
+    }
 
     await showModalBottomSheet(
       context: context,
@@ -483,13 +517,24 @@ class _StockRealPageState extends State<StockRealPage> {
           ),
           child: StatefulBuilder(
             builder: (ctx, setModal) {
+              if (!listenersAttached) {
+                contenidoCtrl.addListener(() {
+                  _syncCostoControl();
+                  setModal(() {});
+                });
+                costoBaseCtrl.addListener(() {
+                  _syncCostoControl();
+                  setModal(() {});
+                });
+                listenersAttached = true;
+              }
               return SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.add_circle_outline, color: Colors.teal),
+                        Icon(Icons.add_circle_outline, color: _brandPrimary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -552,6 +597,34 @@ class _StockRealPageState extends State<StockRealPage> {
                       ],
                     ),
                     const SizedBox(height: 8),
+                    if ((double.tryParse(contenidoCtrl.text.trim()) ?? 0) > 0 &&
+                        (double.tryParse(cantidadCtrl.text.trim()) ?? 0) > 0)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _brandSecondary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _brandPrimary.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calculate, color: _brandPrimary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Total base calculado: ' +
+                                    ((double.tryParse(contenidoCtrl.text.trim()) ?? 0) *
+                                            (double.tryParse(cantidadCtrl.text.trim()) ?? 0))
+                                        .toStringAsFixed(2) +
+                                    ' ${producto.unidadMedida}',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -567,13 +640,46 @@ class _StockRealPageState extends State<StockRealPage> {
                         Expanded(
                           child: TextField(
                             controller: costoControlCtrl,
+                            readOnly: true,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(
-                              labelText: 'Costo por unidad de control (opcional)',
+                              labelText: 'Costo por unidad de control',
+                              hintText: 'Se calcula automáticamente',
                             ),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: proveedorNombre,
+                      items: _proveedores
+                          .map((p) => DropdownMenuItem<String>(
+                                value: p.nombre,
+                                child: Text(p.nombre),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setModal(() {
+                        proveedorNombre = v;
+                        final found = _proveedores.firstWhere(
+                          (p) => p.nombre == v,
+                          orElse: () => ProveedorModel(id: 0, nombre: ''),
+                        );
+                        providerIdSel = found.id != 0 ? found.id : null;
+                      }),
+                      decoration: const InputDecoration(
+                        labelText: 'Proveedor (opcional)',
+                        hintText: 'Seleccione un proveedor',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: observacionesCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Observaciones',
+                        hintText: 'Notas u observaciones de esta entrada',
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -628,9 +734,23 @@ class _StockRealPageState extends State<StockRealPage> {
                             final costoBase = double.tryParse(costoBaseCtrl.text.trim());
                             final costoControl = double.tryParse(costoControlCtrl.text.trim());
 
+                            if (unidadCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Unidad de control es obligatoria')),
+                              );
+                              return;
+                            }
+
                             if (contenido == null || cantidad == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Contenido por unidad y Cantidad son obligatorios')),
+                              );
+                              return;
+                            }
+
+                            if (fechaIngreso == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Seleccione la fecha de ingreso')),
                               );
                               return;
                             }
@@ -643,6 +763,8 @@ class _StockRealPageState extends State<StockRealPage> {
                               unidadControl: unidadCtrl.text.trim(),
                               contenidoPorUnidadBase: contenido,
                               cantidadUnidades: cantidad,
+                              observaciones: observacionesCtrl.text.trim().isEmpty ? null : observacionesCtrl.text.trim(),
+                              providerId: providerIdSel,
                               costoUnitarioBase: costoBase,
                               costoPorUnidadControl: costoControl,
                             );
@@ -667,7 +789,7 @@ class _StockRealPageState extends State<StockRealPage> {
                         icon: const Icon(Icons.save),
                         label: const Text('Crear Entrada'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
+                          backgroundColor: _brandPrimary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),

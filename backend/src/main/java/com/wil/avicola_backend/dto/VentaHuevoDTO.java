@@ -31,4 +31,5 @@ public class VentaHuevoDTO {
 
     // total opcional: si no viene, se calcula en backend
     private BigDecimal total;
+    private String observaciones;
 }

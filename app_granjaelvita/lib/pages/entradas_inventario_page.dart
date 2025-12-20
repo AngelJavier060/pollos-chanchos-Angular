@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/inventario_service.dart';
 import '../models/entrada_inventario_model.dart';
+import '../models/proveedor_model.dart';
+import '../services/producto_service.dart';
 
 /// Página de Gestión de Entradas de Inventario
 /// Muestra inversión por producto y listado de entradas con filtros
@@ -15,16 +17,439 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
   final InventarioService _service = InventarioService();
   List<InversionProducto> _inversiones = [];
   List<EntradaInventarioModel> _entradas = [];
+  List<StockRealProducto> _stock = [];
+  List<StockRealProducto> _agotados = [];
   bool _isLoading = true;
   String? _error;
   String _filtroEstado = 'vigentes'; // 'vigentes', 'historico', 'todos'
   String _busqueda = '';
   final TextEditingController _busquedaController = TextEditingController();
+  List<ProveedorModel> _proveedores = [];
+  static const Color _brandPrimary = Color(0xFF7A9BCB);
+  static const Color _brandSecondary = Color(0xFF9DBDD1);
 
   @override
   void initState() {
     super.initState();
     _cargarDatos();
+    _cargarProveedores();
+  }
+
+  /// Banner de productos agotados con acceso directo a recarga
+  Widget _buildAgotadosBanner() {
+    if (_agotados.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Productos agotados (${_agotados.length}) - Reponer stock',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF7F1D1D)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _abrirNuevaEntrada(_agotados.first),
+                child: const Text('Reponer ahora'),
+              )
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _agotados
+                  .map((p) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ActionChip(
+                          label: Text(p.nombre, overflow: TextOverflow.ellipsis),
+                          avatar: const Icon(Icons.inventory_2, size: 18, color: Colors.red),
+                          backgroundColor: Colors.white,
+                          onPressed: () => _abrirNuevaEntrada(p),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  /// Formulario de nueva entrada (recarga)
+  Future<void> _abrirNuevaEntrada(StockRealProducto? preselect) async {
+    StockRealProducto? seleccionado = preselect;
+    final unidadCtrl = TextEditingController();
+    final contenidoCtrl = TextEditingController();
+    final cantidadCtrl = TextEditingController();
+    final costoBaseCtrl = TextEditingController();
+    final costoControlCtrl = TextEditingController();
+    final loteCtrl = TextEditingController();
+    final observacionesCtrl = TextEditingController();
+    String? proveedorNombre;
+    int? providerIdSel;
+    DateTime? fechaIngreso;
+    DateTime? fechaVencimiento;
+    bool listenersAttached = false;
+
+    void _syncCostoControl() {
+      final contenido = double.tryParse(contenidoCtrl.text.trim());
+      final costoBase = double.tryParse(costoBaseCtrl.text.trim());
+      if (contenido != null && contenido > 0 && costoBase != null) {
+        final calc = costoBase * contenido; // costo por unidad de control = costo base (kg/ml) * contenido
+        costoControlCtrl.text = calc.toStringAsFixed(4);
+      }
+    }
+
+    final productosOrdenados = [
+      ..._agotados,
+      ..._stock.where((p) => p.estado != 'agotado')
+    ];
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (ctx, setModal) {
+              if (!listenersAttached) {
+                contenidoCtrl.addListener(() {
+                  _syncCostoControl();
+                  setModal(() {});
+                });
+                costoBaseCtrl.addListener(() {
+                  _syncCostoControl();
+                  setModal(() {});
+                });
+                listenersAttached = true;
+              }
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.add_circle_outline, color: _brandPrimary),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Nueva Entrada de Inventario',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<StockRealProducto>(
+                      value: seleccionado,
+                      items: productosOrdenados
+                          .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Row(
+                                  children: [
+                                    if (p.estado == 'agotado')
+                                      const Icon(Icons.error, color: Colors.red, size: 16)
+                                    else if (p.estado == 'critico')
+                                      const Icon(Icons.warning_amber, color: Colors.orange, size: 16)
+                                    else
+                                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                    const SizedBox(width: 6),
+                                    Expanded(child: Text(p.nombre, overflow: TextOverflow.ellipsis)),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setModal(() => seleccionado = v),
+                      decoration: const InputDecoration(
+                        labelText: 'Producto',
+                        hintText: 'Seleccione un producto',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: unidadCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Unidad de control',
+                              hintText: 'saco, frasco, caja',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: loteCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Código de lote',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: contenidoCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Contenido por unidad (${seleccionado?.unidadMedida ?? 'base'})',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: cantidadCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Cantidad de unidades',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if ((double.tryParse(contenidoCtrl.text.trim()) ?? 0) > 0 &&
+                        (double.tryParse(cantidadCtrl.text.trim()) ?? 0) > 0)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _brandSecondary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _brandPrimary.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calculate, color: _brandPrimary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Total base calculado: ' +
+                                    ((double.tryParse(contenidoCtrl.text.trim()) ?? 0) *
+                                            (double.tryParse(cantidadCtrl.text.trim()) ?? 0))
+                                        .toStringAsFixed(2) +
+                                    ' ${seleccionado?.unidadMedida ?? ''}',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: costoBaseCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Costo unitario base',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: costoControlCtrl,
+                            readOnly: true,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Costo por unidad de control',
+                              hintText: 'Se calcula automáticamente',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: proveedorNombre,
+                      items: _proveedores
+                          .map((p) => DropdownMenuItem<String>(
+                                value: p.nombre,
+                                child: Text(p.nombre),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setModal(() {
+                        proveedorNombre = v;
+                        final found = _proveedores.firstWhere(
+                          (p) => p.nombre == v,
+                          orElse: () => ProveedorModel(id: 0, nombre: ''),
+                        );
+                        providerIdSel = found.id != 0 ? found.id : null;
+                      }),
+                      decoration: const InputDecoration(
+                        labelText: 'Proveedor (opcional)',
+                        hintText: 'Seleccione un proveedor',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: observacionesCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Observaciones',
+                        hintText: 'Notas u observaciones de esta entrada',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                firstDate: DateTime(now.year - 2),
+                                lastDate: DateTime(now.year + 2),
+                                initialDate: fechaIngreso ?? now,
+                              );
+                              if (picked != null) setModal(() => fechaIngreso = picked);
+                            },
+                            icon: const Icon(Icons.event_available),
+                            label: Text(fechaIngreso == null
+                                ? 'Fecha de ingreso'
+                                : '${fechaIngreso!.day.toString().padLeft(2, '0')}/${fechaIngreso!.month.toString().padLeft(2, '0')}/${fechaIngreso!.year}'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                firstDate: DateTime(now.year - 2),
+                                lastDate: DateTime(now.year + 5),
+                                initialDate: fechaVencimiento ?? now,
+                              );
+                              if (picked != null) setModal(() => fechaVencimiento = picked);
+                            },
+                            icon: const Icon(Icons.event_busy),
+                            label: Text(fechaVencimiento == null
+                                ? 'Fecha de vencimiento'
+                                : '${fechaVencimiento!.day.toString().padLeft(2, '0')}/${fechaVencimiento!.month.toString().padLeft(2, '0')}/${fechaVencimiento!.year}'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          try {
+                            if (seleccionado == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Seleccione un producto')),
+                              );
+                              return;
+                            }
+                            final contenido = double.tryParse(contenidoCtrl.text.trim());
+                            final cantidad = double.tryParse(cantidadCtrl.text.trim());
+                            final costoBase = double.tryParse(costoBaseCtrl.text.trim());
+                            final costoControl = double.tryParse(costoControlCtrl.text.trim());
+
+                            if (unidadCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Unidad de control es obligatoria')),
+                              );
+                              return;
+                            }
+
+                            if (contenido == null || cantidad == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Contenido por unidad y Cantidad son obligatorios')),
+                              );
+                              return;
+                            }
+
+                            if (fechaIngreso == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Seleccione la fecha de ingreso')),
+                              );
+                              return;
+                            }
+
+                            await _service.crearEntrada(
+                              productId: seleccionado!.productId,
+                              codigoLote: loteCtrl.text.trim().isEmpty ? null : loteCtrl.text.trim(),
+                              fechaIngresoIso: fechaIngreso?.toIso8601String(),
+                              fechaVencimientoIso: fechaVencimiento?.toIso8601String(),
+                              unidadControl: unidadCtrl.text.trim(),
+                              contenidoPorUnidadBase: contenido,
+                              cantidadUnidades: cantidad,
+                              observaciones: observacionesCtrl.text.trim().isEmpty ? null : observacionesCtrl.text.trim(),
+                              providerId: providerIdSel,
+                              costoUnitarioBase: costoBase,
+                              costoPorUnidadControl: costoControl,
+                            );
+
+                            if (mounted) {
+                              Navigator.pop(ctx);
+                              await _cargarDatos();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Entrada creada correctamente')),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error al crear entrada: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.save),
+                        label: const Text('Crear Entrada'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _brandPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -42,16 +467,34 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
     try {
       final inversiones = await _service.calcularInversionPorProducto();
       final entradas = await _service.obtenerTodasLasEntradas();
+      final stock = await _service.obtenerStockReal();
       
       setState(() {
         _inversiones = inversiones;
         _entradas = entradas;
+        _stock = stock;
+        _agotados = stock.where((p) => p.estado == 'agotado').toList();
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _cargarProveedores() async {
+    try {
+      final proveedores = await ProductoService.listarProveedores();
+      if (!mounted) return;
+      setState(() {
+        _proveedores = proveedores;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _proveedores = [];
       });
     }
   }
@@ -92,7 +535,7 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Gestión de Entradas'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: _brandPrimary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -114,6 +557,8 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _buildAgotadosBanner(),
+                        const SizedBox(height: 12),
                         _buildSearchBar(),
                         const SizedBox(height: 16),
                         _buildInversionSection(),
@@ -355,10 +800,21 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
           children: [
             Icon(Icons.inventory_2, color: Colors.grey[700], size: 22),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'Listado de Entradas',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _brandPrimary),
             ),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: () => _abrirNuevaEntrada(null),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Nueva Entrada'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brandPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            )
           ],
         ),
         const SizedBox(height: 12),
@@ -403,9 +859,9 @@ class _EntradasInventarioPageState extends State<EntradasInventarioPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
+          color: isSelected ? _brandPrimary : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? color : Colors.grey[300]!),
+          border: Border.all(color: isSelected ? _brandPrimary : Colors.grey[300]!),
         ),
         child: Row(
           children: [

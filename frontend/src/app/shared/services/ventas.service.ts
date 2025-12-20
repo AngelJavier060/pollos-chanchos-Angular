@@ -12,6 +12,7 @@ export interface VentaHuevoDTO {
   cantidad: number;
   precioUnit: number;
   total?: number;
+  observaciones?: string;
 }
 
 export interface VentaAnimalDTO {
@@ -23,6 +24,7 @@ export interface VentaAnimalDTO {
   cantidad: number;
   precioUnit: number;
   total?: number;
+  observaciones?: string;
 }
 
 @Injectable({ providedIn: 'root' })

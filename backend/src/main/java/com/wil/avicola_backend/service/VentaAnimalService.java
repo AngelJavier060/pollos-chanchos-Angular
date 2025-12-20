@@ -60,6 +60,7 @@ public class VentaAnimalService {
                 .cantidad(dto.getCantidad())
                 .precioUnit(dto.getPrecioUnit())
                 .total(total)
+                .observaciones(dto.getObservaciones())
                 .vendedor(vendedor)
                 .build();
         return ventaAnimalRepository.save(venta);
@@ -158,6 +159,8 @@ public class VentaAnimalService {
             total = existente.getPrecioUnit().multiply(existente.getCantidad());
         }
         if (total != null) existente.setTotal(total);
+
+        if (dto.getObservaciones() != null) existente.setObservaciones(dto.getObservaciones());
 
         return ventaAnimalRepository.saveAndFlush(existente);
     }

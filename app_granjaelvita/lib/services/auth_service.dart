@@ -183,8 +183,8 @@ class AuthService {
 
   /// Cierra la sesión actual y limpia todos los datos de autenticación
   static Future<void> logout() async {
-    await clearSession();
-    await setBiometricEnabled(false);
+    _token = null;
+    _refreshToken = null;
   }
 
   /// Obtiene el tipo de animal del usuario basado en su rol

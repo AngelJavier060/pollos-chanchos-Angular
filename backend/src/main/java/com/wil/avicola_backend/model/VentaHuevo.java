@@ -72,6 +72,9 @@ public class VentaHuevo {
     @Column(precision = 12, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "observaciones", length = 1000)
+    private String observaciones;
+
     // Vendedor opcional por ahora
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vendedor_id")
