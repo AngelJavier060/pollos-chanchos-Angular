@@ -221,6 +221,10 @@ interface GrupoManoObra {
         <div class="flex items-center gap-3">
           <span class="text-sm font-normal text-gray-500">{{ registrosOrdenados.length }} registros</span>
           <button type="button" (click)="exportarHistorialCSV()" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">Exportar CSV</button>
+          <div class="hidden md:inline-flex bg-slate-100 rounded-lg p-1">
+            <button type="button" (click)="vistaAgrupada = false" [ngClass]="!vistaAgrupada ? 'bg-blue-600 text-white' : 'text-slate-700'" class="px-3 py-1.5 rounded-md">Resumida</button>
+            <button type="button" (click)="vistaAgrupada = true" [ngClass]="vistaAgrupada ? 'bg-blue-600 text-white' : 'text-slate-700'" class="px-3 py-1.5 rounded-md">Agrupada</button>
+          </div>
         </div>
       </h3>
       <p class="text-gray-500 text-sm mb-4">Listado de pagos</p>
@@ -246,14 +250,14 @@ interface GrupoManoObra {
         </div>
       </div>
 
-      <div *ngIf="registrosOrdenados.length === 0" class="text-center py-12 text-gray-500">
+      <div *ngIf="registrosFiltrados.length === 0" class="text-center py-12 text-gray-500">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
         <p>No hay registros de mano de obra</p>
         <p class="text-sm mt-1">Haz clic en "Ingresar mano de obra" para agregar el primer registro</p>
       </div>
-      <div class="overflow-x-auto" *ngIf="registrosOrdenados.length > 0">
+      <div class="overflow-x-auto" *ngIf="!vistaAgrupada && registrosOrdenados.length > 0">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
@@ -284,6 +288,95 @@ interface GrupoManoObra {
           </tfoot>
         </table>
       </div>
+
+      <!-- Vista AGRUPADA (compacta) -->
+      <div class="overflow-x-auto" *ngIf="vistaAgrupada && registrosAgrupados.length > 0">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="w-8"></th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trabajador</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cargo</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Horas Totales</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Costo Total</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <ng-container *ngFor="let g of registrosAgrupados; let i = index">
+              <tr [class.bg-blue-50]="expandedRowIndex === i" class="hover:bg-gray-50">
+                <td class="px-2">
+                  <button type="button" (click)="toggleRow(i)" class="text-gray-500 hover:text-gray-700">
+                    <span *ngIf="expandedRowIndex !== i">&#9654;</span>
+                    <span *ngIf="expandedRowIndex === i">&#9660;</span>
+                  </button>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700 font-medium">{{ g.fecha | dateEs }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">{{ g.trabajador }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">{{ g.cargo }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 text-right">{{ g.horasTotal | number:'1.2-2' }}</td>
+                <td class="px-4 py-3 text-sm text-green-700 font-semibold text-right">S/ {{ g.costoTotal | number:'1.2-2' }}</td>
+              </tr>
+              <tr *ngIf="expandedRowIndex === i" class="bg-blue-50/40">
+                <td></td>
+                <td colspan="5" class="px-4 pb-4">
+                  <div class="text-xs text-gray-600 font-medium mb-2">Detalle por lotes ({{ g.detalles.length }} registros)</div>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+                      <thead class="bg-gray-100">
+                        <tr>
+                          <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Lote</th>
+                          <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Especie</th>
+                          <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600">Horas</th>
+                          <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600">Costo por hora</th>
+                          <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600">Total</th>
+                          <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Observaciones</th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let d of g.detalles" class="bg-white border-t">
+                          <td class="px-3 py-2 text-sm font-medium text-blue-700">{{ d.lote }}</td>
+                          <td class="px-3 py-2 text-sm">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold"
+                                  [ngClass]="{ 'bg-green-100 text-green-700': esPollo(getEtiquetaAnimal(d.animalTipo)), 'bg-rose-100 text-rose-700': esChancho(getEtiquetaAnimal(d.animalTipo)) }">
+                              {{ getEtiquetaAnimal(d.animalTipo) }}
+                            </span>
+                          </td>
+                          <td class="px-3 py-2 text-sm text-right">{{ d.cantidad | number:'1.2-2' }}</td>
+                          <td class="px-3 py-2 text-sm text-right">S/ {{ d.costoUnit | number:'1.2-2' }}</td>
+                          <td class="px-3 py-2 text-sm text-right font-semibold text-emerald-700">S/ {{ d.total | number:'1.2-2' }}</td>
+                          <td class="px-3 py-2 text-sm text-gray-600"><span class="block max-w-[360px] truncate" [title]="d.observaciones">{{ d.observaciones || '—' }}</span></td>
+                          <td class="px-3 py-2 text-sm text-center">
+                            <button (click)="editarRegistroPorId(d.id, d.loteId)" class="text-blue-600 hover:text-blue-800 mr-3" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button (click)="eliminarRegistroPorId(d.id)" class="text-red-600 hover:text-red-800" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot class="bg-gray-50 border-t">
+                        <tr>
+                          <td class="px-3 py-2 text-sm font-semibold text-gray-700" colspan="4">Total del grupo</td>
+                          <td class="px-3 py-2 text-sm font-bold text-emerald-700 text-right">S/ {{ g.costoTotal | number:'1.2-2' }}</td>
+                          <td colspan="2"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+          <tfoot class="bg-gray-50 border-t">
+            <tr>
+              <td></td>
+              <td class="px-4 py-3 text-sm font-semibold text-gray-700" colspan="3">Totales</td>
+              <td class="px-4 py-3 text-sm font-semibold text-gray-700 text-right">{{ totalHorasListado | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-sm font-bold text-green-700 text-right">S/ {{ totalCostoListado | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="text-xs text-gray-500 mt-2">{{ registrosAgrupados.length }} grupos · {{ registrosFiltrados.length }} registros totales</div>
+      </div>
     </div>
   </div>
   `,
@@ -312,6 +405,7 @@ export class ManoObraComponent implements OnInit {
   filtroHasta: string = '';
   filtroTrabajador: string = '';
   trabajadoresDisponibles: string[] = [];
+  vistaAgrupada: boolean = true;
 
   // KPIs
   totalPagado = 0;
@@ -409,7 +503,7 @@ export class ManoObraComponent implements OnInit {
 
   get registrosAgrupados(): GrupoManoObra[] {
     const groups: { [key: string]: GrupoManoObra } = {};
-    this.registros.forEach(item => {
+    (this.registrosFiltrados || []).forEach(item => {
       const fechaStr = this.normalizarFecha(item?.fecha);
       const trabajador = String(item?.nombreTrabajador || '').trim();
       const cargo = String(item?.cargo || '').trim();
