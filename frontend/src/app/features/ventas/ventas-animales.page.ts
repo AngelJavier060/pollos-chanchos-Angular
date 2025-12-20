@@ -8,12 +8,14 @@ import { VentasAnimalesWidgetComponent } from '../dashboard/widgets/ventas-anima
   standalone: true,
   imports: [CommonModule, RouterModule, VentasAnimalesWidgetComponent],
   template: `
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-bold">Venta de Animales (vista)</h1>
-      <p class="text-gray-600">Solo lectura usando datos actuales</p>
+  <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-6">
+      <h1 class="text-3xl font-bold">🐓 🐷 Venta de Animales</h1>
+      <p class="text-sm opacity-90">Sistema de gestión y control de ventas</p>
     </div>
-    <app-ventas-animales-widget></app-ventas-animales-widget>
+    <div class="p-6 bg-white">
+      <app-ventas-animales-widget></app-ventas-animales-widget>
+    </div>
   </div>
   `
 })

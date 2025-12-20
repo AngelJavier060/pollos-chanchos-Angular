@@ -8,12 +8,14 @@ import { VentasHuevosWidgetComponent } from '../dashboard/widgets/ventas-huevos-
   standalone: true,
   imports: [CommonModule, RouterModule, VentasHuevosWidgetComponent],
   template: `
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-bold">Venta de Huevo (vista)</h1>
-      <p class="text-gray-600">Solo lectura usando datos actuales</p>
+  <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div class="bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white px-8 py-6">
+      <h1 class="text-3xl font-bold">🥚 Venta de Huevos</h1>
+      <p class="text-sm opacity-90">Sistema de gestión y control de ventas</p>
     </div>
-    <app-ventas-huevos-widget></app-ventas-huevos-widget>
+    <div class="p-6 bg-white">
+      <app-ventas-huevos-widget></app-ventas-huevos-widget>
+    </div>
   </div>
   `
 })

@@ -15,7 +15,7 @@ import { Animal } from '../../../shared/models/product.model';
   template: `
   <div class="space-y-6">
     <!-- Buscador superior por periodo -->
-    <div class="bg-white border rounded p-4">
+    <div class="bg-gray-50 border-b rounded p-4">
       <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-sm text-gray-600">Periodo</label>
@@ -38,20 +38,20 @@ import { Animal } from '../../../shared/models/product.model';
     </div>
 
     <!-- Resumen de ventas de animales (periodo seleccionado) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div class="bg-blue-50 border border-blue-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-blue-700">Pollos vendidos (periodo)</div>
-        <div class="text-2xl font-bold text-blue-900">{{ cantidadPollosPeriodo }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 px-1">
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100">
+        <div class="text-[11px] uppercase tracking-wide text-blue-700">🐓 Pollos vendidos (periodo)</div>
+        <div class="text-3xl font-extrabold text-blue-900 mt-1">{{ cantidadPollosPeriodo }}</div>
         <div class="text-xs text-blue-700/80 mt-1">{{ montoPollosPeriodo | currency:'USD':'symbol-narrow' }}</div>
       </div>
-      <div class="bg-pink-50 border border-pink-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-pink-700">Chanchos vendidos (periodo)</div>
-        <div class="text-2xl font-bold text-pink-900">{{ cantidadChanchosPeriodo }}</div>
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-pink-600 bg-gradient-to-br from-pink-50 to-pink-100">
+        <div class="text-[11px] uppercase tracking-wide text-pink-700">🐷 Chanchos vendidos (periodo)</div>
+        <div class="text-3xl font-extrabold text-pink-900 mt-1">{{ cantidadChanchosPeriodo }}</div>
         <div class="text-xs text-pink-700/80 mt-1">{{ montoChanchosPeriodo | currency:'USD':'symbol-narrow' }}</div>
       </div>
-      <div class="bg-amber-50 border border-amber-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalCostoVentasAnim | currency:'USD':'symbol-narrow' }}</div>
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-amber-500 bg-gradient-to-br from-amber-50 to-amber-100">
+        <div class="text-[11px] uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
+        <div class="text-3xl font-extrabold text-amber-900 mt-1">{{ totalCostoVentasAnim | currency:'USD':'symbol-narrow' }}</div>
         <div class="text-xs text-amber-700/80 mt-1">{{ totalCantidadVentasAnim }} animales</div>
       </div>
     </div>
@@ -120,14 +120,24 @@ import { Animal } from '../../../shared/models/product.model';
 
       <!-- Ventas guardadas (desde backend) -->
       <div class="mt-6">
-        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-2">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
           <h3 class="font-semibold">Ventas de animales guardadas
-            <span class="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded" *ngIf="ventasAnimalesHoy && ventasAnimalesHoy.length">{{ ventasAnimalesHoy.length }} registros</span>
+            <span class="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded" *ngIf="ventasAnimalesFiltradas && ventasAnimalesFiltradas.length">{{ ventasAnimalesFiltradas.length }} registros</span>
           </h3>
+          <div class="flex items-center gap-2 md:ml-auto">
+            <span class="text-sm font-semibold text-gray-600">Filtro:</span>
+            <button (click)="filtroTabla='todos'" class="filter-animal-btn px-3 py-2 rounded-lg border text-sm"
+                    [ngClass]="{'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-500 shadow': filtroTabla==='todos', 'bg-white border-gray-200 text-gray-700': filtroTabla!=='todos'}">🐾 Todos</button>
+            <button (click)="filtroTabla='pollos'" class="filter-animal-btn px-3 py-2 rounded-lg border text-sm"
+                    [ngClass]="{'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-500 shadow': filtroTabla==='pollos', 'bg-white border-gray-200 text-gray-700': filtroTabla!=='pollos'}">🐓 Pollos</button>
+            <button (click)="filtroTabla='chanchos'" class="filter-animal-btn px-3 py-2 rounded-lg border text-sm"
+                    [ngClass]="{'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-500 shadow': filtroTabla==='chanchos', 'bg-white border-gray-200 text-gray-700': filtroTabla!=='chanchos'}">🐷 Chanchos</button>
+            <span class="ml-2 text-xs bg-indigo-600 text-white px-2 py-1 rounded-full">Activos</span>
+          </div>
         </div>
-        <div class="overflow-auto border rounded" *ngIf="ventasAnimalesHoy && ventasAnimalesHoy.length; else sinVentasAnim">
+        <div class="overflow-auto border rounded" *ngIf="ventasAnimalesFiltradas && ventasAnimalesFiltradas.length; else sinVentasAnim">
           <table class="min-w-full">
-            <thead class="bg-gray-50 text-left text-xs text-gray-500">
+            <thead class="bg-gradient-to-r from-indigo-500 to-purple-600 text-left text-xs text-white uppercase">
               <tr>
                 <th class="px-4 py-3">ID</th>
                 <th class="px-4 py-3">Fecha</th>
@@ -140,11 +150,13 @@ import { Animal } from '../../../shared/models/product.model';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let v of ventasAnimalesHoy" class="border-t">
+              <tr *ngFor="let v of ventasAnimalesFiltradas" class="border-t hover:bg-gray-50 transition">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
                 <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
-                <td class="px-4 py-2">{{ getAnimalNameVenta(v) }}</td>
+                <td class="px-4 py-2">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold" [ngClass]="animalTagClass(v)">{{ getAnimalNameVenta(v) }}</span>
+                </td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingIdAnim===v.id; else viewCantA"> 
                     <input type="number" [(ngModel)]="editAnimModel.cantidad" min="0" class="w-24 border rounded px-2 py-1" />
@@ -459,6 +471,14 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
       error: () => this.ventasAnimAll = []
     });
   }
+  // Filtro visual de la tabla (🐾 todos, 🐓 pollos, 🐷 chanchos)
+  filtroTabla: 'todos'|'pollos'|'chanchos' = 'todos';
+  get ventasAnimalesFiltradas(): any[] {
+    const base = this.ventasAnimalesHoy || [];
+    if (this.filtroTabla === 'pollos') return base.filter(v => this.esPollo(v));
+    if (this.filtroTabla === 'chanchos') return base.filter(v => this.esChancho(v));
+    return base;
+  }
   get totalRegistrosAnimAcum(): number { return (this.ventasAnimAll || []).length; }
   get totalCantidadAnimAcum(): number {
     return (this.ventasAnimAll || []).reduce((acc, v) => acc + (Number(v?.cantidad) || 0), 0);
@@ -511,6 +531,13 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
 
   get montoChanchosPeriodo(): number {
     return this.totalVentasChanchos;
+  }
+
+  // Etiqueta de color según especie
+  animalTagClass(v: any): string {
+    if (this.esPollo(v)) return 'bg-blue-50 text-blue-700';
+    if (this.esChancho(v)) return 'bg-pink-50 text-pink-700';
+    return 'bg-gray-100 text-gray-700';
   }
 
   ngOnDestroy(): void {

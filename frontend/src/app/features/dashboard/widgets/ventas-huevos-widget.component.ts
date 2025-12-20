@@ -16,7 +16,7 @@ import { VentasService } from '../../../shared/services/ventas.service';
   template: `
   <div class="space-y-6">
     <!-- Buscador superior por periodo (profesional) -->
-    <div class="bg-white border rounded p-4">
+    <div class="bg-gray-50 border-b rounded p-4">
       <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-sm text-gray-600">Periodo</label>
@@ -36,24 +36,24 @@ import { VentasService } from '../../../shared/services/ventas.service';
           <button (click)="aplicarFiltroVentas()" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">Buscar</button>
         </div>
         <div>
-          <button (click)="exportVentasCSV()" [disabled]="!ventasHoy?.length" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded hover:bg-emerald-100 text-sm disabled:opacity-40">Exportar CSV</button>
+          <button (click)="exportVentasCSV()" [disabled]="!ventasHoy?.length" class="bg-white border-2 border-rose-500 text-rose-600 px-3 py-2 rounded hover:bg-rose-50 text-sm disabled:opacity-40">📊 Exportar CSV</button>
         </div>
       </div>
     </div>
     <!-- Resumen de ventas (acumulado global: fijo, no cambia con filtros) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div class="bg-emerald-50 border border-emerald-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-emerald-700">Cubetas (periodo)</div>
-        <div class="text-2xl font-bold text-emerald-900">{{ totalCubetasPeriodo }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 px-1">
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-emerald-600 bg-gradient-to-br from-emerald-50 to-emerald-100">
+        <div class="text-[11px] uppercase tracking-wide text-emerald-700">🥚 Cubetas vendidas (periodo)</div>
+        <div class="text-3xl font-extrabold text-emerald-900 mt-1">{{ totalCubetasPeriodo }}</div>
         <div class="text-xs text-emerald-700/80 mt-1">+ {{ totalHuevosSueltosPeriodo }} huevos sueltos</div>
       </div>
-      <div class="bg-blue-50 border border-blue-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-blue-700">Huevos totales (periodo)</div>
-        <div class="text-2xl font-bold text-blue-900">{{ totalHuevosPeriodo }}</div>
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100">
+        <div class="text-[11px] uppercase tracking-wide text-blue-700">Huevos totales (periodo)</div>
+        <div class="text-3xl font-extrabold text-blue-900 mt-1">{{ totalHuevosPeriodo }}</div>
       </div>
-      <div class="bg-amber-50 border border-amber-100 rounded p-4">
-        <div class="text-xs uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
-        <div class="text-2xl font-bold text-amber-900">{{ totalMontoVentas | currency:'USD':'symbol-narrow' }}</div>
+      <div class="rounded-xl p-5 shadow-sm border-l-4 border-amber-500 bg-gradient-to-br from-amber-50 to-amber-100">
+        <div class="text-[11px] uppercase tracking-wide text-amber-700">Monto total (periodo)</div>
+        <div class="text-3xl font-extrabold text-amber-900 mt-1">{{ totalMontoVentas | currency:'USD':'symbol-narrow' }}</div>
       </div>
     </div>
     <!-- Formulario de venta (registro directo) -->
@@ -63,8 +63,8 @@ import { VentasService } from '../../../shared/services/ventas.service';
         <button
           *ngIf="!mostrarCaptura"
           (click)="mostrarFormulario()"
-          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
-          Ingresar una venta de huevos
+          class="bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white px-4 py-2 rounded shadow hover:opacity-90 text-sm">
+          + Ingresar una venta de huevos
         </button>
       </div>
 
@@ -172,10 +172,13 @@ import { VentasService } from '../../../shared/services/ventas.service';
             <span class="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded" *ngIf="ventasHoy && ventasHoy.length">{{ ventasHoy.length }} registros</span>
           </h3>
         </div>
-        
+        <div class="flex items-center gap-2 mb-3" *ngIf="ventasHoy && ventasHoy.length">
+          <span class="text-sm font-semibold text-gray-600">{{ ventasHoy.length }} registros</span>
+          <span class="bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full">Activos</span>
+        </div>
         <div class="overflow-auto border rounded" *ngIf="ventasHoy && ventasHoy.length; else sinVentas">
           <table class="min-w-full">
-            <thead class="bg-gray-50 text-left text-xs text-gray-500">
+            <thead class="bg-gradient-to-r from-fuchsia-500 to-rose-500 text-left text-xs text-white uppercase">
               <tr>
                 <th class="px-4 py-3">ID</th>
                 <th class="px-4 py-3">Fecha</th>
@@ -187,10 +190,10 @@ import { VentasService } from '../../../shared/services/ventas.service';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let v of ventasHoy" class="border-t">
+              <tr *ngFor="let v of ventasHoy" class="border-t hover:bg-rose-50 transition">
                 <td class="px-4 py-2">{{ v.id }}</td>
                 <td class="px-4 py-2">{{ formatFecha(v.fecha) }}</td>
-                <td class="px-4 py-2">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</td>
+                <td class="px-4 py-2"><span class="bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded text-xs font-semibold">{{ formatLoteCodigo(v.loteCodigo || v.loteId) }}</span></td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingId===v.id; else viewCant">
                     <div class="space-y-2">
@@ -207,7 +210,12 @@ import { VentasService } from '../../../shared/services/ventas.service';
                       </div>
                     </div>
                   </ng-container>
-                  <ng-template #viewCant>{{ formatCantidadHuevosValor(v.cantidad) }}</ng-template>
+                  <ng-template #viewCant>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
+                      <span class="text-base">🥚</span>
+                      {{ formatCantidadHuevosValor(v.cantidad) }}
+                    </span>
+                  </ng-template>
                 </td>
                 <td class="px-4 py-2">
                   <ng-container *ngIf="editingId===v.id; else viewPU">

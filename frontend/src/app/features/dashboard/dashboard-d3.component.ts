@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as d3 from 'd3';
@@ -81,7 +81,7 @@ import { LoteService } from '../lotes/services/lote.service';
   </div>
   `
 })
-export class DashboardD3Component implements OnInit, OnDestroy {
+export class DashboardD3Component implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('lineChart', { static: true }) lineChartRef!: ElementRef<HTMLDivElement>;
   @ViewChild('barChart', { static: true }) barChartRef!: ElementRef<HTMLDivElement>;
   @ViewChild('donutChart', { static: true }) donutChartRef!: ElementRef<HTMLDivElement>;
@@ -116,8 +116,22 @@ export class DashboardD3Component implements OnInit, OnDestroy {
     // Cargar por defecto el mes actual
     this.applyPeriod();
     // Redibujar al redimensionar
-    this.resizeObserver = new ResizeObserver(() => { this.drawAll(); this.drawInventoryAndCost(); });
-    this.resizeObserver.observe(this.lineChartRef.nativeElement);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => { this.drawAll(); this.drawInventoryAndCost(); });
+      this.resizeObserver.observe(this.lineChartRef.nativeElement);
+    }
+  }
+
+  ngAfterViewInit(): void {
+    // Render inicial de respaldo en caso de que el ResizeObserver no dispare aún
+    setTimeout(() => {
+      if (!this.labels.length) {
+        this.applyPeriod();
+      } else {
+        this.drawAll();
+        this.drawInventoryAndCost();
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -286,7 +300,8 @@ export class DashboardD3Component implements OnInit, OnDestroy {
       .curve(d3.curveMonotoneX);
 
     // Ejes
-    g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(this.labels.filter((_,i)=> (i%Math.ceil(this.labels.length/10))===0)));
+    const tickStep = Math.max(1, Math.ceil(this.labels.length / 10));
+    g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(this.labels.filter((_,i)=> (i % tickStep) === 0)));
     g.append('g').call(d3.axisLeft(y));
 
     // Linea huevos
@@ -358,9 +373,12 @@ export class DashboardD3Component implements OnInit, OnDestroy {
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     const x = d3.scaleBand<string>().domain(this.labels).range([0, innerW]).padding(0.2);
-    const y = d3.scaleLinear().domain([0, d3.max([...this.huevosPorDia, ...this.animalesPorDia])! * 1.2 + 1]).nice().range([innerH, 0]);
+    const maxVal = d3.max([...this.huevosPorDia, ...this.animalesPorDia]);
+    const yMax = (maxVal ?? 0) * 1.2 + 1;
+    const y = d3.scaleLinear().domain([0, yMax]).nice().range([innerH, 0]);
 
-    g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(this.labels.filter((_,i)=> (i%Math.ceil(this.labels.length/10))===0)));
+    const tickStep2 = Math.max(1, Math.ceil(this.labels.length / 10));
+    g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(this.labels.filter((_,i)=> (i % tickStep2) === 0)));
     g.append('g').call(d3.axisLeft(y));
 
     const groupWidth = x.bandwidth();
@@ -444,7 +462,8 @@ export class DashboardD3Component implements OnInit, OnDestroy {
       { name: 'Chanchos', value: this.registrados.chanchos, color: '#22c55e' }
     ];
     const x = d3.scaleBand<string>().domain(data.map(d => d.name)).range([0, innerW]).padding(0.3);
-    const y = d3.scaleLinear().domain([0, d3.max(data, d => d.value)! * 1.2 + 1]).nice().range([innerH, 0]);
+    const maxInv = d3.max(data, d => d.value) ?? 0;
+    const y = d3.scaleLinear().domain([0, maxInv * 1.2 + 1]).nice().range([innerH, 0]);
     g.append('g').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(x));
     g.append('g').call(d3.axisLeft(y));
     g.selectAll('.bar-inv').data(data).enter().append('rect')
