@@ -95,6 +95,12 @@ export class AnalisisFinancieroComponent implements OnInit {
     return this.especieSeleccionada === 1 ? 'Pollos' : 'Chanchos';
   }
 
+  // Descripción legible del método de prorrateo actual (para badge en UI)
+  getProrrateoDescripcion(): string {
+    const cfg = (this.configuracionesProrrateo || []).find(c => c.metodo === this.metodoProrrateo);
+    return cfg?.descripcion || String(this.metodoProrrateo);
+  }
+
   exportarDetalleCSV(): void {
     const filas: string[] = [];
     const encabezados = [
@@ -966,6 +972,41 @@ export class AnalisisFinancieroComponent implements OnInit {
   refrescarCompleto(): void {
     this.refrescar();
     this.cargarCostosIndirectos();
+  }
+
+  // ===== Acciones rápidas de período y limpieza de filtros (UI) =====
+  setRangoUltimos7(): void {
+    const hoy = new Date();
+    const desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - 6);
+    this.periodoAnalisis.inicio = desde;
+    this.periodoAnalisis.fin = hoy;
+    this.refrescarCompleto();
+  }
+
+  setRangoUltimoMes(): void {
+    const hoy = new Date();
+    const desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - 29);
+    this.periodoAnalisis.inicio = desde;
+    this.periodoAnalisis.fin = hoy;
+    this.refrescarCompleto();
+  }
+
+  setRangoAnioActual(): void {
+    const hoy = new Date();
+    const desde = new Date(hoy.getFullYear(), 0, 1);
+    this.periodoAnalisis.inicio = desde;
+    this.periodoAnalisis.fin = hoy;
+    this.refrescarCompleto();
+  }
+
+  limpiarFiltrosUI(): void {
+    this.filtroCodigo = '';
+    this.mortalidadEstimadaPct = 2;
+    this.periodoAnalisis.inicio = this.obtenerPrimerDiaMes();
+    this.periodoAnalisis.fin = this.obtenerUltimoDiaMes();
+    this.refrescarCompleto();
   }
 
   /**

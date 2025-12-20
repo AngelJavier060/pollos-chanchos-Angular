@@ -218,95 +218,70 @@ interface GrupoManoObra {
           </svg>
           Historial de Pagos
         </span>
-        <span class="text-sm font-normal text-gray-500">{{ registrosAgrupados.length }} grupos</span>
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-normal text-gray-500">{{ registrosOrdenados.length }} registros</span>
+          <button type="button" (click)="exportarHistorialCSV()" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">Exportar CSV</button>
+        </div>
       </h3>
-      <p class="text-gray-500 text-sm mb-4">Resumen agrupado por trabajador - Click en una fila para ver detalle por lotes</p>
+      <p class="text-gray-500 text-sm mb-4">Listado de pagos</p>
 
-      <div *ngIf="registrosAgrupados.length === 0" class="text-center py-12 text-gray-500">
+      <div class="flex flex-col md:flex-row items-start md:items-end gap-3 mb-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Desde</label>
+          <input type="date" [value]="filtroDesde || ''" (change)="onFiltroDesdeChange($any($event.target).value)" class="p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Hasta</label>
+          <input type="date" [value]="filtroHasta || ''" (change)="onFiltroHastaChange($any($event.target).value)" class="p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Trabajador</label>
+          <select [value]="filtroTrabajador" (change)="onFiltroTrabajadorChange($any($event.target).value)" class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">Todos</option>
+            <option *ngFor="let t of trabajadoresDisponibles" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+        <div>
+          <button type="button" (click)="limpiarFiltros()" class="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">Limpiar</button>
+        </div>
+      </div>
+
+      <div *ngIf="registrosOrdenados.length === 0" class="text-center py-12 text-gray-500">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
         <p>No hay registros de mano de obra</p>
         <p class="text-sm mt-1">Haz clic en "Ingresar mano de obra" para agregar el primer registro</p>
       </div>
-
-      <div class="overflow-x-auto" *ngIf="registrosAgrupados.length > 0">
+      <div class="overflow-x-auto" *ngIf="registrosOrdenados.length > 0">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="w-10"></th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trabajador</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cargo</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Observaciones</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Horas Totales</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Costo Total</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-100">
-            <ng-container *ngFor="let row of registrosAgrupados; let i = index">
-              <tr (click)="toggleRow(i)" class="hover:bg-gray-50 cursor-pointer" [class.bg-blue-50]="expandedRowIndex === i">
-                <td class="px-2 py-3">
-                  <svg *ngIf="expandedRowIndex !== i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                  <svg *ngIf="expandedRowIndex === i" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-700 font-medium">{{ row.fecha | dateEs }}</td>
-                <td class="px-4 py-3 text-sm text-gray-700">{{ row.trabajador }}</td>
-                <td class="px-4 py-3 text-sm text-gray-700">{{ row.cargo }}</td>
-                <td class="px-4 py-3 text-sm text-gray-700 text-right">{{ row.horasTotal | number:'1.2-2' }}</td>
-                <td class="px-4 py-3 text-right"><span class="font-bold text-green-600">S/ {{ row.costoTotal | number:'1.2-2' }}</span></td>
-              </tr>
-              <tr *ngIf="expandedRowIndex === i">
-                <td colspan="6" class="bg-gray-50 px-6 py-4">
-                  <div class="pl-6">
-                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Detalle por Lotes ({{ row.detalles.length }})</h4>
-                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                      <table class="w-full">
-                        <thead class="bg-gray-100">
-                          <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lote</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Horas</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Costo Unit.</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                          <tr *ngFor="let d of row.detalles" class="hover:bg-gray-50">
-                            <td class="px-4 py-3">
-                              <span class="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-semibold">{{ d.lote }}</span>
-                              <span *ngIf="getEtiquetaAnimal(d.animalTipo) as etq" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs" [ngClass]="{ 'bg-green-50 text-green-700': esPollo(etq), 'bg-rose-50 text-rose-700': esChancho(etq), 'bg-gray-100 text-gray-600': !esPollo(etq) && !esChancho(etq) }">{{ etq }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-600 text-right font-medium">{{ d.cantidad | number:'1.2-2' }}</td>
-                            <td class="px-4 py-3 text-sm text-gray-600 text-right">S/ {{ d.costoUnit | number:'1.4-4' }}</td>
-                            <td class="px-4 py-3 text-right"><span class="font-semibold text-gray-800">S/ {{ d.total | number:'1.2-2' }}</span></td>
-                            <td class="px-4 py-3 text-center">
-                              <div class="flex items-center justify-center gap-2">
-                                <button (click)="editarRegistroPorId(d.id, d.loteId); $event.stopPropagation()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                </button>
-                                <button (click)="eliminarRegistroPorId(d.id); $event.stopPropagation()" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
-                          <tr>
-                            <td class="px-4 py-3 text-sm font-bold text-gray-700">Total del grupo</td>
-                            <td class="px-4 py-3 text-right text-sm font-semibold text-gray-700">{{ row.horasTotal | number:'1.2-2' }} h</td>
-                            <td class="px-4 py-3"></td>
-                            <td class="px-4 py-3 text-right"><span class="text-lg font-bold text-green-600">S/ {{ row.costoTotal | number:'1.2-2' }}</span></td>
-                            <td class="px-4 py-3"></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </ng-container>
+            <tr *ngFor="let r of registrosOrdenados" class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-sm text-gray-700 font-medium">{{ r.fecha | dateEs }}</td>
+              <td class="px-4 py-3 text-sm text-gray-700">{{ r.nombreTrabajador }}</td>
+              <td class="px-4 py-3 text-sm text-gray-700">{{ r.cargo }}</td>
+              <td class="px-4 py-3 text-sm text-gray-600"><span class="block max-w-[420px] truncate" title="{{ r.observaciones || '' }}">{{ r.observaciones || '—' }}</span></td>
+              <td class="px-4 py-3 text-sm text-gray-700 text-right">{{ r.horasTrabajadas | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-sm text-green-700 font-semibold text-right">S/ {{ (r.total != null ? r.total : ((r.horasTrabajadas || 0) * (r.costoPorHora || 0))) | number:'1.2-2' }}</td>
+            </tr>
           </tbody>
+          <tfoot class="bg-gray-50 border-t">
+            <tr>
+              <td class="px-4 py-3 text-sm font-semibold text-gray-700" colspan="4">Totales</td>
+              <td class="px-4 py-3 text-sm font-semibold text-gray-700 text-right">{{ totalHorasListado | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-sm font-bold text-green-700 text-right">S/ {{ totalCostoListado | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -333,6 +308,10 @@ export class ManoObraComponent implements OnInit {
   editandoId: string | null = null;
   editandoLoteId: string | null = null;
   expandedRowIndex: number | null = null;
+  filtroDesde: string = '';
+  filtroHasta: string = '';
+  filtroTrabajador: string = '';
+  trabajadoresDisponibles: string[] = [];
 
   // KPIs
   totalPagado = 0;
@@ -340,6 +319,8 @@ export class ManoObraComponent implements OnInit {
   ultimoPagoFecha = '';
   cantidadTrabajadores = 0;
   gastosPorLote: { loteId: string; loteNombre: string; total: number }[] = [];
+  totalHorasListado = 0;
+  totalCostoListado = 0;
 
   constructor(private fb: FormBuilder, private lotesService: LoteService, private service: CostosManoObraService) {}
 
@@ -396,6 +377,9 @@ export class ManoObraComponent implements OnInit {
     // Cantidad de trabajadores únicos
     const trabajadores = new Set(this.registros.map(r => r.nombreTrabajador?.toLowerCase().trim()).filter(Boolean));
     this.cantidadTrabajadores = trabajadores.size;
+    this.trabajadoresDisponibles = Array.from(new Set((this.registros || [])
+      .map(r => String(r?.nombreTrabajador || '').trim())
+      .filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
     // Gastos por lote
     const gastoMap = new Map<string, { loteNombre: string; total: number }>();
@@ -412,6 +396,15 @@ export class ManoObraComponent implements OnInit {
       loteNombre: data.loteNombre,
       total: data.total
     }));
+
+    // Totales del listado (para footer del Historial)
+    this.totalHorasListado = (this.registros || []).reduce((acc, r) => acc + Number(r?.horasTrabajadas ?? 0), 0);
+    this.totalCostoListado = (this.registros || []).reduce((acc, r) => {
+      const horas = Number(r?.horasTrabajadas ?? 0);
+      const unit = Number(r?.costoPorHora ?? 0);
+      const tot = Number(r?.total ?? (horas * unit));
+      return acc + (isNaN(tot) ? 0 : tot);
+    }, 0);
   }
 
   get registrosAgrupados(): GrupoManoObra[] {
@@ -444,6 +437,57 @@ export class ManoObraComponent implements OnInit {
       });
     });
     return Object.values(groups).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  }
+
+  get registrosFiltrados(): any[] {
+    try {
+      const desde = this.filtroDesde ? new Date(this.filtroDesde) : null;
+      const hasta = this.filtroHasta ? new Date(this.filtroHasta) : null;
+      const trab = String(this.filtroTrabajador || '').toLowerCase().trim();
+      return (this.registros || []).filter((r: any) => {
+        const f = new Date(this.normalizarFecha(r?.fecha));
+        if (desde && f < desde) return false;
+        if (hasta && f > hasta) return false;
+        if (trab && String(r?.nombreTrabajador || '').toLowerCase().trim() !== trab) return false;
+        return true;
+      });
+    } catch {
+      return this.registros || [];
+    }
+  }
+
+  get registrosOrdenados(): any[] {
+    try {
+      return [...(this.registrosFiltrados || [])].sort((a: any, b: any) => {
+        const fa = new Date(a?.fecha || '').getTime();
+        const fb = new Date(b?.fecha || '').getTime();
+        if (!isNaN(fb) && !isNaN(fa) && fb !== fa) return fb - fa; // fecha desc
+        const ta = String(a?.nombreTrabajador || '').toLowerCase();
+        const tb = String(b?.nombreTrabajador || '').toLowerCase();
+        if (ta !== tb) return ta.localeCompare(tb);
+        const ca = String(a?.cargo || '').toLowerCase();
+        const cb = String(b?.cargo || '').toLowerCase();
+        return ca.localeCompare(cb);
+      });
+    } catch {
+      return this.registros || [];
+    }
+  }
+
+  onFiltroDesdeChange(val: string): void { this.filtroDesde = val || ''; this.recalcularTotalesListado(); }
+  onFiltroHastaChange(val: string): void { this.filtroHasta = val || ''; this.recalcularTotalesListado(); }
+  onFiltroTrabajadorChange(val: string): void { this.filtroTrabajador = val || ''; this.recalcularTotalesListado(); }
+  limpiarFiltros(): void { this.filtroDesde = ''; this.filtroHasta = ''; this.filtroTrabajador = ''; this.recalcularTotalesListado(); }
+
+  recalcularTotalesListado(): void {
+    const lista = this.registrosFiltrados || [];
+    this.totalHorasListado = lista.reduce((acc: number, r: any) => acc + Number(r?.horasTrabajadas ?? 0), 0);
+    this.totalCostoListado = lista.reduce((acc: number, r: any) => {
+      const horas = Number(r?.horasTrabajadas ?? 0);
+      const unit = Number(r?.costoPorHora ?? 0);
+      const tot = Number(r?.total ?? (horas * unit));
+      return acc + (isNaN(tot) ? 0 : tot);
+    }, 0);
   }
 
   toggleRow(index: number): void {
@@ -610,10 +654,12 @@ export class ManoObraComponent implements OnInit {
           return horasA - horasB;
         });
         this.calcularKPIs();
+        this.recalcularTotalesListado();
       }, 
       error: () => {
         this.registros = [];
         this.calcularKPIs();
+        this.recalcularTotalesListado();
       }
     });
   }
@@ -643,6 +689,47 @@ export class ManoObraComponent implements OnInit {
       },
       error: (err) => alert(err?.message || 'Error al eliminar el registro.')
     });
+  }
+
+  exportarHistorialCSV(): void {
+    try {
+      const header = ['Fecha', 'Trabajador', 'Cargo', 'Observaciones', 'Horas Totales', 'Costo Total'];
+      const rows = this.registrosOrdenados || [];
+      const esc = (s: any) => '"' + String(s ?? '').replace(/"/g, '""') + '"';
+      const num = (n: any) => {
+        const v = Number(n);
+        return isNaN(v) ? '0.00' : v.toFixed(2);
+      };
+      let csv = header.join(',') + '\n';
+      for (const r of rows) {
+        const horas = Number(r?.horasTrabajadas ?? 0);
+        const unit = Number(r?.costoPorHora ?? 0);
+        const total = Number(r?.total ?? (horas * unit));
+        const fecha = this.normalizarFecha(r?.fecha);
+        csv += [
+          esc(fecha),
+          esc(r?.nombreTrabajador || ''),
+          esc(r?.cargo || ''),
+          esc(r?.observaciones || ''),
+          num(horas),
+          num(total)
+        ].join(',') + '\n';
+      }
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const desde = this.filtroDesde || 'inicio';
+      const hasta = this.filtroHasta || 'fin';
+      const trab = this.filtroTrabajador ? ('_' + String(this.filtroTrabajador).replace(/\s+/g, '_')) : '';
+      a.href = url;
+      a.download = `historial_mano_obra_${desde}_a_${hasta}${trab}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Error al exportar CSV:', e);
+    }
   }
 
   // ===== Helpers de lotes dinámicos =====
