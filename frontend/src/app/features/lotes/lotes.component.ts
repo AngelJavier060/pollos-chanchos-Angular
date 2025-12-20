@@ -7,6 +7,10 @@ import { LoteService } from './services/lote.service';
 import { RaceService } from '../configuracion/services/race.service';
 import { Lote } from './interfaces/lote.interface';
 import { Race } from '../configuracion/interfaces/race.interface';
+import { VentasService } from '../../shared/services/ventas.service';
+import { MortalidadBackendService } from '../../shared/services/mortalidad-backend.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-lotes',
@@ -68,10 +72,15 @@ export class LotesComponent implements OnInit {
   historicoFechas: Lote[] = [];
   loadingHistorico = false;
 
+  // Verificación por lote (vendidos y muertos)
+  verificacionMap: Record<string, { vendidos: number; muertos: number }> = {};
+
   constructor(
     private fb: FormBuilder,
     private loteService: LoteService,
-    private raceService: RaceService
+    private raceService: RaceService,
+    private ventasService: VentasService,
+    private mortalidadService: MortalidadBackendService
   ) {
     this.initForm();
   }
@@ -291,6 +300,7 @@ export class LotesComponent implements OnInit {
         this.identificarTiposAnimales(); // Identificar tipos de animales disponibles
         // Reaplicar el filtro actual una vez que los lotes estén cargados
         this.filtrarPorTipoAnimal(this.filtroAnimalActual);
+        this.cargarVerificaciones(this.lotesFiltrados);
         
         // Debug: verificar estructura de datos
         console.log('[LotesComponent] Lotes cargados:', this.lotes.length);
@@ -434,6 +444,7 @@ export class LotesComponent implements OnInit {
 
     const loteToSave: Lote = {
       name: loteData.name.trim(),
+      descripcion: (loteData.descripcion || '').toString().trim(),
       quantity: Number(loteData.quantity),
       birthdate: new Date(loteData.birthdate),
       cost: Number(loteData.cost),
@@ -643,6 +654,57 @@ export class LotesComponent implements OnInit {
     }
 
     console.log(`Filtrado por "${tipo}": ${this.lotesFiltrados.length} de ${base.length} lotes`);
+    this.cargarVerificaciones(this.lotesFiltrados);
+  }
+
+  // Cargar verificación (vendidos y muertos) por lote
+  private cargarVerificaciones(lotes: Lote[]): void {
+    const peticiones = (lotes || [])
+      .filter(l => !!l.id)
+      .map(l => {
+        const loteId = l.id as string;
+        const adquiridos = Number(l.quantityOriginal ?? l.quantity ?? 0);
+        const ventas$ = this.ventasService.listarVentasAnimalesPorLoteEmitidas(loteId).pipe(
+          map(list => Array.isArray(list) ? list.reduce((s, v: any) => s + Number(v?.cantidad ?? 0), 0) : 0),
+          catchError(() => of(0))
+        );
+        const muertos$ = this.mortalidadService.contarMuertesPorLote(loteId).pipe(
+          catchError(() => of(0))
+        );
+        return forkJoin({ loteId: of(loteId), vendidos: ventas$, muertos: muertos$, adquiridos: of(adquiridos), vivos: of(Number(l.quantity || 0)) });
+      });
+
+    if (!peticiones.length) {
+      this.verificacionMap = {};
+      return;
+    }
+
+    forkJoin(peticiones).subscribe(resultados => {
+      const mapRes: Record<string, { vendidos: number; muertos: number }> = {};
+      resultados.forEach((r: any) => {
+        const adquiridos = Number(r.adquiridos || 0);
+        const vivos = Number(r.vivos || 0);
+        let vendidos = Math.max(0, Math.min(Number(r.vendidos || 0), adquiridos));
+        const maxMuertosPorAdq = Math.max(0, adquiridos - vendidos);
+        let muertosRaw = Math.max(0, Number(r.muertos || 0));
+        let muertosCap = Math.min(muertosRaw, maxMuertosPorAdq);
+        // Ajustar muertos para coherencia con vivos mostrados: adquiridos - vendidos - muertos == vivos
+        const muertosNecesarios = Math.max(0, adquiridos - vendidos - vivos);
+        muertosCap = Math.max(0, Math.min(muertosNecesarios, maxMuertosPorAdq));
+        mapRes[r.loteId] = { vendidos, muertos: muertosCap };
+      });
+      this.verificacionMap = mapRes;
+    });
+  }
+
+  getVerificacionTexto(lote: Lote): string {
+    const key = lote.id || '';
+    const v = this.verificacionMap[key];
+    if (!v) return '-';
+    const partes: string[] = [];
+    if ((v.vendidos || 0) > 0) partes.push(`${v.vendidos} vendidos`);
+    if ((v.muertos || 0) > 0) partes.push(`${v.muertos} muertos`);
+    return partes.length ? partes.join(' y ') : 'Sin bajas';
   }
   
   // Método para identificar todos los tipos de animales en los lotes

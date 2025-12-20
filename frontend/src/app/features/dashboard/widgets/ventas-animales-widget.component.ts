@@ -140,6 +140,19 @@ import { Animal } from '../../../shared/models/product.model';
             <button (click)="filtroTabla='chanchos'" class="filter-animal-btn px-3 py-2 rounded-lg border text-sm"
                     [ngClass]="{'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-500 shadow': filtroTabla==='chanchos', 'bg-white border-gray-200 text-gray-700': filtroTabla!=='chanchos'}">🐷 Chanchos</button>
             <span class="ml-2 text-xs bg-indigo-600 text-white px-2 py-1 rounded-full">Activos</span>
+            <input [(ngModel)]="busquedaLote" (ngModelChange)="onBusquedaLoteChange()" type="text" placeholder="Buscar por lote..." class="ml-3 w-44 md:w-56 border rounded px-3 py-2 text-sm" />
+            <button *ngIf="busquedaLote?.trim()" (click)="limpiarBusquedaLote()" class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">Limpiar</button>
+          </div>
+        </div>
+        <!-- KPIs visibles solo cuando hay búsqueda por lote -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3" *ngIf="busquedaLote?.trim()">
+          <div class="rounded-lg p-3 bg-white border">
+            <div class="text-[11px] uppercase tracking-wide text-gray-500">Lotes encontrados</div>
+            <div class="text-2xl font-bold">{{ kpiBusquedaNumLotes }}</div>
+          </div>
+          <div class="rounded-lg p-3 bg-white border">
+            <div class="text-[11px] uppercase tracking-wide text-gray-500">Cantidad vendida (registros filtrados)</div>
+            <div class="text-2xl font-bold">{{ kpiBusquedaTotalVendidos }}</div>
           </div>
         </div>
         <div class="overflow-auto border rounded" *ngIf="ventasAnimalesFiltradas && ventasAnimalesFiltradas.length; else sinVentasAnim">
@@ -357,6 +370,7 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
 
   especie: 'all' | 'pollos' | 'chanchos' = 'all';
   busqueda = '';
+  busquedaLote: string = '';
 
   private sub?: Subscription;
 
@@ -514,9 +528,54 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   filtroTabla: 'todos'|'pollos'|'chanchos' = 'todos';
   get ventasAnimalesFiltradas(): any[] {
     const base = this.ventasAnimalesHoy || [];
-    if (this.filtroTabla === 'pollos') return base.filter(v => this.esPollo(v));
-    if (this.filtroTabla === 'chanchos') return base.filter(v => this.esChancho(v));
-    return base;
+    let arr = base;
+    if (this.filtroTabla === 'pollos') arr = arr.filter(v => this.esPollo(v));
+    if (this.filtroTabla === 'chanchos') arr = arr.filter(v => this.esChancho(v));
+    const q = (this.busquedaLote || '').trim().toLowerCase();
+    if (q) {
+      arr = arr.filter(v => this.coincideVentaConBusqueda(v, q));
+    }
+    return arr;
+  }
+
+  private coincideVentaConBusqueda(v: any, q: string): boolean {
+    if (!v) return false;
+    const code = (v.loteCodigo || '').toString().toLowerCase();
+    const idStr = (v.loteId != null ? String(v.loteId) : '').toLowerCase();
+    const label = this.formatLoteCodigo(v.loteCodigo || v.loteId).toLowerCase();
+    if (code.includes(q) || idStr.includes(q) || label.includes(q)) return true;
+    // Intentar resolver contra el lote cargado
+    const byId = this.lotes.find(l => String(l.id).toLowerCase() === idStr);
+    const byCode = !byId && code ? this.lotes.find(l => String(l.codigo).toLowerCase() === code) : null;
+    const lot = byId || byCode || null;
+    if (lot) {
+      const nombre = (lot.name || '').toString().toLowerCase();
+      const codigo = (lot.codigo || '').toString().toLowerCase();
+      const etiqueta = this.formatLoteCodigo(lot.codigo || lot.id).toLowerCase();
+      return nombre.includes(q) || codigo.includes(q) || etiqueta.includes(q);
+    }
+    return false;
+  }
+
+  get kpiBusquedaNumLotes(): number {
+    const set = new Set<string>();
+    for (const v of this.ventasAnimalesFiltradas) {
+      const key = String(v.loteId ?? v.loteCodigo ?? '');
+      if (key) set.add(key);
+    }
+    return set.size;
+  }
+
+  get kpiBusquedaTotalVendidos(): number {
+    return this.ventasAnimalesFiltradas.reduce((acc, v) => acc + (Number(v?.cantidad) || 0), 0);
+  }
+
+  onBusquedaLoteChange(): void {
+    // No-op: la UI reacciona por getter, pero dejamos hook por si se requiere side-effect
+  }
+
+  limpiarBusquedaLote(): void {
+    this.busquedaLote = '';
   }
   get totalRegistrosAnimAcum(): number { return (this.ventasAnimAll || []).length; }
   get totalCantidadAnimAcum(): number {
@@ -655,10 +714,10 @@ export class VentasAnimalesWidgetComponent implements OnInit, OnDestroy {
   // Lotes filtrados por animal seleccionado desde configuración - solo lotes con stock disponible
   // Evitar duplicados (mismos lotes repetidos por id/código)
   get lotesFiltradosPorAnimal(): Lote[] {
+    // Requerir selección de animal para listar lotes y evitar errores de especie
+    if (this.animalSeleccionadoId == null) return [];
     let list = (this.lotes || []).filter(l => (l.quantity || 0) > 0);
-    if (this.animalSeleccionadoId != null) {
-      list = list.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
-    }
+    list = list.filter(l => l.race?.animal?.id === this.animalSeleccionadoId);
     const map = new Map<string, Lote>();
     for (const l of list) {
       const key = String((l as any).id ?? (l as any).codigo ?? (l as any).name ?? '');

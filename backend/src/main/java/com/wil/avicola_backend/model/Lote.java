@@ -51,6 +51,9 @@ public class Lote {
     @NotBlank(message = "El nombre es obligatorio")
     private String name;
 
+    @Column(name = "descripcion", length = 255)
+    private String descripcion; // Descripción (origen)
+
     @CreatedDate
     LocalDateTime create_date;
     @LastModifiedDate

@@ -508,12 +508,14 @@
       <table class="min-w-full bg-white">
         <thead class="bg-gray-100">
           <tr>
-            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+            <!-- Código oculto por solicitud -->
+            <!-- <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th> -->
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Original</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animales Vivos</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verificación</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distribución</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Nacimiento</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
@@ -525,9 +527,6 @@
             <td colspan="10" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
           </tr>
           <tr *ngFor="let lote of lotesFiltrados" class="hover:bg-gray-50">
-            <td class="py-4 px-4">
-              <span class="font-mono text-sm">{{ lote.codigo || lote.id }}</span>
-            </td>
             <td class="py-4 px-4 font-medium">{{ lote.name }}</td>
             <td class="py-4 px-4">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
@@ -554,6 +553,9 @@
                   -{{ lote.quantityOriginal - lote.quantity }}
                 </span>
               </div>
+            </td>
+            <td class="py-4 px-4">
+              <span class="text-xs text-gray-700">{{ getVerificacionTexto(lote) }}</span>
             </td>
             <td class="py-4 px-4">
               <div *ngIf="lote.maleCount != null || lote.femaleCount != null" class="text-xs space-y-1">

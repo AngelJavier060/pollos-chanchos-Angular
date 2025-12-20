@@ -51,12 +51,20 @@ public class VentaAnimalService {
             total = dto.getPrecioUnit().multiply(dto.getCantidad());
         }
 
+        // Forzar consistencia: animalId/animalName deben provenir del lote
+        Long animalIdFromLote = lote.getRace() != null && lote.getRace().getAnimal() != null
+                ? lote.getRace().getAnimal().getId()
+                : null;
+        String animalNameFromLote = lote.getRace() != null && lote.getRace().getAnimal() != null
+                ? lote.getRace().getAnimal().getName()
+                : null;
+
         VentaAnimal venta = VentaAnimal.builder()
                 .fecha(dto.getFecha())
                 .loteId(lote.getId())
                 .loteCodigo(lote.getCodigo())
-                .animalId(dto.getAnimalId())
-                .animalName(dto.getAnimalName())
+                .animalId(animalIdFromLote)
+                .animalName(animalNameFromLote)
                 .cantidad(dto.getCantidad())
                 .precioUnit(dto.getPrecioUnit())
                 .total(total)
@@ -149,8 +157,12 @@ public class VentaAnimalService {
         if (dto.getFecha() != null) existente.setFecha(dto.getFecha());
         if (dto.getLoteId() != null) existente.setLoteId(loteIdNuevo);
         if (dto.getLoteCodigo() != null) existente.setLoteCodigo(loteCodigoNuevo);
-        if (dto.getAnimalId() != null) existente.setAnimalId(dto.getAnimalId());
-        if (dto.getAnimalName() != null) existente.setAnimalName(dto.getAnimalName());
+        // Forzar consistencia de especie según el lote destino
+        Lote loteDestino = resolveLote(loteIdNuevo, loteCodigoNuevo);
+        if (loteDestino.getRace() != null && loteDestino.getRace().getAnimal() != null) {
+            existente.setAnimalId(loteDestino.getRace().getAnimal().getId());
+            existente.setAnimalName(loteDestino.getRace().getAnimal().getName());
+        }
         if (dto.getCantidad() != null) existente.setCantidad(dto.getCantidad());
         if (dto.getPrecioUnit() != null) existente.setPrecioUnit(dto.getPrecioUnit());
 

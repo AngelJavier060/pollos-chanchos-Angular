@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import com.wil.avicola_backend.model.Race;
 import com.wil.avicola_backend.repository.LoteRepository;
 import com.wil.avicola_backend.repository.RaceRepository;
 import com.wil.avicola_backend.repository.VentaAnimalRepository;
+import com.wil.avicola_backend.repository.MortalidadRepository;
 
 @Service
 public class LoteService {
@@ -30,6 +33,8 @@ public class LoteService {
     private CodigoLoteService codigoLoteService;
     @Autowired
     private VentaAnimalRepository ventaAnimalRepository;
+    @Autowired
+    private MortalidadRepository mortalidadRepository;
 
     public ResponseEntity<?> findLotes() {
         return ResponseEntity.ok().body(loteRepository.findAll());
@@ -85,6 +90,11 @@ public class LoteService {
         String codigo = codigoLoteService.generarCodigoLote(raza);
         lote.setCodigo(codigo);
         
+        // Normalizamos descripción si viene desde frontend
+        if (lote.getDescripcion() != null) {
+            lote.setDescripcion(lote.getDescripcion().trim());
+        }
+
         Lote lote_new = loteRepository.save(lote);
         return ResponseEntity.status(HttpStatus.OK).body(lote_new);
     }
@@ -104,6 +114,9 @@ public class LoteService {
             lote_old.setBirthdate(lote.getBirthdate());
             lote_old.setCost(lote.getCost());
             lote_old.setName(lote.getName());
+            if (lote.getDescripcion() != null) {
+                lote_old.setDescripcion(lote.getDescripcion().trim());
+            }
             
             // ✅ MANTENER LA CANTIDAD ORIGINAL - NO SE MODIFICA DESPUÉS DE LA CREACIÓN
             // Solo establecemos quantityOriginal si no existe (para lotes creados antes de esta funcionalidad)
@@ -225,5 +238,49 @@ public class LoteService {
             return ResponseEntity.ok(loteRepository.findHistoricoByFechaCierreBetween(inicio, fin));
         }
         return ResponseEntity.ok(loteRepository.findHistoricoByAnimalAndFechaCierreBetween(animalId, inicio, fin));
+    }
+
+    // ================= Verificación por lote (vendidos y muertos) =================
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getVerificacionPorLotes(Long animalId, boolean historico) {
+        java.util.List<Lote> lotes;
+        if (historico) {
+            lotes = (animalId == null)
+                    ? loteRepository.findByQuantityEquals(0)
+                    : loteRepository.findByRaceAnimalIdAndQuantityEquals(animalId, 0);
+        } else {
+            lotes = (animalId == null)
+                    ? loteRepository.findByQuantityGreaterThan(0)
+                    : loteRepository.findByRaceAnimalIdAndQuantityGreaterThan(animalId, 0);
+        }
+
+        java.util.List<java.util.Map<String, Object>> resp = new java.util.ArrayList<>();
+        for (Lote lote : lotes) {
+            String loteId = lote.getId();
+            long adquiridos;
+            {
+                Integer qo = lote.getQuantityOriginal();
+                adquiridos = (qo != null) ? qo.longValue() : (long) lote.getQuantity();
+            }
+
+            java.math.BigDecimal vendidosBD = ventaAnimalRepository.sumCantidadEmitidaByLoteId(loteId);
+            long vendidosRaw = (vendidosBD != null) ? vendidosBD.longValue() : 0L;
+
+            Integer muertosInt = mortalidadRepository.countMuertesByLoteId(loteId);
+            long muertosRaw = (muertosInt != null) ? muertosInt.longValue() : 0L;
+
+            // Normalización: impedir que vendidos + muertos > adquiridos
+            long vendidosCap = Math.max(0L, Math.min(vendidosRaw, adquiridos));
+            long maxMuertos = Math.max(0L, adquiridos - vendidosCap);
+            long muertosCap = Math.max(0L, Math.min(muertosRaw, maxMuertos));
+
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("loteId", loteId);
+            item.put("vendidos", vendidosCap);
+            item.put("muertos", muertosCap);
+            item.put("adquiridos", adquiridos);
+            item.put("vivos", lote.getQuantity());
+            resp.add(item);
+        }
+        return ResponseEntity.ok(resp);
     }
 }

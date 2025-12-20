@@ -50,6 +50,7 @@ export class LoteService {
         id: lote.id,
         codigo: lote.codigo,
         name: lote.name,
+        descripcion: lote.descripcion || undefined,
         quantity: Number(lote.quantity),
         quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
         birthdate: this.parseDate(lote.birthdate),
@@ -81,6 +82,7 @@ export class LoteService {
     // Incluimos la raza completa en la solicitud
     const loteToSend: any = {
       name: lote.name?.trim() || '',
+      descripcion: (lote.descripcion ?? '').toString().trim(),
       quantity: Number(lote.quantity) || 0,
       birthdate: lote.birthdate instanceof Date ? 
                 lote.birthdate.toISOString().split('T')[0] : 
@@ -113,6 +115,7 @@ export class LoteService {
     const loteToUpdate: any = {
       id: lote.id,
       name: lote.name?.trim(),
+      descripcion: (lote.descripcion ?? '').toString().trim(),
       quantity: Number(lote.quantity),
       birthdate: lote.birthdate instanceof Date ? 
                 lote.birthdate.toISOString().split('T')[0] : 
@@ -167,6 +170,7 @@ export class LoteService {
       id: lote.id,
       codigo: lote.codigo,
       name: lote.name,
+      descripcion: lote.descripcion || undefined,
       quantity: Number(lote.quantity),
       quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
       birthdate: this.parseDate(lote.birthdate),

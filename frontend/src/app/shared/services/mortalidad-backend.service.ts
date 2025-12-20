@@ -79,6 +79,12 @@ export class MortalidadBackendService {
     );
   }
 
+  contarMuertesPorLote(loteId: string): Observable<number> {
+    return this.http.get<any>(`${this.apiUrl}/lote/${loteId}/contar`).pipe(
+      map(res => (res && typeof res === 'object' && 'data' in res) ? Number(res.data || 0) : Number(res || 0))
+    );
+  }
+
   /**
    * ✅ OBTENER CAUSAS DE MORTALIDAD
    */
