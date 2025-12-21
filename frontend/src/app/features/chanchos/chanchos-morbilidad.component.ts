@@ -433,14 +433,15 @@ export class ChanchosMorbilidadComponent implements OnInit, OnDestroy {
       registros = registros.filter(r => (r.enfermedad?.nombre || '').toLowerCase().includes(term));
     }
     if (this.busquedaLote) {
-      registros = registros.filter(r => String(r.loteId).includes(this.busquedaLote));
+      const term = this.busquedaLote.toLowerCase();
+      registros = registros.filter(r => this.getNombreLote(String(r.loteId)).toLowerCase().includes(term));
     }
     return registros.sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime());
   }
 
   getNombreLote(loteId: string): string {
-    const lote = this.lotesChanchos.find(l => String(l.id) === loteId);
-    return lote ? `Lote ${lote.id} - ${lote.race?.name || 'Sin raza'}` : `Lote ${loteId}`;
+    const lote = this.lotesChanchos.find(l => String(l.id) === String(loteId) || String(l.codigo || '') === String(loteId));
+    return lote ? (lote.name || `Lote ${lote.id}`) : `Lote ${loteId}`;
   }
 
   compareEnfermedades(e1: Enfermedad, e2: Enfermedad): boolean { return e1 && e2 ? e1.id === e2.id : e1 === e2; }

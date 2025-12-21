@@ -671,7 +671,7 @@ export class LotesComponent implements OnInit {
         const muertos$ = this.mortalidadService.contarMuertesPorLote(loteId).pipe(
           catchError(() => of(0))
         );
-        return forkJoin({ loteId: of(loteId), vendidos: ventas$, muertos: muertos$, adquiridos: of(adquiridos), vivos: of(Number(l.quantity || 0)) });
+        return forkJoin({ loteId: of(loteId), vendidos: ventas$, muertos: muertos$, adquiridos: of(adquiridos) });
       });
 
     if (!peticiones.length) {
@@ -683,14 +683,10 @@ export class LotesComponent implements OnInit {
       const mapRes: Record<string, { vendidos: number; muertos: number }> = {};
       resultados.forEach((r: any) => {
         const adquiridos = Number(r.adquiridos || 0);
-        const vivos = Number(r.vivos || 0);
         let vendidos = Math.max(0, Math.min(Number(r.vendidos || 0), adquiridos));
         const maxMuertosPorAdq = Math.max(0, adquiridos - vendidos);
         let muertosRaw = Math.max(0, Number(r.muertos || 0));
         let muertosCap = Math.min(muertosRaw, maxMuertosPorAdq);
-        // Ajustar muertos para coherencia con vivos mostrados: adquiridos - vendidos - muertos == vivos
-        const muertosNecesarios = Math.max(0, adquiridos - vendidos - vivos);
-        muertosCap = Math.max(0, Math.min(muertosNecesarios, maxMuertosPorAdq));
         mapRes[r.loteId] = { vendidos, muertos: muertosCap };
       });
       this.verificacionMap = mapRes;
@@ -705,6 +701,16 @@ export class LotesComponent implements OnInit {
     if ((v.vendidos || 0) > 0) partes.push(`${v.vendidos} vendidos`);
     if ((v.muertos || 0) > 0) partes.push(`${v.muertos} muertos`);
     return partes.length ? partes.join(' y ') : 'Sin bajas';
+  }
+
+  // Calcular "Animales vivos" a partir de adquiridos - vendidos - muertos
+  getVivosCalculados(lote: Lote): number {
+    const adquiridos = Number(lote.quantityOriginal ?? lote.quantity ?? 0);
+    const key = lote.id || '';
+    const v = this.verificacionMap[key];
+    if (!v) return Number(lote.quantity || adquiridos || 0);
+    const vivos = Math.max(0, adquiridos - (Number(v.vendidos || 0)) - (Number(v.muertos || 0)));
+    return vivos;
   }
   
   // Método para identificar todos los tipos de animales en los lotes

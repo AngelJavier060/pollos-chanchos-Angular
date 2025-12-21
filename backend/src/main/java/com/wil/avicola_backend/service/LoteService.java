@@ -283,4 +283,59 @@ public class LoteService {
         }
         return ResponseEntity.ok(resp);
     }
+
+    // ================= Reconciliar cantidades (quantity) por lote =================
+    public ResponseEntity<java.util.Map<String, Object>> reconciliarCantidades(Long animalId) {
+        java.util.List<Lote> lotes;
+        if (animalId == null) {
+            lotes = new java.util.ArrayList<>();
+            loteRepository.findAll().forEach(lotes::add); // CrudRepository#findAll devuelve Iterable
+        } else {
+            lotes = loteRepository.findByRaceAnimalId(animalId);
+        }
+
+        int modificados = 0;
+        java.util.List<String> cambiados = new java.util.ArrayList<>();
+
+        for (Lote lote : lotes) {
+            String loteId = lote.getId();
+            long adquiridos;
+            {
+                Integer qo = lote.getQuantityOriginal();
+                adquiridos = (qo != null) ? qo.longValue() : (long) lote.getQuantity();
+            }
+
+            java.math.BigDecimal vendidosBD = ventaAnimalRepository.sumCantidadEmitidaByLoteId(loteId);
+            long vendidos = (vendidosBD != null) ? vendidosBD.longValue() : 0L;
+            Integer muertosInt = mortalidadRepository.countMuertesByLoteId(loteId);
+            long muertos = (muertosInt != null) ? muertosInt.longValue() : 0L;
+
+            if (vendidos < 0) vendidos = 0;
+            if (muertos < 0) muertos = 0;
+            if (vendidos > adquiridos) vendidos = adquiridos;
+            if (muertos > (adquiridos - vendidos)) muertos = (adquiridos - vendidos);
+
+            long vivosCalc = Math.max(0L, adquiridos - vendidos - muertos);
+            int vivosCalcInt = (int) Math.max(0L, Math.min((long) Integer.MAX_VALUE, vivosCalc));
+
+            int cantidadAnterior = lote.getQuantity();
+            if (cantidadAnterior != vivosCalcInt) {
+                lote.setQuantity(vivosCalcInt);
+                // actualizar fecha cierre si corresponde
+                if (cantidadAnterior > 0 && vivosCalcInt == 0) {
+                    lote.setFechaCierre(java.time.LocalDateTime.now());
+                } else if (cantidadAnterior == 0 && vivosCalcInt > 0) {
+                    lote.setFechaCierre(null);
+                }
+                loteRepository.save(lote);
+                modificados++;
+                cambiados.add(loteId);
+            }
+        }
+
+        java.util.Map<String, Object> res = new java.util.HashMap<>();
+        res.put("modificados", modificados);
+        res.put("lotes", cambiados);
+        return ResponseEntity.ok(res);
+    }
 }

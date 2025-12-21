@@ -511,6 +511,7 @@
             <!-- Código oculto por solicitud -->
             <!-- <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th> -->
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Raza</th>
             <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Original</th>
@@ -524,10 +525,11 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
           <tr *ngIf="lotesFiltrados.length === 0">
-            <td colspan="10" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
+            <td colspan="11" class="py-4 px-4 text-center text-sm text-gray-500">No hay lotes registrados para el filtro seleccionado</td>
           </tr>
           <tr *ngFor="let lote of lotesFiltrados" class="hover:bg-gray-50">
             <td class="py-4 px-4 font-medium">{{ lote.name }}</td>
+            <td class="py-4 px-4">{{ lote.descripcion || '-' }}</td>
             <td class="py-4 px-4">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                     [ngClass]="{
@@ -544,13 +546,13 @@
             <td class="py-4 px-4">
               <div class="flex items-center space-x-2">
                 <span [ngClass]="{
-                  'text-green-600 font-semibold': lote.quantity > 0,
-                  'text-red-600 font-semibold': lote.quantity === 0,
-                  'text-yellow-600 font-semibold': lote.quantity > 0 && lote.quantity < (lote.quantityOriginal || lote.quantity) * 0.8
-                }">{{ lote.quantity }}</span>
-                <span *ngIf="lote.quantityOriginal && lote.quantity < lote.quantityOriginal" 
+                  'text-green-600 font-semibold': getVivosCalculados(lote) > 0,
+                  'text-red-600 font-semibold': getVivosCalculados(lote) === 0,
+                  'text-yellow-600 font-semibold': getVivosCalculados(lote) > 0 && getVivosCalculados(lote) < (lote.quantityOriginal || lote.quantity) * 0.8
+                }">{{ getVivosCalculados(lote) }}</span>
+                <span *ngIf="(lote.quantityOriginal || lote.quantity) > getVivosCalculados(lote)" 
                       class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                  -{{ lote.quantityOriginal - lote.quantity }}
+                  -{{ (lote.quantityOriginal || lote.quantity) - getVivosCalculados(lote) }}
                 </span>
               </div>
             </td>
