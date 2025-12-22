@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { catchError } from 'rxjs/operators';
 
 export interface RegistroAlimentacionRequest {
   loteId: string;
@@ -113,10 +114,10 @@ export class AlimentacionService {
    * @param especie Opcional: 'pollos' o 'chanchos' para filtrar por especie
    */
   getHistorialAlimentacion(fechaInicio: string, fechaFin: string, especie?: string): Observable<PlanEjecucionHistorial[]> {
-    // ✅ USAR ENDPOINT DEBUG PÚBLICO QUE NO REQUIERE AUTENTICACIÓN
-    const url = (environment.production)
-      ? `${this.apiUrl}/historial`
-      : `${this.apiUrl}/debug/historial`;
+    // En producción intentamos endpoint oficial y hacemos fallback si falla
+    const urlProd = `${this.apiUrl}/historial`;
+    const urlDebug = `${this.apiUrl}/debug/historial`;
+    const url = environment.production ? urlProd : urlDebug;
     const params: any = { fechaInicio, fechaFin };
     
     // Agregar filtro de especie si se especifica
@@ -127,7 +128,27 @@ export class AlimentacionService {
     console.log('📚 Obteniendo historial de alimentación:', { fechaInicio, fechaFin, especie: especie || 'TODAS' });
     console.log('🔗 URL:', url);
     
-    return this.http.get<PlanEjecucionHistorial[]>(url, { params });
+    const primaria$ = this.http.get<PlanEjecucionHistorial[]>(url, { params });
+    if (!environment.production) return primaria$;
+
+    // Fallbacks en producción: (1) sin especie (2) endpoint debug
+    return primaria$.pipe(
+      catchError((err) => {
+        console.warn('⚠️ Falló historial oficial, reintentando sin especie...', err);
+        const paramsSinEspecie: any = { fechaInicio, fechaFin };
+        return this.http.get<PlanEjecucionHistorial[]>(urlProd, { params: paramsSinEspecie }).pipe(
+          catchError((err2) => {
+            console.warn('⚠️ Falló historial sin especie, usando endpoint debug...', err2);
+            return this.http.get<PlanEjecucionHistorial[]>(urlDebug, { params }).pipe(
+              catchError((err3) => {
+                console.error('❌ No se pudo obtener historial (fallbacks agotados)', err3);
+                return of([] as PlanEjecucionHistorial[]);
+              })
+            );
+          })
+        );
+      })
+    );
   }
 
   // 🔥 NUEVOS MÉTODOS PARA HISTORIAL PROFESIONAL
