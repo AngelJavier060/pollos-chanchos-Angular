@@ -788,8 +788,9 @@ export class PollosAlimentacionComponent implements OnInit {
   private async resolverTipoAlimentoId(al: EtapaAlimento): Promise<number | null> {
     try {
       if (al.productoId) {
-        const prod = await this.productService.getProductById(al.productoId).toPromise();
-        const id = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
+        // Evitar llamada remota en producción: resolver desde cache local
+        const prodLocal = (this.productosCache || []).find(p => Number(p?.id) === Number(al.productoId));
+        const id = prodLocal?.typeFood?.id || (prodLocal as any)?.typeFood_id || null;
         return Number.isFinite(Number(id)) ? Number(id) : null;
       }
       if (al.alimentoRecomendado) {
@@ -1064,13 +1065,14 @@ export class PollosAlimentacionComponent implements OnInit {
             let productId: number | null = al.productoId || null;
             if (productId) {
               try {
-                const prod = await this.productService.getProductById(productId).toPromise();
-                tipoAlimentoId = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
-                // Asegurar que mantenemos el productId correcto por seguridad
-                productId = prod?.id ?? productId;
-              } catch (e) {
-                console.warn('⚠️ No se pudo obtener product por ID', al.productoId, e);
-              }
+                // Evitar llamada remota en producción: usar cache local para obtener typeFoodId
+                const prodLocal = (this.productosCache || []).find(p => Number(p?.id) === Number(productId));
+                if (prodLocal) {
+                  tipoAlimentoId = prodLocal?.typeFood?.id || (prodLocal as any)?.typeFood_id || null;
+                  // Asegurar que mantenemos el productId correcto por seguridad
+                  productId = prodLocal?.id ?? productId;
+                }
+              } catch {}
             }
 
             // Intento rápido por caché local (normalizado) para resolver productId por nombre
