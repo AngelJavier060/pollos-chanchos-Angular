@@ -423,8 +423,9 @@ export class LogisticaComponent implements OnInit {
 
   get ultimaMovilizacion(): string {
     if (this.registros.length === 0) return '';
-    const fechas = this.registros.map(r => r.fecha).filter(f => f).sort().reverse();
-    return fechas[0] || '';
+    const sorted = (this.registros || []).slice().sort(this.compararDesc.bind(this));
+    const f = this.fechaValor(sorted[0]);
+    return f || '';
   }
 
   // Getter para agrupar registros por fecha, transporte, concepto y unidad
@@ -658,7 +659,13 @@ export class LogisticaComponent implements OnInit {
   }
 
   cargarRegistros(): void {
-    this.service.listar().subscribe({ next: (data) => this.registros = data, error: () => this.registros = [] });
+    this.service.listar().subscribe({
+      next: (data) => {
+        const arr = Array.isArray(data) ? data.slice() : [];
+        this.registros = arr.sort(this.compararDesc.bind(this));
+      },
+      error: () => this.registros = []
+    });
   }
 
   // ===== Helpers de lotes dinámicos =====
@@ -689,6 +696,25 @@ export class LogisticaComponent implements OnInit {
     } catch {
       return String(f || '');
     }
+  }
+
+  private fechaValor(item: any): string {
+    try {
+      const fuente = item?.fecha ?? item?.date ?? item?.createdAt ?? item?.created_at ?? '';
+      return this.normalizarFecha(fuente);
+    } catch {
+      return '';
+    }
+  }
+
+  private compararDesc(a: any, b: any): number {
+    const fa = this.fechaValor(a);
+    const fb = this.fechaValor(b);
+    const cmp = String(fb || '').localeCompare(String(fa || ''));
+    if (cmp !== 0) return cmp;
+    const idA = Number(a?.id || 0);
+    const idB = Number(b?.id || 0);
+    return idB - idA;
   }
 
   // Etiqueta y estilos según tipo de animal
