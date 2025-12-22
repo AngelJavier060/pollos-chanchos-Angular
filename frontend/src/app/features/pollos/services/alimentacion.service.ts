@@ -78,7 +78,9 @@ export class AlimentacionService {
    */
   registrarAlimentacion(request: RegistroAlimentacionRequest): Observable<string> {
     // ✅ USAR ENDPOINT DE DEBUG QUE SÍ GUARDA EN LA BASE DE DATOS
-    const url = `${this.apiUrl}/debug/registrar-alimentacion`;
+    const url = (environment.production)
+      ? `${this.apiUrl}/registrar-alimentacion`
+      : `${this.apiUrl}/debug/registrar-alimentacion`;
     
     const headers = new HttpHeaders({
       'Content-Type': 'application/json'
@@ -112,7 +114,9 @@ export class AlimentacionService {
    */
   getHistorialAlimentacion(fechaInicio: string, fechaFin: string, especie?: string): Observable<PlanEjecucionHistorial[]> {
     // ✅ USAR ENDPOINT DEBUG PÚBLICO QUE NO REQUIERE AUTENTICACIÓN
-    const url = `${this.apiUrl}/debug/historial`;
+    const url = (environment.production)
+      ? `${this.apiUrl}/historial`
+      : `${this.apiUrl}/debug/historial`;
     const params: any = { fechaInicio, fechaFin };
     
     // Agregar filtro de especie si se especifica

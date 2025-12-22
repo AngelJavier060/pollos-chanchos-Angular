@@ -1073,6 +1073,19 @@ export class PollosAlimentacionComponent implements OnInit {
               }
             }
 
+            // Intento rápido por caché local (normalizado) para resolver productId por nombre
+            if (!productId && al.alimentoRecomendado && this.productoByNameNorm && typeof this.normalizarTexto === 'function') {
+              try {
+                const norm = this.normalizarTexto(al.alimentoRecomendado);
+                const prodCache = this.productoByNameNorm.get(norm);
+                if (prodCache?.id != null) {
+                  productId = Number(prodCache.id);
+                  const tfid = prodCache?.typeFood?.id || (prodCache as any)?.typeFood_id || null;
+                  if (tfid != null) tipoAlimentoId = tfid as any;
+                }
+              } catch {}
+            }
+
             // Fallback: buscar por nombre si no tuvimos productoId o fallo anterior
             if (!tipoAlimentoId && al.alimentoRecomendado) {
               try {

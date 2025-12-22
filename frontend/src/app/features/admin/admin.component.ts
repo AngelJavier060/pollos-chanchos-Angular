@@ -95,7 +95,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private updateAvatarUrl(): void {
-    const newAvatarUrl = this.currentUser?.profilePicture || 'assets/img/default-avatar.png';
+    const newAvatarUrl = this.currentUser?.profilePicture || (this.currentUser as any)?.photoUrl || 'assets/img/default-avatar.png';
     if (this.avatarUrl !== newAvatarUrl) {
       this.avatarUrl = newAvatarUrl;
     }

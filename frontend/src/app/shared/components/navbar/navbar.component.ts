@@ -30,6 +30,10 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
+      // Normalizar foto: si no hay profilePicture, usar photoUrl cuando exista
+      if (user && !user.profilePicture && (user as any).photoUrl) {
+        user = { ...user, profilePicture: (user as any).photoUrl } as User;
+      }
       this.currentUser = user;
       this.isAdmin = this.authService.isAdmin();
       this.isAuthenticated = !!user;

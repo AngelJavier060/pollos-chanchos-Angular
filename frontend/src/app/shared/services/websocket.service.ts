@@ -9,7 +9,17 @@ export class WebsocketService {
   private stompClient: Client | null = null;
   private connected = false;
 
+  private isRealtimeEnabled(): boolean {
+    // En producción, desactivado por defecto a menos que enableRealtime === true
+    if ((environment as any)?.production) {
+      return (environment as any).enableRealtime === true;
+    }
+    // En desarrollo, activado por defecto a menos que se ponga en false
+    return (environment as any).enableRealtime !== false;
+  }
+
   private ensureConnected(): void {
+    if (!this.isRealtimeEnabled()) return;
     if (this.connected && this.stompClient) return;
 
     const wsUrl = `${environment.apiUrl}/ws`;
@@ -36,11 +46,22 @@ export class WebsocketService {
 
   connect(): Observable<string> {
     // Backwards-compatible API: subscribe to inventory updates by default
+    if (!this.isRealtimeEnabled()) {
+      const s = new Subject<string>();
+      // Completar inmediatamente para no dejar suscripciones colgadas
+      setTimeout(() => s.complete(), 0);
+      return s.asObservable();
+    }
     return this.subscribe('/topic/inventory-update');
   }
 
   subscribe(destination: string): Observable<string> {
     const subject = new Subject<string>();
+    if (!this.isRealtimeEnabled()) {
+      // No hacer nada en producción si está deshabilitado
+      setTimeout(() => subject.complete(), 0);
+      return subject.asObservable();
+    }
     this.ensureConnected();
 
     const trySubscribe = () => {
@@ -67,6 +88,7 @@ export class WebsocketService {
   }
 
   sendMessage(destination: string, payload: any): void {
+    if (!this.isRealtimeEnabled()) return;
     this.ensureConnected();
     const send = () => {
       if (!this.stompClient || !this.connected) {
