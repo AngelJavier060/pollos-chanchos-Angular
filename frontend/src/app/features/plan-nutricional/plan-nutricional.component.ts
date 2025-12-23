@@ -122,8 +122,8 @@ export class PlanNutricionalComponent implements OnInit {
     });
     
     this.detalleForm = this.fb.group({
-      dayStart: ['', [Validators.required, Validators.min(1), Validators.max(365)]],
-      dayEnd: ['', [Validators.required, Validators.min(1), Validators.max(365)]],
+      dayStart: ['', [Validators.required, Validators.min(1), Validators.max(5000)]],
+      dayEnd: ['', [Validators.required, Validators.min(1), Validators.max(5000)]],
       animalId: ['', Validators.required],
       productId: ['', Validators.required],
       quantityPerAnimal: ['', [Validators.required, Validators.min(0.001)]],
@@ -258,22 +258,24 @@ export class PlanNutricionalComponent implements OnInit {
       
       this.loading = true;
       const formData = this.planForm.value;
+
+      const animalIdNum = Number(formData.animalId);
       
       const planData: PlanAlimentacion = {
         name: formData.name,
         description: formData.description,
         animal: {
-          id: formData.animalId,
-          name: this.animales.find(a => a.id === formData.animalId)?.name || ''
+          id: Number.isFinite(animalIdNum) ? animalIdNum : formData.animalId,
+          name: this.animales.find(a => Number(a.id) === animalIdNum)?.name || ''
         }
       };
       
       // ✅ Validación anti-solapamiento a nivel de PLAN por animal (frontend)
       try {
         const nuevoRango = this.extractRangeFromName(planData.name || '');
-        if (nuevoRango && formData.animalId) {
+        if (nuevoRango && Number.isFinite(animalIdNum)) {
           const overlap = (this.planes || [])
-            .filter(p => (p.animalId || p.animal?.id) === formData.animalId)
+            .filter(p => Number(p.animalId || p.animal?.id) === animalIdNum)
             .filter(p => !this.editingPlan || p.id !== this.editingPlan.id)
             .some(p => {
               const r = this.extractRangeFromName(p.name || '');
@@ -567,10 +569,10 @@ export class PlanNutricionalComponent implements OnInit {
 
   get planSolapadoNombre(): string | null {
     const rango = this.rangoDetectadoForm;
-    const animalId = this.planForm?.get('animalId')?.value;
-    if (!rango || !animalId) return null;
+    const animalIdNum = Number(this.planForm?.get('animalId')?.value);
+    if (!rango || !Number.isFinite(animalIdNum)) return null;
     const existente = (this.planes || [])
-      .filter(p => (p.animalId || p.animal?.id) === animalId)
+      .filter(p => Number(p.animalId || p.animal?.id) === animalIdNum)
       .filter(p => !this.editingPlan || p.id !== this.editingPlan.id)
       .find(p => {
         const r = this.extractRangeFromName(p.name || '');
@@ -873,6 +875,22 @@ export class PlanNutricionalComponent implements OnInit {
 
   saveDetalle(): void {
     if (!this.detalleForm.valid) {
+      const dsErr: any = this.detalleForm.get('dayStart')?.errors || null;
+      const deErr: any = this.detalleForm.get('dayEnd')?.errors || null;
+      if (dsErr?.min || dsErr?.max || deErr?.min || deErr?.max) {
+        const min = dsErr?.min?.min ?? deErr?.min?.min;
+        const max = dsErr?.max?.max ?? deErr?.max?.max;
+        let msg = 'Verifica los rangos de días.';
+        if (min != null && max != null) {
+          msg = `Los días deben estar entre ${min} y ${max}.`;
+        } else if (min != null) {
+          msg = `Los días deben ser mayores o iguales a ${min}.`;
+        } else if (max != null) {
+          msg = `Los días deben ser menores o iguales a ${max}.`;
+        }
+        alert(`❌ Rango inválido\n\n${msg}`);
+        return;
+      }
       const errs: any = this.detalleForm.errors || {};
       if (errs?.rangoInvalido) {
         alert(`❌ Rango inválido\n\n${errs.rangoInvalido}`);

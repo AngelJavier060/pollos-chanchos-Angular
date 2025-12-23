@@ -1055,6 +1055,35 @@ export class PollosAlimentacionComponent implements OnInit {
         try {
           const loteIdStr = String(this.loteSeleccionado.id || this.loteSeleccionado.codigo || '');
           const numAnimales = this.loteSeleccionado?.quantity || 1;
+          let stockValido: Record<string, number> = {};
+          try {
+            stockValido = await this.invEntradasService.stockValidoAgrupado().toPromise() || {};
+          } catch {
+            stockValido = {};
+          }
+          const elegirProductIdPorNombre = (nombre: string): number | null => {
+            const n = this.normalizarTexto(nombre);
+            const productos = (this.productosCache || []);
+            const exactos = productos.filter(p => this.normalizarTexto(p?.name) === n);
+            const candidatos = exactos.length > 0 ? exactos : productos.filter(p => {
+              const pn = this.normalizarTexto(p?.name);
+              return pn && (pn.includes(n) || n.includes(pn));
+            });
+            let mejorId: number | null = null;
+            let mejorStock = -1;
+            for (const c of candidatos) {
+              const id = Number(c?.id);
+              if (!Number.isFinite(id)) continue;
+              const disp = Number(stockValido[String(id)] || 0);
+              if (disp > mejorStock) {
+                mejorStock = disp;
+                mejorId = id;
+              }
+            }
+            if (mejorId != null) return mejorId;
+            const primero = candidatos.length > 0 ? Number(candidatos[0]?.id) : null;
+            return Number.isFinite(Number(primero)) ? Number(primero) : null;
+          };
           const llamadas = this.alimentosSeleccionados.map(async (al) => {
             // Cantidad por este alimento = quantityPerAnimal * número de animales del lote
             const cantidad = parseFloat(((al.quantityPerAnimal || 0) * numAnimales).toFixed(3));
@@ -1075,15 +1104,16 @@ export class PollosAlimentacionComponent implements OnInit {
               } catch {}
             }
 
-            // Intento rápido por caché local (normalizado) para resolver productId por nombre
-            if (!productId && al.alimentoRecomendado && this.productoByNameNorm && typeof this.normalizarTexto === 'function') {
+            if (!productId && al.alimentoRecomendado) {
               try {
-                const norm = this.normalizarTexto(al.alimentoRecomendado);
-                const prodCache = this.productoByNameNorm.get(norm);
-                if (prodCache?.id != null) {
-                  productId = Number(prodCache.id);
-                  const tfid = prodCache?.typeFood?.id || (prodCache as any)?.typeFood_id || null;
-                  if (tfid != null) tipoAlimentoId = tfid as any;
+                const pidSel = elegirProductIdPorNombre(al.alimentoRecomendado);
+                if (pidSel != null) {
+                  productId = Number(pidSel);
+                  const prodSel = (this.productosCache || []).find(p => Number(p?.id) === Number(productId));
+                  if (prodSel && !tipoAlimentoId) {
+                    tipoAlimentoId = prodSel?.typeFood?.id || (prodSel as any)?.typeFood_id || null;
+                  }
+                  console.log('🧭 productId seleccionado por stock válido:', { alimento: al.alimentoRecomendado, productId, stock: Number(stockValido[String(productId)] || 0) });
                 }
               } catch {}
             }
@@ -1096,7 +1126,7 @@ export class PollosAlimentacionComponent implements OnInit {
                 tipoAlimentoId = prod?.typeFood?.id || (prod as any)?.typeFood_id || null;
                 // Si logramos resolver un producto único por nombre, usar su id para que la
                 // disminución en Admin/Inventario sea por producto y no solo por tipo.
-                if (prod?.id != null) {
+                if (!productId && prod?.id != null) {
                   productId = prod.id;
                 }
               } catch (e) {
