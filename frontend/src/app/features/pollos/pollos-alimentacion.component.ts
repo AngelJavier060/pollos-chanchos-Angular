@@ -1132,10 +1132,14 @@ export class PollosAlimentacionComponent implements OnInit {
             console.log('📦 Registrando consumo en inventario:', payload);
             try {
               const resp: any = await this.inventarioService.registrarConsumoAlimento(payload).toPromise();
+              console.log(`✅ [${al.alimentoRecomendado}] Respuesta consumo:`, resp);
               return { alimento: al.alimentoRecomendado, solicitado: cantidad, resp };
             } catch (err: any) {
-              console.error('❌ Error registrando consumo para', al.alimentoRecomendado, err);
-              return { alimento: al.alimentoRecomendado, solicitado: cantidad, error: err };
+              // Extraer info del error HTTP para diagnóstico
+              const httpStatus = err?.status || 'N/A';
+              const httpError = err?.error || err?.message || 'Error desconocido';
+              console.error(`❌ Error HTTP ${httpStatus} registrando consumo para ${al.alimentoRecomendado}:`, httpError);
+              return { alimento: al.alimentoRecomendado, solicitado: cantidad, error: err, httpStatus };
             }
           });
           const respuestas: any[] = (await Promise.all(llamadas))?.filter(Boolean) as any[];
@@ -1152,17 +1156,21 @@ export class PollosAlimentacionComponent implements OnInit {
             const ok = res?.success === true && pendiente === 0 && !bloqueoVenc;
             const parcial = res?.success === true && pendiente > 0;
             const sinStock = res?.success === false && String(res?.error || '').toLowerCase().includes('stock insuficiente');
+            const httpStatus = r?.httpStatus || null;
+            const esErrorHttp = httpStatus && (httpStatus >= 500 || httpStatus === 502 || httpStatus === 0);
             const huboError = Boolean(r?.error) || (res?.success === false && !sinStock && !bloqueoVenc);
             let estado = 'OK';
-            if (bloqueoVenc) estado = 'VENCIDO';
+            if (esErrorHttp) estado = `ERROR HTTP ${httpStatus}`;
+            else if (bloqueoVenc) estado = 'VENCIDO';
             else if (parcial) estado = 'PARCIAL';
             else if (sinStock) estado = 'SIN STOCK';
             else if (!ok) estado = 'ERROR';
             let extra = '';
-            if (bloqueoVenc) extra = 'Stock vencido. Registre una entrada vigente.';
+            if (esErrorHttp) extra = 'Backend no responde. Verifique que el servidor esté activo.';
+            else if (bloqueoVenc) extra = 'Stock vencido. Registre una entrada vigente.';
             else if (parcial) extra = `Consumo parcial. Pendiente ${pendiente.toFixed(2)} kg.`;
             else if (sinStock) extra = 'No hay stock disponible.';
-            else if (huboError) extra = String(res?.error || 'Error desconocido');
+            else if (huboError) extra = String(res?.error || r?.error?.message || 'Error desconocido');
             detalleLineas.push(`${r?.alimento || 'Alimento'}: ${estado}${extra ? ` — ${extra}` : ''}`);
             if (r?.error || res?.success === false) errores++;
             if (pendiente > 0) parciales++;

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 
 export interface InventarioAlimento {
@@ -72,8 +72,31 @@ export class InventarioService {
    * Registrar consumo de alimento con deducción automática de inventario
    */
   registrarConsumoAlimento(request: RegistroConsumoRequest): Observable<RegistroConsumoResponse> {
-    console.log('🍽️ InventarioService: registrarConsumoAlimento', request);
-    return this.http.post<RegistroConsumoResponse>(`${this.apiUrl}/registrar-consumo`, request);
+    const url = `${this.apiUrl}/registrar-consumo`;
+    console.log('🍽️ InventarioService: registrarConsumoAlimento', { url, request });
+    return this.http.post<RegistroConsumoResponse>(url, request).pipe(
+      tap(resp => {
+        console.log('✅ [CONSUMO] Respuesta exitosa:', resp);
+        if (resp?.success === false) {
+          console.warn('⚠️ [CONSUMO] Backend respondió success=false:', resp?.error || resp?.message);
+        }
+        if (resp?.bloqueoPorVencido) {
+          console.warn('⚠️ [CONSUMO] Bloqueado por stock vencido');
+        }
+        if ((resp?.cantidadPendiente ?? 0) > 0) {
+          console.warn('⚠️ [CONSUMO] Consumo parcial, pendiente:', resp?.cantidadPendiente);
+        }
+      }),
+      catchError(err => {
+        const status = err?.status || 'N/A';
+        const statusText = err?.statusText || '';
+        const errorBody = err?.error || err?.message || 'Error desconocido';
+        console.error(`❌ [CONSUMO] Error HTTP ${status} ${statusText}:`, errorBody);
+        console.error('❌ [CONSUMO] Request que falló:', request);
+        // Re-lanzar para que el componente lo maneje
+        return throwError(() => err);
+      })
+    );
   }
 
   /**

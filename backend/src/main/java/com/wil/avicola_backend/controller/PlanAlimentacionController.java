@@ -472,7 +472,9 @@ public class PlanAlimentacionController {
             if (requestData.containsKey("nombreProducto") && requestData.get("nombreProducto") != null) {
                 nombreProducto = requestData.get("nombreProducto").toString();
             }
-            if ((nombreProductoId != null) || (nombreProducto != null && !nombreProducto.isBlank())) {
+            // Solo resolver por nombre si AÚN no tenemos productId. Si el front ya envía productId,
+            // lo respetamos para no cambiar al usuario de producto (p.ej. Maíz ID 14 vs Maiz ID 3).
+            if (productId == null && ((nombreProductoId != null) || (nombreProducto != null && !nombreProducto.isBlank()))) {
                 try {
                     Long pid = materializacionInventarioService.asegurarProductoEInventarioDesdeNombre(
                         nombreProductoId,
@@ -481,7 +483,7 @@ public class PlanAlimentacionController {
                         usuarioRegistro,
                         "Materialización automática por consumo"
                     );
-                    productId = pid; // prioridad por nombre
+                    productId = pid; // prioridad solo si antes era null
                     System.out.println("✅ productId resuelto por nombre_producto => " + pid + " (nombre='" + nombreProducto + "')");
                 } catch (Exception ex) {
                     System.err.println("❌ No se pudo resolver productId desde nombreProducto: '" + nombreProducto + "' | Causa: " + ex.getMessage());

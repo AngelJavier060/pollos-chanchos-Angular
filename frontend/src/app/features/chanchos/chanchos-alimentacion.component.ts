@@ -897,21 +897,31 @@ export class ChanchosAlimentacionComponent implements OnInit {
         // Descontar inventario por cada alimento seleccionado (similar a Pollos)
         try {
           const loteIdStr = String(this.loteSeleccionado?.id || this.loteSeleccionado?.codigo || '');
+          // ✅ Cargar cache de productos para evitar llamadas remotas getProductById (405 en prod)
+          let productosCache: any[] = [];
+          try {
+            productosCache = await this.productService.getProducts({} as any).toPromise() || [];
+          } catch (e) {
+            console.warn('⚠️ No se pudo cargar cache de productos:', e);
+          }
           const llamadas = this.alimentosSeleccionados.map(async (al) => {
             // Cantidad por este alimento = cantidadPorAnimal * animales del lote
             const cantidad = parseFloat(((al.quantityPerAnimal || 0) * (this.loteSeleccionado?.quantity || 0)).toFixed(3));
             if (cantidad <= 0) return null;
 
             // Obtener producto para extraer typeFoodId (si tenemos productoId es directo)
+            // ✅ Evitar llamada remota getProductById (causa 405 en producción): usar cache local
             let tipoAlimentoId: number | null = null;
             let productId: number | null = al.productoId || null;
             if (productId) {
               try {
-                const prod = await this.productService.getProductById(productId).toPromise();
-                tipoAlimentoId = (prod as any)?.typeFood?.id || (prod as any)?.typeFood_id || null;
-                productId = (prod as any)?.id ?? productId;
+                const prod = (productosCache || []).find((p: any) => Number(p?.id) === Number(productId));
+                if (prod) {
+                  tipoAlimentoId = (prod as any)?.typeFood?.id || (prod as any)?.typeFood_id || null;
+                  productId = (prod as any)?.id ?? productId;
+                }
               } catch (e) {
-                console.warn('⚠️ No se pudo obtener product por ID', al.productoId, e);
+                console.warn('⚠️ No se pudo resolver product por ID desde cache', al.productoId, e);
               }
             }
 
