@@ -45,6 +45,7 @@ services:
     build: ./frontend
     container_name: pollos-chanchos-angular-frontend
     ports:
+      - "18080:80"
       - "18088:80"
       - "8004:80"
     depends_on:
