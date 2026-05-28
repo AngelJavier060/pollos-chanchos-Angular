@@ -28,7 +28,7 @@ jobs:
           echo "🚀 Starting deployment process..."
           
           # Navegar al directorio del proyecto
-          cd /opt/pollos-chanchos-Angular || { echo "❌ Directory not found"; exit 1; }
+          cd /opt/granja-improvement/pollos-chanchos-angular || { echo "❌ Directory not found"; exit 1; }
           
           # Hacer backup del docker-compose actual
           echo "📦 Creating backup..."
