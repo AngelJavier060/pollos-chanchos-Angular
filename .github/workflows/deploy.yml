@@ -43,7 +43,7 @@ jobs:
           
           # Detener contenedores
           echo "🛑 Stopping containers..."
-          docker-compose down || true
+          docker compose down || true
           
           # Limpiar recursos de Docker
           echo "🧹 Cleaning Docker resources..."
@@ -51,12 +51,12 @@ jobs:
           
           # Construir y levantar contenedores
           echo "🚀 Starting containers..."
-          docker-compose up --build -d || { echo "❌ Docker compose failed"; exit 1; }
+          docker compose up --build -d || { echo "❌ Docker compose failed"; exit 1; }
           
           # Verificar estado
           echo "📊 Checking container status..."
           sleep 10
-          docker-compose ps
+          docker compose ps
           
           echo "✅ Deployment completed successfully!"
 

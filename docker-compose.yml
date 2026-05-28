@@ -1,22 +1,18 @@
-version: '3.8'
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: pollos-chanchos-angular-mysql
+  postgres:
+    image: postgres:16
+    container_name: pollos-chanchos-angular-postgres
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_avicola
-      MYSQL_USER: avicola_user
-      MYSQL_PASSWORD: avicola_password
-    ports:
-      - "3308:3306"
+      POSTGRES_DB: db_avicola
+      POSTGRES_USER: avicola_user
+      POSTGRES_PASSWORD: avicola_password
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U avicola_user -d db_avicola"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,16 +26,17 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=production
       - SERVER_PORT=8088
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/db_avicola?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=avicola_user
-      - SPRING_DATASOURCE_PASSWORD=avicola_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=db_avicola
+      - DB_USER=avicola_user
+      - DB_PASSWORD=avicola_password
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
-    # (Healthcheck removido para evitar depender de /actuator/health o /health)
     volumes:
       - uploads_data:/app/uploads
 
@@ -48,7 +45,6 @@ services:
     container_name: pollos-chanchos-angular-frontend
     ports:
       - "8004:80"
-      # - "443:443"    # Comenta o elimina esta línea si Nginx maneja el SSL en el host
     depends_on:
       backend:
         condition: service_started
@@ -57,15 +53,9 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
 
 volumes:
-  mysql_data:
+  postgres_data:
   uploads_data:
 
 networks:
