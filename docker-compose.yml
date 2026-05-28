@@ -31,6 +31,7 @@ services:
       - DB_NAME=db_avicola
       - DB_USER=avicola_user
       - DB_PASSWORD=avicola_password
+      - APP_UPLOAD_DIR=/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
