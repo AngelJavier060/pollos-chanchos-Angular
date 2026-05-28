@@ -1,6 +1,6 @@
--- Crear tabla para el historial de cambios en plan_ejecucion
+-- Crear tabla para el historial de cambios en plan_ejecucion (PostgreSQL)
 CREATE TABLE plan_ejecucion_historial (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     plan_ejecucion_id BIGINT NOT NULL,
     campo_modificado VARCHAR(50) NOT NULL,
     valor_anterior TEXT,
@@ -9,20 +9,18 @@ CREATE TABLE plan_ejecucion_historial (
     fecha_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     motivo TEXT,
     ip_address VARCHAR(45),
-    user_agent TEXT,
-    
-    INDEX idx_plan_ejecucion_id (plan_ejecucion_id),
-    INDEX idx_usuario_id (usuario_id),
-    INDEX idx_fecha_cambio (fecha_cambio)
+    user_agent TEXT
 );
 
--- Añadir comentarios para documentar la tabla
-ALTER TABLE plan_ejecucion_historial 
-COMMENT = 'Tabla para el historial de cambios en la ejecución de planes de alimentación';
+CREATE INDEX idx_plan_ejecucion_id ON plan_ejecucion_historial(plan_ejecucion_id);
+CREATE INDEX idx_usuario_id ON plan_ejecucion_historial(usuario_id);
+CREATE INDEX idx_fecha_cambio ON plan_ejecucion_historial(fecha_cambio);
 
--- Crear vista para consultas frecuentes de historial
-CREATE VIEW v_historial_reciente AS
-SELECT 
+COMMENT ON TABLE plan_ejecucion_historial IS 'Tabla para el historial de cambios en la ejecución de planes de alimentación';
+
+-- Crear vista para consultas frecuentes de historial (sintaxis PostgreSQL)
+CREATE OR REPLACE VIEW v_historial_reciente AS
+SELECT
     h.id,
     h.plan_ejecucion_id,
     h.campo_modificado,
@@ -31,8 +29,8 @@ SELECT
     h.usuario_id,
     h.fecha_cambio,
     h.motivo,
-    u.username as usuario_nombre
+    u.username AS usuario_nombre
 FROM plan_ejecucion_historial h
 LEFT JOIN users u ON h.usuario_id = u.id
-WHERE h.fecha_cambio >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-ORDER BY h.fecha_cambio DESC; 
+WHERE h.fecha_cambio >= NOW() - INTERVAL '30 days'
+ORDER BY h.fecha_cambio DESC;

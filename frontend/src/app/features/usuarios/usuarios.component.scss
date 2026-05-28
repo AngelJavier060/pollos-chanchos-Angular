@@ -1,77 +1,9 @@
-// Estilos específicos para el módulo de usuarios
+/* Estilos específicos para el módulo de usuarios - Diseño Profesional */
 
-// Estilo para mejorar la adaptabilidad en dispositivos móviles
-@media (max-width: 768px) {
-  .table-container {
-    overflow-x: auto;
-    margin: 0 -16px;
-    padding: 0 16px;
-  }
-
-  .user-table {
-    min-width: 700px;
-  }
-
-  .action-buttons {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-  }
-}
-
-// Animación para mensajes
-.message {
-  animation: fadeInOut 5s ease-in-out;
-}
-
-@keyframes fadeInOut {
-  0% { opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-// Estilo para el modal
-.modal-overlay {
-  backdrop-filter: blur(2px);
-  animation: fadeIn 0.3s ease-in-out;
-}
-
+// Animaciones
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-// Estilos para estados de usuario
-.status-badge {
-  transition: all 0.3s ease;
-  
-  &.active {
-    background-color: rgba(0, 200, 0, 0.2);
-    color: #007700;
-  }
-  
-  &.inactive {
-    background-color: rgba(200, 0, 0, 0.2);
-    color: #770000;
-  }
-}
-
-// Mejorar los botones de acción
-.action-button {
-  padding: 0.25rem;
-  border-radius: 9999px;
-  transition: all 0.2s;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-}
-
-// Animaciones para mensajes de éxito
-.success-message {
-  animation: slideDown 0.5s ease-in-out;
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slideDown {
@@ -85,13 +17,72 @@
   }
 }
 
-// Estilo para resaltar la fila actualizada
-.updated-row {
-  animation: highlight 2s ease-in-out;
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-@keyframes highlight {
-  0% { background-color: #e5e7eb; }
-  50% { background-color: #93c5fd; }
-  100% { background-color: #e5e7eb; }
+.modal-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.message {
+  animation: fadeInOut 4s ease-in-out;
+}
+
+.success-message {
+  animation: slideDown 0.3s ease-out;
+}
+
+// Transiciones suaves para la tabla
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+// Estilo para el scroll suave
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #c3c5d9 transparent;
+  
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: #c3c5d9;
+    border-radius: 8px;
+  }
+}
+
+// Efecto hover en filas de tabla
+.hover\:bg-surface-container-lowest\/50:hover {
+  background-color: rgba(242, 243, 255, 0.5);
+}
+
+// Mejora para los botones de acción
+button.rounded-full {
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+// Animación para el modal
+[class*="scale-100"] {
+  animation: fadeIn 0.25s ease-out;
+}
+
+// Ajuste para los checkboxes personalizados
+div[role="checkbox"] {
+  user-select: none;
+  
+  &:focus-visible {
+    outline: 2px solid #003ec7;
+    outline-offset: 2px;
+  }
 }

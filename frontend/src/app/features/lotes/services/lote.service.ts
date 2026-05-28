@@ -27,9 +27,15 @@ export class LoteService {
     );
   }
 
-  private transformLotes(lotes: any[]): Lote[] {
+  private transformLotes(lotes: any): Lote[] {
+    const arr: any[] = Array.isArray(lotes)
+      ? lotes
+      : (Array.isArray((lotes as any)?.data) ? (lotes as any).data
+        : (Array.isArray((lotes as any)?.content) ? (lotes as any).content
+          : (Array.isArray((lotes as any)?.lotes) ? (lotes as any).lotes : [])));
+
     console.log('Datos recibidos del backend:', lotes); // Agregamos log para debug
-    return lotes.map(lote => {
+    return arr.map(lote => {
       // Verificamos la estructura de race para acceder correctamente a sus propiedades
       let raceName = 'No asignada';
       let animalId = 0;
@@ -51,10 +57,10 @@ export class LoteService {
         codigo: lote.codigo,
         name: lote.name,
         descripcion: lote.descripcion || undefined,
-        quantity: Number(lote.quantity),
-        quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
+        quantity: this.toNumberOrZero(lote.quantity),
+        quantityOriginal: this.toNumberOrZero(lote.quantityOriginal != null ? lote.quantityOriginal : lote.quantity),
         birthdate: this.parseDate(lote.birthdate),
-        cost: Number(lote.cost),
+        cost: this.toNumberOrZero(lote.cost),
         race: {
           id: lote.race?.id || 0,
           name: raceName,
@@ -67,8 +73,8 @@ export class LoteService {
         update_date: this.parseDate(lote.update_date) || undefined,
         fechaCierre: this.parseDate(lote.fechaCierre),
         // Campos de distribución por sexo para chanchos
-        maleCount: lote.maleCount != null ? Number(lote.maleCount) : undefined,
-        femaleCount: lote.femaleCount != null ? Number(lote.femaleCount) : undefined,
+        maleCount: lote.maleCount != null ? this.toNumberOrZero(lote.maleCount) : undefined,
+        femaleCount: lote.femaleCount != null ? this.toNumberOrZero(lote.femaleCount) : undefined,
         malePurpose: lote.malePurpose || undefined,
         femalePurpose: lote.femalePurpose || undefined
       };
@@ -171,10 +177,10 @@ export class LoteService {
       codigo: lote.codigo,
       name: lote.name,
       descripcion: lote.descripcion || undefined,
-      quantity: Number(lote.quantity),
-      quantityOriginal: Number(lote.quantityOriginal || lote.quantity),
+      quantity: this.toNumberOrZero(lote.quantity),
+      quantityOriginal: this.toNumberOrZero(lote.quantityOriginal != null ? lote.quantityOriginal : lote.quantity),
       birthdate: this.parseDate(lote.birthdate),
-      cost: Number(lote.cost),
+      cost: this.toNumberOrZero(lote.cost),
       race: {
         id: lote.race?.id || 0,
         name: raceName,
@@ -187,8 +193,8 @@ export class LoteService {
       update_date: this.parseDate(lote.update_date) || undefined,
       fechaCierre: this.parseDate(lote.fechaCierre),
       // Campos de distribución por sexo para chanchos
-      maleCount: lote.maleCount != null ? Number(lote.maleCount) : undefined,
-      femaleCount: lote.femaleCount != null ? Number(lote.femaleCount) : undefined,
+      maleCount: lote.maleCount != null ? this.toNumberOrZero(lote.maleCount) : undefined,
+      femaleCount: lote.femaleCount != null ? this.toNumberOrZero(lote.femaleCount) : undefined,
       malePurpose: lote.malePurpose || undefined,
       femalePurpose: lote.femalePurpose || undefined
     };
@@ -312,6 +318,11 @@ export class LoteService {
   }
 
   // ===== Helpers de fecha =====
+  private toNumberOrZero(value: any): number {
+    const n = Number(value);
+    return isNaN(n) ? 0 : n;
+  }
+
   private parseDate(value: any): Date | null {
     if (value == null) return null;
     // Epoch millis o número

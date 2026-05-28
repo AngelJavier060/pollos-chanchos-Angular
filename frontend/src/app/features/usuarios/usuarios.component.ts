@@ -571,6 +571,25 @@ export class UsuariosComponent implements OnInit, OnDestroy {
     }
   }
   
+  /**
+   * Nuevo método para toggle de roles con la interfaz mejorada (checkboxes clickeables)
+   */
+  handleRoleToggle(role: string): void {
+    const currentRoles = this.userForm.get('roles')?.value || [];
+    
+    if (currentRoles.includes(role)) {
+      // Eliminamos el rol
+      this.userForm.patchValue({
+        roles: currentRoles.filter((r: string) => r !== role)
+      });
+    } else {
+      // Agregamos el rol
+      this.userForm.patchValue({
+        roles: [...currentRoles, role]
+      });
+    }
+  }
+
   isRoleSelected(role: string): boolean {
     const currentRoles = this.userForm.get('roles')?.value || [];
     return currentRoles.includes(role);

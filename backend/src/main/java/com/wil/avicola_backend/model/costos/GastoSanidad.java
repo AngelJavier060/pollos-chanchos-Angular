@@ -54,6 +54,30 @@ public class GastoSanidad {
 
     private String observaciones;
 
+    @Column(name = "product_id")
+    private Long productId;
+
+    @Column(name = "tipo_aplicacion", length = 30)
+    private String tipoAplicacion;
+
+    @Column(name = "via", length = 30)
+    private String via;
+
+    @Column(name = "aplicado_por_tipo", length = 20)
+    private String aplicadoPorTipo;
+
+    @Column(name = "responsable", length = 120)
+    private String responsable;
+
+    @Column(name = "costo_aplicacion")
+    private Double costoAplicacion;
+
+    @Column(name = "proxima_fecha")
+    private LocalDate proximaFecha;
+
+    @Column(name = "fecha_hora_aplicacion")
+    private LocalDateTime fechaHoraAplicacion;
+
     @ManyToOne
     @JoinColumn(name = "lote_id")
     private Lote lote;
@@ -83,6 +107,7 @@ public class GastoSanidad {
     private void calcularTotal() {
         double c = this.cantidad != null ? this.cantidad : 0d;
         double u = this.costoUnitario != null ? this.costoUnitario : 0d;
-        this.total = Math.round((c * u) * 100.0) / 100.0;
+        double ca = this.costoAplicacion != null ? this.costoAplicacion : 0d;
+        this.total = Math.round(((c * u) + ca) * 100.0) / 100.0;
     }
 }

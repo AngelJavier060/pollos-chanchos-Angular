@@ -1,294 +1,294 @@
-<div class="p-8 bg-white rounded-lg shadow-md">
-  <!-- Encabezado -->
-  <div class="text-center mb-8">
-    <h1 class="text-3xl font-bold text-blue-800">¡Bienvenido a Gestión de Usuarios!</h1>
-    <p class="text-gray-600 mt-2">Administra los usuarios del sistema avícola</p>
+﻿<!-- Hero / Welcome Section -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 md:p-8 mb-6 text-center shadow-[0_2px_8px_-2px_rgba(0,82,255,0.08)]">
+  <h2 class="font-headline-lg text-headline-lg md:text-display-lg text-primary mb-1">Bienvenido a Gestión de Usuarios!</h2>
+  <p class="font-body-lg text-body-lg text-on-surface-variant">Administra los usuarios del sistema avícola</p>
+</div>
+
+<!-- Mensajes de éxito o error -->
+<div *ngIf="successMessage" class="mb-4 p-4 rounded-xl bg-[#dcfce7] border border-[#bbf7d0] flex justify-between items-center">
+  <span class="flex items-center gap-2 font-body-md text-body-md text-[#166534]">
+    <span class="material-symbols-outlined text-[#16a34a]">check_circle</span>
+    {{ successMessage }}
+  </span>
+  <button (click)="successMessage = ''" class="text-[#166534] hover:text-[#14532d]">
+    <span class="material-symbols-outlined">close</span>
+  </button>
+</div>
+
+<div *ngIf="error && !error.includes('autenticación')" class="mb-4 p-4 rounded-xl bg-error-container border border-[#ffcdd2] flex justify-between items-center">
+  <span class="flex items-center gap-2 font-body-md text-body-md text-on-error-container">
+    <span class="material-symbols-outlined">error</span>
+    {{ error }}
+  </span>
+  <button (click)="error = ''" class="text-on-error-container hover:text-[#5f0000]">
+    <span class="material-symbols-outlined">close</span>
+  </button>
+</div>
+
+<!-- Alerta de verificación de autenticación -->
+<div *ngIf="error && error.includes('autenticación')" class="mb-4 p-4 rounded-xl bg-surface-container-high border border-outline-variant flex items-start gap-3">
+  <span class="material-symbols-outlined text-outline flex-shrink-0 mt-0.5">warning</span>
+  <div>
+    <p class="font-label-md text-label-md text-on-surface font-bold">Problema de Autenticación</p>
+    <p class="font-body-md text-body-md text-on-surface-variant">{{ error }} <a routerLink="/auth/login/admin" class="text-primary underline hover:text-primary-container transition-colors">Ir a inicio de sesión</a></p>
+  </div>
+</div>
+
+<!-- Data Table Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-[0_2px_8px_-2px_rgba(0,82,255,0.08)] overflow-hidden">
+  <!-- Table Header Actions -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 md:p-6 border-b border-outline-variant gap-4 bg-surface-container-low/50">
+    <h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+      <span class="material-symbols-outlined">group</span>
+      Lista de Usuarios
+    </h3>
+    <button (click)="openAddModal()" class="bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary px-5 py-2.5 rounded-lg font-label-md text-label-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap shadow-sm">
+      <span class="material-symbols-outlined text-sm">add</span>
+      Nuevo Usuario
+    </button>
   </div>
 
-  <!-- Alerta de verificación de autenticación -->
-  <div *ngIf="error && error.includes('autenticación')" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
-    <div class="flex items-center">
-      <div class="py-1">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-      </div>
-      <div>
-        <p class="font-bold">Problema de Autenticación</p>
-        <p class="text-sm">{{ error }} <span class="underline cursor-pointer" routerLink="/auth/login/admin">Ir a inicio de sesión</span></p>
-      </div>
-    </div>
+  <!-- Loading spinner -->
+  <div *ngIf="loading" class="flex justify-center items-center py-16">
+    <div class="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
   </div>
 
-  <!-- Mensajes de éxito o error -->
-  <div *ngIf="successMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex justify-between message">
-    <span class="flex items-center">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-      </svg>
-      {{ successMessage }}
-    </span>
-    <span class="cursor-pointer" (click)="successMessage = ''">✕</span>
-  </div>
-  
-  <div *ngIf="error && !error.includes('autenticación')" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex justify-between message">
-    <span class="flex items-center">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-      </svg>
-      {{ error }}
-    </span>
-    <span class="cursor-pointer" (click)="error = ''">✕</span>
-  </div>
-  
-  <!-- Contenedor principal -->
-  <div class="bg-blue-50 p-6 rounded-lg border border-blue-100 mb-6">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-xl font-semibold text-blue-700">Lista de Usuarios</h2>
-      <div class="flex gap-2">
-        <button (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-sm flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Nuevo Usuario
-        </button>
-      </div>
-    </div>
-    
-    <!-- Loading spinner -->
-    <div *ngIf="loading" class="flex justify-center my-8">
-      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-    </div>
-      <!-- Tabla de usuarios -->
-    <div class="overflow-x-auto table-container" *ngIf="!loading">
-      <table class="min-w-full bg-white rounded-lg overflow-hidden shadow-md user-table">        <thead class="bg-gray-100 text-gray-700">
-          <tr>
-            <th class="py-3 px-4 text-left">Foto</th>
-            <th class="py-3 px-4 text-left">Usuario</th>
-            <th class="py-3 px-4 text-left">Email</th>
-            <th class="py-3 px-4 text-left">Nombre</th>
-            <th class="py-3 px-4 text-left">Rol</th>
-            <th class="py-3 px-4 text-left">Estado</th>
-            <th class="py-3 px-4 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-          <tr *ngIf="users.length === 0">
-            <td colspan="6" class="py-4 px-4 text-center text-gray-500">No hay usuarios registrados</td>
-          </tr>          <tr *ngFor="let user of users" class="hover:bg-gray-50 transition-colors duration-200">
-            <!-- Columna de foto -->
-<td class="px-6 py-4 whitespace-nowrap">
-  <div class="flex-shrink-0 h-12 w-12">
-    <img [src]="getUserImageUrl(user)"
-         [alt]="user.username"
-         class="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-         (error)="handleImageError($event)">
-  </div>
-</td>
+  <!-- Table Content -->
+  <div class="overflow-x-auto" *ngIf="!loading">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="border-b border-outline-variant bg-surface-container-low/30">
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Foto</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Usuario</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Email</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Nombre</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Rol</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Estado</th>
+          <th class="py-4 px-4 md:px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant/50">
+        <tr *ngIf="users.length === 0">
+          <td colspan="7" class="py-12 px-6 text-center">
+            <span class="material-symbols-outlined text-4xl text-outline mb-2 block">group_off</span>
+            <p class="font-body-md text-body-md text-on-surface-variant">No hay usuarios registrados</p>
+          </td>
+        </tr>
+        <tr *ngFor="let user of users" class="hover:bg-surface-container-lowest/50 transition-colors duration-150">
+          <!-- Columna de foto -->
+          <td class="py-4 px-4 md:px-6">
+            <div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary overflow-hidden">
+              <img *ngIf="user.profilePicture" [src]="getUserImageUrl(user)" [alt]="user.username" class="w-full h-full object-cover" (error)="handleImageError($event)">
+              <span *ngIf="!user.profilePicture" class="material-symbols-outlined text-lg">person</span>
+            </div>
+          </td>
 
-<!-- Columna de usuario -->
-<td class="px-6 py-4 whitespace-nowrap">
-  <div class="flex flex-col">
-    <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
-    <div class="text-sm text-gray-500">{{ user.name || 'Sin nombre' }}</div>
-  </div>
-</td>
-            <td class="py-3 px-4">{{ user.email }}</td>
-            <td class="py-3 px-4">{{ user.name || '-' }}</td>
-            <td class="py-3 px-4">
-              <div class="flex flex-wrap gap-1">
-                <ng-container *ngFor="let role of user.roles">
-                  <span class="px-2 py-0.5 rounded-full text-xs" 
-                        [ngClass]="{
-                          'bg-blue-100 text-blue-800': role === ERole.ROLE_ADMIN,
-                          'bg-green-100 text-green-800': role === ERole.ROLE_USER,
-                          'bg-yellow-100 text-yellow-800': role === ERole.ROLE_POULTRY,
-                          'bg-purple-100 text-purple-800': role === ERole.ROLE_PORCINE,
-                          'bg-gray-100 text-gray-800': true
-                        }">
-                    {{ role }}
-                  </span>
-                </ng-container>
-              </div>
-            </td>            <td class="py-3 px-4">
-              <span *ngIf="user.active === undefined || user.active" 
-                    class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded status-badge active flex items-center justify-center w-20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                Activo
-              </span>
-              <span *ngIf="user.active === false" 
-                    class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded status-badge inactive flex items-center justify-center w-20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Inactivo
-              </span>
-            </td>
-            <!-- Actions -->
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <div class="flex justify-end space-x-2">
-                <button type="button" 
-                        (click)="openEditModal(user)"
-                        class="text-blue-600 hover:text-blue-900">
-                  Editar
-                </button>
-                <button type="button"
-                        *ngIf="getValidId(user.id) !== null"
-                        (click)="deleteUser(user.id)"
-                        class="text-red-600 hover:text-red-800">
-                  Eliminar
-                </button>
-                <button type="button"
-                        *ngIf="getValidId(user.id) !== null"
-                        (click)="toggleUserStatus(user.id)"
-                        [class.text-red-600]="user.active"
-                        [class.text-green-600]="!user.active">
-                  {{ user.active ? 'Desactivar' : 'Activar' }}
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+          <!-- Columna de usuario -->
+          <td class="py-4 px-4 md:px-6">
+            <p class="font-body-md text-body-md text-on-surface">{{ user.username }}</p>
+            <p class="font-label-sm text-label-sm text-on-surface-variant">{{ user.name || 'Sin nombre' }}</p>
+          </td>
+
+          <td class="py-4 px-4 md:px-6 font-body-md text-body-md text-on-surface-variant">{{ user.email }}</td>
+          <td class="py-4 px-4 md:px-6 font-body-md text-body-md text-on-surface-variant">{{ user.name || '-' }}</td>
+
+          <!-- Columna de roles -->
+          <td class="py-4 px-4 md:px-6">
+            <div class="flex flex-wrap gap-1.5">
+              <ng-container *ngFor="let role of user.roles">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium gap-1"
+                      [ngClass]="{
+                        'bg-[#dbeafe] text-[#1e40af]': role === ERole.ROLE_ADMIN,
+                        'bg-[#dcfce7] text-[#166534]': role === ERole.ROLE_USER,
+                        'bg-[#fef9c3] text-[#854d0e]': role === ERole.ROLE_POULTRY,
+                        'bg-[#f3e8ff] text-[#6b21a8]': role === ERole.ROLE_PORCINE,
+                        'bg-surface-container-high text-on-surface-variant': true
+                      }">
+                  <ng-container [ngSwitch]="role">
+                    <span *ngSwitchCase="ERole.ROLE_ADMIN"><span class="material-symbols-outlined text-[12px]">admin_panel_settings</span> Administrador</span>
+                    <span *ngSwitchCase="ERole.ROLE_USER"><span class="material-symbols-outlined text-[12px]">person</span> Usuario básico</span>
+                    <span *ngSwitchCase="ERole.ROLE_POULTRY"><span class="material-symbols-outlined text-[12px]">raven</span> Pollos</span>
+                    <span *ngSwitchCase="ERole.ROLE_PORCINE"><span class="material-symbols-outlined text-[12px]">pets</span> Chanchos</span>
+                    <span *ngSwitchDefault>{{ role }}</span>
+                  </ng-container>
+                </span>
+              </ng-container>
+            </div>
+          </td>
+
+          <!-- Columna de estado -->
+          <td class="py-4 px-4 md:px-6">
+            <span *ngIf="user.active === undefined || user.active"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#dcfce7] text-[#166534] gap-1">
+              <span class="material-symbols-outlined text-[12px]">check</span> Activo
+            </span>
+            <span *ngIf="user.active === false"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-container text-on-error-container gap-1">
+              <span class="material-symbols-outlined text-[12px]">block</span> Inactivo
+            </span>
+          </td>
+
+          <!-- Acciones -->
+          <td class="py-4 px-4 md:px-6 text-right">
+            <div class="flex justify-end gap-1 font-label-md text-label-md">
+              <button type="button" (click)="openEditModal(user)" class="text-primary hover:bg-primary/10 p-1.5 rounded-full transition-colors" aria-label="Editar usuario">
+                <span class="material-symbols-outlined text-lg">edit</span>
+              </button>
+              <button type="button" *ngIf="getValidId(user.id) !== null" (click)="deleteUser(user.id)" class="text-error hover:bg-error/10 p-1.5 rounded-full transition-colors" aria-label="Eliminar usuario">
+                <span class="material-symbols-outlined text-lg">delete</span>
+              </button>
+              <button type="button" *ngIf="getValidId(user.id) !== null" (click)="toggleUserStatus(user.id)"
+                      [class.text-error]="user.active !== false" [class.text-secondary]="user.active === false"
+                      class="hover:bg-surface-container-high p-1.5 rounded-full transition-colors"
+                      [attr.aria-label]="(user.active !== false ? 'Desactivar' : 'Activar') + ' usuario'">
+                <span class="material-symbols-outlined text-lg">{{ user.active !== false ? 'block' : 'check_circle' }}</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
 <!-- Modal para crear/editar usuario -->
-<div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 modal-overlay">
-  <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 mx-4 transform transition-all duration-300 scale-100">
-    <!-- Mensaje de éxito flotante -->
-    <div *ngIf="successMessage" 
-         class="absolute top-0 left-0 right-0 p-4 bg-green-500 text-white rounded-t-lg transition-all duration-500 flex items-center justify-between">
-      <div class="flex items-center">
-        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span class="font-medium">{{ successMessage }}</span>
-      </div>
-      <span class="text-sm">Cerrando en 2s...</span>
-    </div>
-
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="text-xl font-semibold text-gray-800">{{ isEditMode ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
-      <button (click)="closeModal()" class="text-gray-500 hover:text-gray-800">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
+<div *ngIf="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div class="bg-surface-container-lowest rounded-2xl shadow-xl w-full max-w-lg mx-4 transform transition-all duration-300 overflow-hidden">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center p-6 border-b border-outline-variant bg-surface-container-low/30">
+      <h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+        <span class="material-symbols-outlined">{{ isEditMode ? 'edit' : 'person_add' }}</span>
+        {{ isEditMode ? 'Editar Usuario' : 'Nuevo Usuario' }}
+      </h3>
+      <button (click)="closeModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors">
+        <span class="material-symbols-outlined">close</span>
       </button>
     </div>
 
-    <!-- Mensaje de error -->
-    <div *ngIf="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-      <div class="flex">
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-        </svg>
-        <span>{{ error }}</span>
+    <!-- Mensaje de éxito flotante -->
+    <div *ngIf="successMessage" class="mx-6 mt-4 p-3 rounded-xl bg-[#dcfce7] border border-[#bbf7d0] flex items-center justify-between">
+      <div class="flex items-center gap-2 font-body-md text-body-md text-[#166534]">
+        <span class="material-symbols-outlined text-[#16a34a]">check_circle</span>
+        <span>{{ successMessage }}</span>
       </div>
+      <span class="text-sm text-[#166534]">Cerrando en 2s...</span>
     </div>
-    
-    <form [formGroup]="userForm" (ngSubmit)="saveUser()">
-      <!-- Mensajes de error del formulario -->
-      <div *ngIf="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">
-        {{ error }}
-      </div>
-      
+
+    <!-- Mensaje de error -->
+    <div *ngIf="error" class="mx-6 mt-4 p-3 rounded-xl bg-error-container border border-[#ffcdd2] flex items-center gap-2 font-body-md text-body-md text-on-error-container">
+      <span class="material-symbols-outlined">error</span>
+      <span>{{ error }}</span>
+    </div>
+
+    <!-- Formulario -->
+    <form [formGroup]="userForm" (ngSubmit)="saveUser()" class="p-6 space-y-5">
       <!-- Nombre de usuario -->
-      <div class="mb-4">
-        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Usuario *</label>
-        <input 
-          type="text" 
-          id="username" 
+      <div>
+        <label for="username" class="block font-label-md text-label-md text-on-surface mb-1.5">Usuario *</label>
+        <input
+          type="text"
+          id="username"
           formControlName="username"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          [class.border-red-500]="usernameControl?.invalid && usernameControl?.touched"
+          class="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          [class.border-error]="usernameControl?.invalid && usernameControl?.touched"
+          placeholder="Ingrese nombre de usuario"
         >
-        <div *ngIf="usernameControl?.invalid && usernameControl?.touched" class="text-red-600 text-sm mt-1">
+        <div *ngIf="usernameControl?.invalid && usernameControl?.touched" class="mt-1.5 font-label-sm text-label-sm text-error flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">error</span>
           <span *ngIf="usernameControl?.errors?.['required']">El nombre de usuario es obligatorio.</span>
-          <span *ngIf="usernameControl?.errors?.['minlength']">El nombre de usuario debe tener al menos 3 caracteres.</span>
+          <span *ngIf="usernameControl?.errors?.['minlength']">Debe tener al menos 3 caracteres.</span>
         </div>
       </div>
-      
+
       <!-- Email -->
-      <div class="mb-4">
-        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-        <input 
-          type="email" 
-          id="email" 
+      <div>
+        <label for="email" class="block font-label-md text-label-md text-on-surface mb-1.5">Email *</label>
+        <input
+          type="email"
+          id="email"
           formControlName="email"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          [class.border-red-500]="emailControl?.invalid && emailControl?.touched"
+          class="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          [class.border-error]="emailControl?.invalid && emailControl?.touched"
+          placeholder="correo@ejemplo.com"
         >
-        <div *ngIf="emailControl?.invalid && emailControl?.touched" class="text-red-600 text-sm mt-1">
+        <div *ngIf="emailControl?.invalid && emailControl?.touched" class="mt-1.5 font-label-sm text-label-sm text-error flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">error</span>
           <span *ngIf="emailControl?.errors?.['required']">El email es obligatorio.</span>
           <span *ngIf="emailControl?.errors?.['email']">Ingrese un email válido.</span>
         </div>
       </div>
-        <!-- Password -->
-      <div class="mb-4">
-        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-          {{ isEditMode ? 'Nueva Contraseña (dejar en blanco para mantener la actual)' : 'Contraseña *' }}
+
+      <!-- Password -->
+      <div>
+        <label for="password" class="block font-label-md text-label-md text-on-surface mb-1.5">
+          {{ isEditMode ? 'Nueva Contraseña' : 'Contraseña *' }}
         </label>
-        <input 
-          type="password" 
-          id="password" 
+        <input
+          type="password"
+          id="password"
           formControlName="password"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          [class.border-red-500]="passwordControl?.invalid && passwordControl?.touched"
+          class="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          [class.border-error]="passwordControl?.invalid && passwordControl?.touched"
+          placeholder="{{ isEditMode ? 'Dejar en blanco para mantener la actual' : 'Mínimo 6 caracteres' }}"
         >
-        <div *ngIf="passwordControl?.invalid && passwordControl?.touched" class="text-red-600 text-sm mt-1">
+        <div *ngIf="passwordControl?.invalid && passwordControl?.touched" class="mt-1.5 font-label-sm text-label-sm text-error flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">error</span>
           <span *ngIf="passwordControl?.errors?.['required']">La contraseña es obligatoria.</span>
-          <span *ngIf="passwordControl?.errors?.['minlength']">La contraseña debe tener al menos 6 caracteres.</span>
+          <span *ngIf="passwordControl?.errors?.['minlength']">Debe tener al menos 6 caracteres.</span>
         </div>
+        <p *ngIf="isEditMode" class="mt-1 font-label-sm text-label-sm text-on-surface-variant">Dejar en blanco para mantener la contraseña actual</p>
       </div>
-      
+
       <!-- Nombre completo -->
-      <div class="mb-4">
-        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
-        <input 
-          type="text" 
-          id="name" 
+      <div>
+        <label for="name" class="block font-label-md text-label-md text-on-surface mb-1.5">Nombre completo</label>
+        <input
+          type="text"
+          id="name"
           formControlName="name"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          placeholder="Nombre y apellidos"
         >
       </div>
-        <!-- Teléfono -->
-      <div class="mb-4">
-        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-        <input 
-          type="text" 
-          id="phone" 
+
+      <!-- Teléfono -->
+      <div>
+        <label for="phone" class="block font-label-md text-label-md text-on-surface mb-1.5">Teléfono</label>
+        <input
+          type="text"
+          id="phone"
           formControlName="phone"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          placeholder="Número de teléfono"
         >
       </div>
-        <!-- Foto de Perfil -->
-      <div class="mb-4">
-        <label for="profilePicture" class="block text-sm font-medium text-gray-700 mb-1">Foto de Perfil</label>
-        
+
+      <!-- Foto de Perfil -->
+      <div>
+        <label class="block font-label-md text-label-md text-on-surface mb-1.5">Foto de Perfil</label>
+
         <!-- Previsualización de imagen -->
-        <div *ngIf="previewImage || userForm.get('profilePicture')?.value" class="mb-2">
-          <div class="relative w-24 h-24 overflow-hidden rounded-full border border-gray-300 mb-2">
-            <img 
-              [src]="previewImage || userForm.get('profilePicture')?.value" 
-              alt="Foto de perfil" 
+        <div *ngIf="previewImage || userForm.get('profilePicture')?.value" class="mb-3">
+          <div class="relative w-20 h-20 overflow-hidden rounded-full border-2 border-outline-variant">
+            <img
+              [src]="previewImage || userForm.get('profilePicture')?.value"
+              alt="Foto de perfil"
               class="w-full h-full object-cover"
-              onerror="this.src='assets/default-user.png'; this.onerror='';"
+              onerror="this.src='assets/img/default-avatar.png'; this.onerror='';"
             >
-            <button 
-              type="button" 
-              class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center"
+            <button
+              type="button"
+              class="absolute -top-1 -right-1 bg-error text-on-error rounded-full w-5 h-5 flex items-center justify-center shadow-sm hover:bg-error/90 transition-colors"
               (click)="clearProfilePicture()"
               title="Eliminar imagen"
-            >×</button>
+            >
+              <span class="material-symbols-outlined text-[12px]">close</span>
+            </button>
           </div>
         </div>
-        
+
         <!-- Selector de archivo -->
-        <div class="flex items-center">
+        <div class="flex flex-col sm:flex-row gap-3">
           <input
             type="file"
             id="profilePictureFile"
@@ -300,91 +300,117 @@
           <button
             type="button"
             (click)="fileInput.click()"
-            class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            class="inline-flex items-center justify-center px-4 py-2.5 bg-surface-container-high text-on-surface hover:bg-surface-container-highest rounded-lg font-label-md text-label-md transition-colors gap-2"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+            <span class="material-symbols-outlined text-sm">image</span>
             Seleccionar Imagen
           </button>
-          <input 
-            type="text" 
-            id="profilePicture" 
+          <input
+            type="text"
+            id="profilePicture"
             formControlName="profilePicture"
             placeholder="URL de la imagen (opcional)"
-            class="flex-1 ml-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="flex-1 px-3.5 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           >
         </div>
-        <p class="text-xs text-gray-500 mt-1">Sube una imagen o ingresa una URL</p>
-      </div><!-- Roles -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <p class="mt-1 font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">info</span>
+          Sube una imagen o ingresa una URL
+        </p>
+      </div>
+
+      <!-- Roles -->
+      <div>
+        <label class="block font-label-md text-label-md text-on-surface mb-2">
           Roles
-          <span *ngIf="isEditMode" class="text-xs text-amber-600 ml-2">(No editable)</span>
+          <span *ngIf="isEditMode" class="text-xs text-secondary ml-2 font-normal">(Modificable)</span>
         </label>
-        
-        <!-- Modo edición: mostrar solo lectura -->
-        <div *ngIf="isEditMode" class="bg-gray-100 p-3 rounded-lg border border-gray-200">
-          <div class="flex flex-wrap gap-2">
-            <span *ngFor="let role of userForm.get('roles')?.value"
-                  class="px-3 py-1 rounded-full text-xs font-medium"
-                  [ngClass]="{
-                    'bg-blue-100 text-blue-800': role === ERole.ROLE_ADMIN,
-                    'bg-green-100 text-green-800': role === ERole.ROLE_USER,
-                    'bg-yellow-100 text-yellow-800': role === ERole.ROLE_POULTRY,
-                    'bg-purple-100 text-purple-800': role === ERole.ROLE_PORCINE
-                  }">
-              {{ role }}
+
+        <!-- Modo edición: editable -->
+        <div *ngIf="isEditMode" class="flex flex-wrap gap-2">
+          <div *ngFor="let role of availableRoles"
+               (click)="handleRoleToggle(role)"
+               class="flex items-center gap-2 px-3.5 py-2 bg-surface border border-outline-variant rounded-lg cursor-pointer transition-all duration-200 select-none"
+               [class.border-primary]="isRoleSelected(role)"
+               [style.background-color]="isRoleSelected(role) ? 'rgba(0, 62, 199, 0.05)' : ''">
+            <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-200"
+                 [class.border-primary]="isRoleSelected(role)"
+                 [class.border-outline]="!isRoleSelected(role)"
+                 [class.bg-primary]="isRoleSelected(role)">
+              <span *ngIf="isRoleSelected(role)" class="material-symbols-outlined text-[12px] text-on-primary">check</span>
+            </div>
+            <span class="text-sm font-medium" [ngClass]="{
+              'text-primary': role === ERole.ROLE_ADMIN,
+              'text-[#166534]': role === ERole.ROLE_USER,
+              'text-[#854d0e]': role === ERole.ROLE_POULTRY,
+              'text-[#6b21a8]': role === ERole.ROLE_PORCINE
+            }">
+              <ng-container [ngSwitch]="role">
+                <span *ngSwitchCase="ERole.ROLE_ADMIN" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">admin_panel_settings</span> Administrador</span>
+                <span *ngSwitchCase="ERole.ROLE_USER" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">person</span> Usuario básico</span>
+                <span *ngSwitchCase="ERole.ROLE_POULTRY" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">raven</span> Pollos</span>
+                <span *ngSwitchCase="ERole.ROLE_PORCINE" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">pets</span> Chanchos</span>
+                <span *ngSwitchDefault>{{ role }}</span>
+              </ng-container>
             </span>
           </div>
-          <p class="text-xs text-amber-600 mt-2 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            El rol se asigna al crear el usuario y no puede modificarse
+          <p class="text-xs text-on-surface-variant mt-1 w-full flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">info</span>
+            Puedes cambiar los roles del usuario. Un usuario puede tener múltiples roles.
           </p>
         </div>
-        
-        <!-- Modo creación: permitir selección -->
-        <div *ngIf="!isEditMode" class="flex flex-wrap gap-3">
-          <div *ngFor="let role of availableRoles" class="flex items-center bg-gray-100 p-2 rounded-md hover:bg-gray-200 transition-colors">
-            <input 
-              type="checkbox" 
-              [id]="'role-' + role"
-              [value]="role"
-              [checked]="isRoleSelected(role)"
-              (change)="onRoleChange($event, role)"
-              class="w-4 h-4 mr-2 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            >
-            <label [for]="'role-' + role" class="text-sm text-gray-700">
-              <span [ngClass]="{
-                'text-blue-600 font-medium': role === ERole.ROLE_ADMIN,
-                'text-green-600': role === ERole.ROLE_USER,
-                'text-yellow-600': role === ERole.ROLE_POULTRY,
-                'text-orange-600': role === ERole.ROLE_PORCINE
-              }">{{ role }}</span>
-            </label>
+
+        <!-- Modo creación: editable -->
+        <div *ngIf="!isEditMode" class="flex flex-wrap gap-2">
+          <div *ngFor="let role of availableRoles"
+               (click)="handleRoleToggle(role)"
+               class="flex items-center gap-2 px-3.5 py-2 bg-surface border border-outline-variant rounded-lg cursor-pointer transition-all duration-200 select-none"
+               [class.border-primary]="isRoleSelected(role)"
+               [style.background-color]="isRoleSelected(role) ? 'rgba(0, 62, 199, 0.05)' : ''">
+            <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-200"
+                 [class.border-primary]="isRoleSelected(role)"
+                 [class.border-outline]="!isRoleSelected(role)"
+                 [class.bg-primary]="isRoleSelected(role)">
+              <span *ngIf="isRoleSelected(role)" class="material-symbols-outlined text-[12px] text-on-primary">check</span>
+            </div>
+            <span class="text-sm font-medium" [ngClass]="{
+              'text-primary': role === ERole.ROLE_ADMIN,
+              'text-[#166534]': role === ERole.ROLE_USER,
+              'text-[#854d0e]': role === ERole.ROLE_POULTRY,
+              'text-[#6b21a8]': role === ERole.ROLE_PORCINE
+            }">
+              <ng-container [ngSwitch]="role">
+                <span *ngSwitchCase="ERole.ROLE_ADMIN" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">admin_panel_settings</span> Administrador</span>
+                <span *ngSwitchCase="ERole.ROLE_USER" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">person</span> Usuario básico</span>
+                <span *ngSwitchCase="ERole.ROLE_POULTRY" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">raven</span> Pollos</span>
+                <span *ngSwitchCase="ERole.ROLE_PORCINE" class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">pets</span> Chanchos</span>
+                <span *ngSwitchDefault>{{ role }}</span>
+              </ng-container>
+            </span>
           </div>
+          <p class="text-xs text-on-surface-variant mt-1 w-full flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">info</span>
+            Selecciona al menos un rol. Puedes asignar múltiples roles.
+          </p>
         </div>
-        <p *ngIf="!isEditMode" class="text-sm text-gray-500 mt-1">Selecciona al menos un rol para el usuario</p>
       </div>
-      
+
       <!-- Botones de acción -->
-      <div class="flex justify-end space-x-3 mt-6">
-        <button 
-          type="button" 
+      <div class="flex justify-end gap-3 pt-2 border-t border-outline-variant">
+        <button
+          type="button"
           (click)="closeModal()"
-          class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+          class="px-5 py-2.5 text-on-surface-variant bg-surface-container-high hover:bg-surface-container-highest rounded-lg font-label-md text-label-md transition-colors"
         >
           Cancelar
         </button>
-        <button 
+        <button
           type="submit"
           [disabled]="userForm.invalid || loading"
-          class="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
-          [class.opacity-70]="userForm.invalid || loading"
+          class="px-5 py-2.5 bg-primary text-on-primary hover:bg-primary/90 rounded-lg font-label-md text-label-md transition-all duration-200 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <span *ngIf="loading" class="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+          <span *ngIf="loading" class="h-4 w-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></span>
+          <span *ngIf="!loading" class="material-symbols-outlined text-sm">{{ isEditMode ? 'save' : 'person_add' }}</span>
           {{ isEditMode ? 'Actualizar' : 'Guardar' }}
         </button>
       </div>

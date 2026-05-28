@@ -2,10 +2,10 @@ package com.wil.avicola_backend.controller.costos;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,19 +44,33 @@ public class GastoSanidadController {
         return ResponseEntity.ok(service.listar(desde, hasta, loteId, loteCodigo));
     }
 
+    @GetMapping("/resumen")
+    public ResponseEntity<Map<String, Object>> resumen(
+        @RequestParam(name = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        @RequestParam(name = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+        @RequestParam(name = "loteId", required = false) String loteId,
+        @RequestParam(name = "loteCodigo", required = false) String loteCodigo
+    ) {
+        return ResponseEntity.ok(service.resumen(desde, hasta, loteId, loteCodigo));
+    }
+
+    @GetMapping("/agenda")
+    public ResponseEntity<List<GastoSanidad>> agenda(
+        @RequestParam(name = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        @RequestParam(name = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+        @RequestParam(name = "loteId", required = false) String loteId,
+        @RequestParam(name = "loteCodigo", required = false) String loteCodigo
+    ) {
+        return ResponseEntity.ok(service.agenda(desde, hasta, loteId, loteCodigo));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<GastoSanidad> obtener(@PathVariable String id) {
         return ResponseEntity.ok(service.obtener(id));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<GastoSanidad> actualizar(@PathVariable String id, @Valid @RequestBody GastoSanidadDTO body) {
+    public ResponseEntity<GastoSanidad> actualizar(@PathVariable String id, @RequestBody GastoSanidadDTO body) {
         return ResponseEntity.ok(service.actualizar(id, body));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable String id) {
-        service.eliminar(id);
-        return ResponseEntity.noContent().build();
     }
 }

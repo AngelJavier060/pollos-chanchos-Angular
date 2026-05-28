@@ -13,4 +13,11 @@ public interface GastoSanidadRepository extends JpaRepository<GastoSanidad, Stri
     List<GastoSanidad> findByFechaBetween(LocalDate desde, LocalDate hasta);
     List<GastoSanidad> findByLote_Id(String loteId);
     List<GastoSanidad> findByLote_Codigo(String loteCodigo);
+
+    List<GastoSanidad> findByLote_IdAndFechaBetween(String loteId, LocalDate desde, LocalDate hasta);
+    List<GastoSanidad> findByLote_CodigoAndFechaBetween(String loteCodigo, LocalDate desde, LocalDate hasta);
+
+    List<GastoSanidad> findByProximaFechaBetween(LocalDate desde, LocalDate hasta);
+    List<GastoSanidad> findByLote_IdAndProximaFechaBetween(String loteId, LocalDate desde, LocalDate hasta);
+    List<GastoSanidad> findByLote_CodigoAndProximaFechaBetween(String loteCodigo, LocalDate desde, LocalDate hasta);
 }

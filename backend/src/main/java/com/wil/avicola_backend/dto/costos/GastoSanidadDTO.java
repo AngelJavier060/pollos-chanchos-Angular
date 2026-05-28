@@ -1,6 +1,7 @@
 package com.wil.avicola_backend.dto.costos;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -18,6 +19,16 @@ public class GastoSanidadDTO {
     private Double costoUnitario;
     @NotNull
     private LocalDate fecha;
+
+    private Long productId;
+    private String tipoAplicacion;
+    private String via;
+    private String aplicadoPorTipo;
+    private String responsable;
+    private Double costoAplicacion;
+    private LocalDate proximaFecha;
+    private LocalDateTime fechaHoraAplicacion;
+
     private String loteId;
     private String loteCodigo;
     private String observaciones;

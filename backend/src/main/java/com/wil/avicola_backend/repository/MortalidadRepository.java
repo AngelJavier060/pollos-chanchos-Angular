@@ -59,7 +59,7 @@ public interface MortalidadRepository extends JpaRepository<RegistroMortalidad, 
     List<Object[]> getEstadisticasPorCausaAndFechaRange(@Param("fechaInicio") LocalDateTime fechaInicio, @Param("fechaFin") LocalDateTime fechaFin);
     
     // Tendencia diaria
-    @Query("SELECT DATE(r.fechaRegistro), SUM(r.cantidadMuertos) FROM RegistroMortalidad r WHERE r.fechaRegistro >= :fechaInicio GROUP BY DATE(r.fechaRegistro) ORDER BY DATE(r.fechaRegistro)")
+    @Query("SELECT CAST(r.fechaRegistro AS date), SUM(r.cantidadMuertos) FROM RegistroMortalidad r WHERE r.fechaRegistro >= :fechaInicio GROUP BY CAST(r.fechaRegistro AS date) ORDER BY CAST(r.fechaRegistro AS date)")
     List<Object[]> getTendenciaDiaria(@Param("fechaInicio") LocalDateTime fechaInicio);
     
     // Buscar por causa - Cargando relación causa

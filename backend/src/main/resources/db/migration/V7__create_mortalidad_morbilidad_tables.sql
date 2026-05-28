@@ -1,12 +1,12 @@
 -- Crear tabla de causas de mortalidad
 CREATE TABLE causas_mortalidad (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
     color VARCHAR(20),
     activo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insertar causas predefinidas
@@ -23,8 +23,8 @@ INSERT INTO causas_mortalidad (nombre, descripcion, color) VALUES
 
 -- Crear tabla de registros de mortalidad
 CREATE TABLE registros_mortalidad (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    lote_id INT NOT NULL,
+    id SERIAL PRIMARY KEY,
+    lote_id VARCHAR(255) NOT NULL,
     cantidad_muertos INT NOT NULL,
     causa_id INT NOT NULL,
     observaciones TEXT,
@@ -35,14 +35,13 @@ CREATE TABLE registros_mortalidad (
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_registro VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (lote_id) REFERENCES lotes(id),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (causa_id) REFERENCES causas_mortalidad(id)
 );
 
 -- Crear tabla de enfermedades
 CREATE TABLE enfermedades (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
     sintomas TEXT,
@@ -50,7 +49,7 @@ CREATE TABLE enfermedades (
     contagiosa BOOLEAN DEFAULT FALSE,
     activo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insertar enfermedades comunes
@@ -68,15 +67,15 @@ INSERT INTO enfermedades (nombre, descripcion, sintomas, tratamiento_recomendado
 
 -- Crear tabla de medicamentos
 CREATE TABLE medicamentos (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
     tipo VARCHAR(100),
     dosis_recomendada VARCHAR(255),
-    tiempo_retiro INT, -- días
+    tiempo_retiro INT,
     activo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insertar medicamentos comunes
@@ -94,15 +93,15 @@ INSERT INTO medicamentos (nombre, descripcion, tipo, dosis_recomendada, tiempo_r
 
 -- Crear tabla de registros de morbilidad
 CREATE TABLE registros_morbilidad (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     lote_id INT NOT NULL,
     fecha DATE NOT NULL,
     hora TIME NOT NULL,
     cantidad_enfermos INT NOT NULL,
     enfermedad_id INT NOT NULL,
     sintomas_observados TEXT,
-    gravedad ENUM('leve', 'moderada', 'severa') DEFAULT 'leve',
-    estado_tratamiento ENUM('en_observacion', 'en_tratamiento', 'recuperado', 'movido_a_mortalidad') DEFAULT 'en_observacion',
+    gravedad VARCHAR(20) DEFAULT 'leve' CHECK (gravedad IN ('leve', 'moderada', 'severa')),
+    estado_tratamiento VARCHAR(30) DEFAULT 'en_observacion' CHECK (estado_tratamiento IN ('en_observacion', 'en_tratamiento', 'recuperado', 'movido_a_mortalidad')),
     medicamento_id INT,
     dosis_aplicada VARCHAR(255),
     fecha_inicio_tratamiento DATE,
@@ -119,16 +118,15 @@ CREATE TABLE registros_morbilidad (
     animales_tratados INT DEFAULT 0,
     derivado_a_mortalidad BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (lote_id) REFERENCES lotes(id),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enfermedad_id) REFERENCES enfermedades(id),
     FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id)
 );
 
 -- Crear tabla de alertas de mortalidad
 CREATE TABLE alertas_mortalidad (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    tipo ENUM('critica', 'advertencia', 'informativa') NOT NULL,
+    id SERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('critica', 'advertencia', 'informativa')),
     titulo VARCHAR(255) NOT NULL,
     mensaje TEXT NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -136,15 +134,14 @@ CREATE TABLE alertas_mortalidad (
     lote_id INT,
     usuario_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (lote_id) REFERENCES lotes(id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Crear tabla de alertas de morbilidad
 CREATE TABLE alertas_morbilidad (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    tipo ENUM('brote', 'aislamiento', 'tratamiento', 'seguimiento') NOT NULL,
-    prioridad ENUM('alta', 'media', 'baja') NOT NULL,
+    id SERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('brote', 'aislamiento', 'tratamiento', 'seguimiento')),
+    prioridad VARCHAR(10) NOT NULL CHECK (prioridad IN ('alta', 'media', 'baja')),
     titulo VARCHAR(255) NOT NULL,
     mensaje TEXT NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -153,8 +150,7 @@ CREATE TABLE alertas_morbilidad (
     usuario_id INT,
     accion_requerida VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (lote_id) REFERENCES lotes(id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Crear índices para optimizar consultas
@@ -163,4 +159,4 @@ CREATE INDEX idx_registros_mortalidad_fecha ON registros_mortalidad(fecha_regist
 CREATE INDEX idx_registros_morbilidad_lote ON registros_morbilidad(lote_id);
 CREATE INDEX idx_registros_morbilidad_fecha ON registros_morbilidad(fecha);
 CREATE INDEX idx_alertas_mortalidad_leida ON alertas_mortalidad(leida);
-CREATE INDEX idx_alertas_morbilidad_leida ON alertas_morbilidad(leida); 
+CREATE INDEX idx_alertas_morbilidad_leida ON alertas_morbilidad(leida);

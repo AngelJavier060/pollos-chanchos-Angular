@@ -40,7 +40,7 @@ public class ConsumosLoteController {
             
             // Diagnóstico: Ver qué animales existen
             try {
-                List<Map<String, Object>> animales = jdbcTemplate.queryForList("SELECT id, name FROM animals");
+                List<Map<String, Object>> animales = jdbcTemplate.queryForList("SELECT id, name FROM animal");
                 System.out.println("[ConsumosLote] Animales en BD: " + animales);
             } catch (Exception e) {
                 System.out.println("[ConsumosLote] Error consultando animales: " + e.getMessage());
@@ -58,9 +58,9 @@ public class ConsumosLoteController {
             // Diagnóstico: Ver lotes de chanchos
             try {
                 List<Map<String, Object>> lotesChanchos = jdbcTemplate.queryForList(
-                    "SELECT l.id, l.codigo, a.name as animal FROM lotes l " +
-                    "LEFT JOIN races r ON l.race_id = r.id " +
-                    "LEFT JOIN animals a ON r.animal_id = a.id " +
+                    "SELECT l.id, l.codigo, a.name as animal FROM lote l " +
+                    "LEFT JOIN race r ON l.race_id = r.id " +
+                    "LEFT JOIN animal a ON r.animal_id = a.id " +
                     "WHERE a.name LIKE '%Chancho%' OR a.name LIKE '%Cerdo%' OR a.name LIKE '%Porcino%'");
                 System.out.println("[ConsumosLote] Lotes de chanchos encontrados: " + lotesChanchos.size());
             } catch (Exception e) {
@@ -83,12 +83,12 @@ public class ConsumosLoteController {
                     u.name as usuario_nombre_completo
                 FROM plan_ejecucion pe
                 LEFT JOIN plan_asignacion pa ON pe.asignacion_id = pa.id
-                LEFT JOIN lotes l ON pa.lote_id = l.id
+                LEFT JOIN lote l ON pa.lote_id = l.id
                 LEFT JOIN plan_detalle pd ON pe.detalle_id = pd.id
                 LEFT JOIN product p ON pd.product_id = p.id
                 LEFT JOIN usuarios u ON pe.executed_by_user_id = u.id
-                LEFT JOIN races r ON l.race_id = r.id
-                LEFT JOIN animals a ON r.animal_id = a.id
+                LEFT JOIN race r ON l.race_id = r.id
+                LEFT JOIN animal a ON r.animal_id = a.id
                 WHERE (
                     LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ?
                 )
@@ -119,12 +119,12 @@ public class ConsumosLoteController {
                         u.name as usuario_nombre_completo
                     FROM plan_ejecucion pe
                     LEFT JOIN plan_asignacion pa ON pe.asignacion_id = pa.id
-                    LEFT JOIN lotes l ON pa.lote_id = l.id
+                    LEFT JOIN lote l ON pa.lote_id = l.id
                     LEFT JOIN plan_detalle pd ON pe.detalle_id = pd.id
                     LEFT JOIN product p ON pd.product_id = p.id
                     LEFT JOIN usuarios u ON pe.executed_by_user_id = u.id
-                    LEFT JOIN races r ON l.race_id = r.id
-                    LEFT JOIN animals a ON r.animal_id = a.id
+                    LEFT JOIN race r ON l.race_id = r.id
+                    LEFT JOIN animal a ON r.animal_id = a.id
                     WHERE (
                         LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(a.name) LIKE ?
                     )

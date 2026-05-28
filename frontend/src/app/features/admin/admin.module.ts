@@ -35,7 +35,7 @@ const routes: Routes = [
       {
         path: 'inventario/sanidad',
         loadComponent: () => import('../inventario/sanidad-cuidado-animal.component').then(m => m.SanidadCuidadoAnimalComponent),
-        title: 'Sanidad y Cuidado Animal',
+        title: 'Sanidad → Aplicaciones',
         canActivate: [AuthGuard],
         data: { roles: [ERole.ROLE_ADMIN] }
       },

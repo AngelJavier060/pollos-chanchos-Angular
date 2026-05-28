@@ -33,6 +33,28 @@ export class CostosSanidadService {
     );
   }
 
+  resumen(options: { desde?: string; hasta?: string; loteId?: string; loteCodigo?: string } = {}): Observable<any> {
+    let params = new HttpParams();
+    if (options.desde) params = params.set('desde', options.desde);
+    if (options.hasta) params = params.set('hasta', options.hasta);
+    if (options.loteId) params = params.set('loteId', options.loteId);
+    if (options.loteCodigo) params = params.set('loteCodigo', options.loteCodigo);
+    return this.http.get<any>(`${this.apiUrl}/resumen`, { params }).pipe(
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  agenda(options: { desde?: string; hasta?: string; loteId?: string; loteCodigo?: string } = {}): Observable<any[]> {
+    let params = new HttpParams();
+    if (options.desde) params = params.set('desde', options.desde);
+    if (options.hasta) params = params.set('hasta', options.hasta);
+    if (options.loteId) params = params.set('loteId', options.loteId);
+    if (options.loteCodigo) params = params.set('loteCodigo', options.loteCodigo);
+    return this.http.get<any[]>(`${this.apiUrl}/agenda`, { params }).pipe(
+      catchError((error) => this.handleError(error))
+    );
+  }
+
   actualizar(id: string, body: any): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/${id}`, body, this.httpOptions).pipe(
       catchError((error) => this.handleError(error))
