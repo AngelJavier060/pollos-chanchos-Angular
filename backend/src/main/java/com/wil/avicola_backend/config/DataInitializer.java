@@ -120,17 +120,24 @@ public class DataInitializer implements CommandLineRunner {
      * Crea un usuario SOLO si no existe. NO sobrescribe datos de usuarios existentes.
      * Esto permite que los administradores editen usuarios sin que se reviertan los cambios.
      */
-    private void ensureSpecificUserExists(String username, String email, String rawPassword, ERole roleEnum) {
+        private void ensureSpecificUserExists(String username, String email, String rawPassword, ERole roleEnum) {
         try {
-            Optional<Usuario> opt = usuarioRepository.findByUsername(username);
-            
-            // Si el usuario ya existe, NO hacer nada - respetar los datos editados por el admin
-            if (opt.isPresent()) {
+            // Verificar si el usuario ya existe por username
+            Optional<Usuario> optByUsername = usuarioRepository.findByUsername(username);
+            if (optByUsername.isPresent()) {
                 logger.info("Usuario '{}' ya existe. Se respetan sus datos actuales (no se sobrescriben).", username);
                 return;
             }
             
-            // Solo crear si NO existe
+            // Verificar si el email ya está registrado (para evitar violación de unique constraint)
+            Optional<Usuario> optByEmail = usuarioRepository.findByEmail(email);
+            if (optByEmail.isPresent()) {
+                logger.warn("El email '{}' ya está registrado para el usuario '{}'. Se omite creación de '{}'.", 
+                    email, optByEmail.get().getUsername(), username);
+                return;
+            }
+            
+            // Solo crear si NO existe ni username ni email
             Role role = roleRepository.findByName(roleEnum)
                     .orElseThrow(() -> new RuntimeException("Error: Rol no encontrado: " + roleEnum));
 
