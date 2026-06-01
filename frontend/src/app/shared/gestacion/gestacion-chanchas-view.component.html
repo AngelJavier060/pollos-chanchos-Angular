@@ -1,0 +1,229 @@
+<div class="gestacion-page" [class.tema-admin]="tema === 'admin'" [class.tema-chanchos]="tema === 'chanchos'">
+  <header class="gestacion-header">
+    <div class="gestacion-header__icon" aria-hidden="true">🐷</div>
+    <div>
+      <h1 class="gestacion-header__title">Control de gestación — chanchas</h1>
+      <p class="gestacion-header__sub">
+        Seguimiento por etapas · Duración total: {{ diasTotal }} días
+        <span *ngIf="!esEdicion" class="gestacion-header__badge-consulta">Solo consulta</span>
+      </p>
+    </div>
+  </header>
+
+  <p *ngIf="!esEdicion" class="gestacion-aviso-consulta">
+    <i class="fas fa-info-circle"></i>
+    Los registros se gestionan desde el panel de administración. Aquí puede consultar el estado de cada chancha.
+  </p>
+
+  <section class="gestacion-stats" aria-label="Resumen">
+    <article class="stat-card">
+      <span class="stat-card__lbl">Total chanchas</span>
+      <span class="stat-card__val">{{ stats.total }}</span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__lbl">En gestación</span>
+      <span class="stat-card__val">{{ stats.gestando }}</span>
+    </article>
+    <article class="stat-card stat-card--warn">
+      <span class="stat-card__lbl">Pre-parto</span>
+      <span class="stat-card__val">{{ stats.preParto }}</span>
+    </article>
+    <article class="stat-card stat-card--ok">
+      <span class="stat-card__lbl">Paridas</span>
+      <span class="stat-card__val">{{ stats.paridas }}</span>
+    </article>
+  </section>
+
+  <section *ngIf="alertas.length > 0" class="gestacion-alertas" aria-label="Alertas">
+    <div *ngFor="let a of alertas" class="alerta" [class.alerta--warning]="a.tipo === 'warning'" [class.alerta--danger]="a.tipo === 'danger'">
+      <span class="alerta__icon">⚠</span>
+      <span><strong>{{ a.chancha.nombre }}</strong>: {{ mensajeAlerta(a) }}</span>
+    </div>
+  </section>
+
+  <div class="gestacion-topbar">
+    <span class="gestacion-topbar__lbl">Registro de chanchas</span>
+    <button *ngIf="esEdicion" type="button" class="btn btn--primary" (click)="abrirNueva()">
+      + Nueva chancha
+    </button>
+  </div>
+
+  <div class="gestacion-table-wrap">
+    <table class="gestacion-table">
+      <thead>
+        <tr>
+          <th>Chancha / Lote</th>
+          <th>Inseminación</th>
+          <th>Etapa actual</th>
+          <th>Días / progreso</th>
+          <th>Parto estimado</th>
+          <th>Faltan para parto</th>
+          <th>Estado</th>
+          <th class="th-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="chanchas.length === 0">
+          <td colspan="8" class="gestacion-empty">
+            No hay chanchas registradas.
+            <span *ngIf="esEdicion"> Agregue la primera con el botón superior.</span>
+          </td>
+        </tr>
+        <tr *ngFor="let c of chanchas" class="gestacion-row">
+          <td>
+            <strong>{{ c.nombre }}</strong>
+            <div *ngIf="subtituloChancha(c)" class="gestacion-sub">{{ subtituloChancha(c) }}</div>
+            <span *ngIf="c.activa === false" class="badge badge-gray gestacion-badge-baja">Baja</span>
+          </td>
+          <td>{{ inseminacionFmt(c) }}</td>
+          <td>{{ etapaDe(c) }}</td>
+          <td>
+            <div class="pbar-lbl">Día {{ diasDe(c) >= 0 ? diasDe(c) : 0 }} de {{ diasTotal }} ({{ pctDe(c) }}%)</div>
+            <div class="pbar" role="progressbar" [attr.aria-valuenow]="pctDe(c)" aria-valuemin="0" aria-valuemax="100">
+              <div class="pbar__fill" [style.width.%]="pctDe(c)"></div>
+            </div>
+          </td>
+          <td>{{ partoEstimadoDe(c) }}</td>
+          <td>
+            <div [ngClass]="claseContadorDias(c)" class="contador-dias-wrap" [attr.title]="'Días restantes hasta parto estimado'">
+              <span *ngIf="numeroDiasFaltan(c) !== null" class="contador-dias__num">{{ numeroDiasFaltan(c) }}</span>
+              <span class="contador-dias__lbl">{{ textoDiasFaltan(c) }}</span>
+            </div>
+          </td>
+          <td><span class="badge" [ngClass]="estadoDe(c).cls">{{ estadoDe(c).label }}</span></td>
+          <td class="td-acciones">
+            <button type="button" class="btn btn--sm" (click)="verDetalle(c)" title="Ver detalle">Ver</button>
+            <ng-container *ngIf="esEdicion">
+              <button type="button" class="btn btn--sm" (click)="abrirEditar(c)" title="Editar">Editar</button>
+              <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)" title="Eliminar">Eliminar</button>
+            </ng-container>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section *ngIf="detalle" class="gestacion-detalle">
+    <div class="gestacion-detalle__head">
+      <div>
+        <h2 class="gestacion-detalle__nombre">{{ detalle.nombre }}</h2>
+        <p class="gestacion-detalle__sub">{{ detalle.raza || 'Sin raza' }} · Parto #{{ detalle.numeroParto }}</p>
+      </div>
+      <button type="button" class="btn btn--sm" (click)="cerrarDetalle()">Cerrar</button>
+    </div>
+    <div class="gestacion-detalle__grid">
+      <div class="info-item">
+        <span class="info-item__lbl">Fecha inseminación</span>
+        <span class="info-item__val">{{ inseminacionFmt(detalle) }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-item__lbl">Días transcurridos</span>
+        <span class="info-item__val">{{ diasDe(detalle) }} de {{ diasTotal }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-item__lbl">Parto estimado</span>
+        <span class="info-item__val">{{ partoEstimadoDe(detalle) }}</span>
+      </div>
+      <div class="info-item info-item--contador">
+        <span class="info-item__lbl">Faltan para el parto</span>
+        <div [ngClass]="claseContadorDias(detalle)" class="contador-dias-wrap contador-dias-wrap--lg">
+          <span *ngIf="numeroDiasFaltan(detalle) !== null" class="contador-dias__num">{{ numeroDiasFaltan(detalle) }}</span>
+          <span class="contador-dias__lbl">{{ textoDiasFaltan(detalle) }}</span>
+        </div>
+      </div>
+      <div *ngIf="detalle.observaciones" class="info-item info-item--full">
+        <span class="info-item__lbl">Observaciones</span>
+        <span class="info-item__val">{{ detalle.observaciones }}</span>
+      </div>
+    </div>
+    <h3 class="etapas-tit">Etapas de gestación</h3>
+    <div class="etapas-grid">
+      <div
+        *ngFor="let e of etapas; let i = index"
+        class="etapa"
+        [class.etapa--done]="i < etapaIdxDetalle()"
+        [class.etapa--active]="i === etapaIdxDetalle()"
+      >
+        <div class="etapa__nombre">{{ e.nombre }}</div>
+        <div class="etapa__dias">Días {{ e.dias }}</div>
+      </div>
+    </div>
+  </section>
+
+  <div *ngIf="mostrarModal && esEdicion" class="gestacion-overlay" (click)="cerrarModal()" role="dialog" aria-modal="true">
+    <div class="gestacion-modal" (click)="$event.stopPropagation()">
+      <h2 class="gestacion-modal__title">{{ form.id ? 'Editar chancha' : 'Registrar chancha' }}</h2>
+      <p *ngIf="mensajeError" class="gestacion-modal__error">{{ mensajeError }}</p>
+      <p *ngIf="lotesError" class="gestacion-modal__error">{{ lotesError }}</p>
+
+      <label class="fg fg--full">
+        <span>Lote *</span>
+        <select
+          class="gestacion-select"
+          [(ngModel)]="form.loteId"
+          (ngModelChange)="onLoteChange()"
+          [disabled]="lotesCargando"
+        >
+          <option value="">— Seleccione lote —</option>
+          <option *ngFor="let l of lotes" [value]="l.id">{{ etiquetaLote(l) }}</option>
+        </select>
+        <span *ngIf="lotesCargando" class="gestacion-hint">Cargando lotes…</span>
+        <span *ngIf="form.loteId && infoLoteSeleccionado()" class="gestacion-hint gestacion-hint--ok">{{ infoLoteSeleccionado() }}</span>
+      </label>
+
+      <label class="fg fg--full" *ngIf="form.loteId">
+        <span>Chancha en el lote * (Chancha-01, Chancha-02…)</span>
+        <select
+          class="gestacion-select"
+          [(ngModel)]="form.numeroEnLote"
+          (ngModelChange)="onNumeroChanchaChange()"
+        >
+          <option [ngValue]="null">— Seleccione número —</option>
+          <option
+            *ngFor="let o of opcionesChancha"
+            [ngValue]="o.numero"
+            [disabled]="!o.disponible && form.activa"
+          >
+            {{ o.etiqueta }}{{ o.disponible ? '' : ' — ' + (o.motivoNoDisponible || 'No disponible') }}
+          </option>
+        </select>
+      </label>
+
+      <div class="gestacion-form-row" *ngIf="form.nombre">
+        <label class="fg">
+          <span>Código generado</span>
+          <input type="text" [value]="form.nombre" readonly class="gestacion-readonly" />
+        </label>
+        <label class="fg">
+          <span>Raza (del lote)</span>
+          <input type="text" [(ngModel)]="form.raza" readonly class="gestacion-readonly" />
+        </label>
+      </div>
+      <div class="gestacion-form-row">
+        <label class="fg">
+          <span>Fecha de inseminación *</span>
+          <input type="date" [(ngModel)]="form.fechaInseminacion" />
+        </label>
+        <label class="fg">
+          <span>Número de parto</span>
+          <input type="number" min="1" [(ngModel)]="form.numeroParto" />
+        </label>
+      </div>
+      <label class="fg fg--full">
+        <span>Observaciones</span>
+        <input type="text" [(ngModel)]="form.observaciones" placeholder="Notas adicionales..." />
+      </label>
+
+      <label class="fg fg--full gestacion-check" *ngIf="form.id">
+        <input type="checkbox" [(ngModel)]="form.activa" (ngModelChange)="actualizarOpcionesChancha()" />
+        <span>Chancha activa en el lote (desmarcar si fue vendida o murió)</span>
+      </label>
+      <div class="gestacion-modal__actions">
+        <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn--primary" (click)="guardar()">
+          {{ form.id ? 'Guardar cambios' : 'Registrar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

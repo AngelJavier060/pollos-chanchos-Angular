@@ -12,6 +12,7 @@ import { ReportesComponent } from '../reportes/reportes.component';
 import { ProfileComponent } from '../profile/profile.component';
 import { AuthGuard } from '../../core/guards/auth.guard';
 import { ERole } from '../../shared/models/role.model';
+import { GestacionAdminPage } from '../../shared/gestacion/gestacion-admin.page';
 
 const routes: Routes = [
   {
@@ -83,6 +84,13 @@ const routes: Routes = [
       },
       { path: 'plan-nutricional', component: PlanNutricionalComponent, title: 'Plan Nutricional' },
       {
+        path: 'gestacion',
+        component: GestacionAdminPage,
+        title: 'Control de Gestación',
+        canActivate: [AuthGuard],
+        data: { roles: [ERole.ROLE_ADMIN] }
+      },
+      {
         path: 'analisis-financiero',
         loadComponent: () => import('../analisis-financiero/analisis-financiero.component').then(m => m.AnalisisFinancieroComponent),
         title: 'Análisis Financiero',
@@ -107,8 +115,8 @@ const routes: Routes = [
     CommonModule,
     RouterModule.forChild(routes),
     ReactiveFormsModule,
-    FormsModule
-    // AdminComponent es un componente standalone y no debe importarse aquí
+    FormsModule,
+    GestacionAdminPage
   ]
 })
 export class AdminModule { }

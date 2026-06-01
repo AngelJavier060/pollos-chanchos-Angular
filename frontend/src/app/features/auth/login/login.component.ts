@@ -95,7 +95,7 @@ export class LoginComponent implements OnInit {
     this.error = 'Iniciando sesión...';
     console.log('Iniciando proceso de login...');
 
-    const identifier = this.loginForm.get('identifier')?.value;
+    const identifier = (this.loginForm.get('identifier')?.value ?? '').toString().trim();
     const password = this.loginForm.get('password')?.value;
 
     if (!identifier || !password) {
@@ -103,7 +103,7 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    // Siempre enviamos como 'username', el backend detecta si es email
+    // El backend acepta usuario (ej. Javier) o correo (ej. javier@avicola.com) en el campo username
     const loginData = {
       username: identifier,
       password

@@ -11,6 +11,7 @@ import { ChanchosLotesComponent } from './chanchos-lotes.component';
 import { ChanchosHistoricoComponent } from './chanchos-historico.component';
 import { ChanchosMortalidadComponent } from './chanchos-mortalidad.component';
 import { ChanchosMorbilidadComponent } from './chanchos-morbilidad.component';
+import { ChanchosGestacionComponent } from './chanchos-gestacion.component';
 
 const routes: Routes = [
   {
@@ -25,6 +26,7 @@ const routes: Routes = [
       { path: 'historico', component: ChanchosHistoricoComponent, canActivate: [AuthGuard] },
       { path: 'mortalidad', component: ChanchosMortalidadComponent, canActivate: [AuthGuard] },
       { path: 'morbilidad', component: ChanchosMorbilidadComponent, canActivate: [AuthGuard] },
+      { path: 'gestacion', component: ChanchosGestacionComponent, canActivate: [AuthGuard] },
       {
         path: 'inventario',
         loadComponent: () => import('../inventario/inventario.component').then(m => m.InventarioComponent),
@@ -47,7 +49,8 @@ const routes: Routes = [
   imports: [
     CommonModule,
     FormsModule,
-    RouterModule.forChild(routes)
+    RouterModule.forChild(routes),
+    ChanchosGestacionComponent
   ]
 })
 export class ChanchosModule { }

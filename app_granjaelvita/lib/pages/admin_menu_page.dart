@@ -7,6 +7,7 @@ import 'inventario_menu_page.dart';
 import 'ventas_menu_page.dart';
 import 'usuarios_dashboard_page.dart';
 import 'lotes_dashboard_page.dart';
+import 'gestacion_page.dart';
 
 // Paleta de colores corporativa - Verde, Azul, Tierra (inspirada en Menu_Iconos)
 class AppColors {
@@ -108,6 +109,12 @@ class AdminMenuPage extends StatelessWidget {
         'colorDark': AppColors.accentTeal,
       },
       {
+        'label': 'Gestación',
+        'icon': Icons.pregnant_woman_rounded,
+        'colorLight': const Color(0xFFBCAAA4),
+        'colorDark': const Color(0xFF6D4C41),
+      },
+      {
         'label': 'Análisis',
         'icon': Icons.bar_chart_rounded,
         'colorLight': const Color(0xFFFFB74D),
@@ -130,6 +137,8 @@ class AdminMenuPage extends StatelessWidget {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UsuariosDashboardPage()));
       } else if (label == 'Lotes') {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LotesDashboardPage()));
+      } else if (label == 'Gestación') {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GestacionPage(modoEdicion: true)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label próximamente')));
       }

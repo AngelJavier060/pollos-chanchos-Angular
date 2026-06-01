@@ -1,7 +1,7 @@
 <!-- Layout principal con sidebar -->
 <div class="chanchos-dashboard-layout flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" [class.dark-mode]="isDarkMode">
   <!-- SIDEBAR PROFESIONAL -->
-  <aside class="sidebar bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col border-r border-gray-200 relative overflow-hidden"
+  <aside class="sidebar bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col border-r border-gray-200 relative min-h-screen"
          [ngClass]="{ 'collapsed': isSidebarCollapsed }"
          [class.w-80]="!isSidebarCollapsed"
          [class.w-20]="isSidebarCollapsed">
@@ -21,8 +21,8 @@
       <div class="divider" *ngIf="!isSidebarCollapsed"></div>
     </div>
 
-    <!-- Navegación simple del Sidebar (igual a Pollos) -->
-    <nav class="flex-1 p-4 space-y-2">
+    <!-- Navegación del sidebar -->
+    <nav class="flex-1 p-4 space-y-2 overflow-y-auto min-h-0">
       <ul class="space-y-1">
         <li>
           <a routerLink="dashboard" routerLinkActive="active"
@@ -43,6 +43,13 @@
              class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
             <i class="fas fa-clipboard-list text-sm mr-3"></i>
             <span class="flex-1">Lotes</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="gestacion" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-pink-50 hover:text-pink-800 transition-all duration-200 font-medium">
+            <i class="fas fa-heart text-sm mr-3 text-pink-600"></i>
+            <span class="flex-1">Control de Gestación</span>
           </a>
         </li>
         <li>

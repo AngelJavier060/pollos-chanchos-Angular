@@ -22,6 +22,11 @@ public class LoginRequestDto {
      * Determina si el campo username contiene un email
      */
     public boolean isEmail() {
-        return username != null && username.contains("@");
+        return username != null && username.trim().contains("@");
+    }
+
+    /** Identificador normalizado (sin espacios al inicio/fin). */
+    public String getIdentifier() {
+        return username != null ? username.trim() : "";
     }
 }

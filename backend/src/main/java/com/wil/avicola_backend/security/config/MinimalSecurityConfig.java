@@ -102,6 +102,10 @@ public class MinimalSecurityConfig {
                     // Otros endpoints públicos temporales
                     .requestMatchers("/animal/**", "/api/animal/**").permitAll()
                     .requestMatchers("/api/lote/**", "/lote/**").permitAll() // Para cargar lotes en mortalidad
+                    .requestMatchers(HttpMethod.GET, "/api/gestacion/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/gestacion/**").permitAll()
+                    .requestMatchers(HttpMethod.PUT, "/api/gestacion/**").permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/api/gestacion/**").permitAll()
                     // Todo lo demás requiere autenticación
                     .anyRequest().authenticated();
                     

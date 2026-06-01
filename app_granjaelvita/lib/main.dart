@@ -8,6 +8,7 @@ import 'pages/alimentacion_page.dart';
 import 'pages/admin_menu_page.dart';
 import 'pages/historico_alimentacion_page.dart';
 import 'pages/lotes_dashboard_page.dart';
+import 'pages/gestacion_page.dart';
 
 void main() => runApp(const GranjaElviataApp());
 
@@ -833,6 +834,7 @@ class HomePage extends StatelessWidget {
       'assets/images/Granja3.jpg',
     ];
 
+    final esChanchos = result.roles.contains('ROLE_PORCINE');
     final items = [
       {'label':'Dashboard','icon': Icons.dashboard_customize_rounded,'color': Colors.blue},
       {'label':'Alimentación','icon': Icons.restaurant_menu,'color': Colors.green},
@@ -840,6 +842,8 @@ class HomePage extends StatelessWidget {
       {'label':'Histórico','icon': Icons.history,'color': Colors.orange},
       {'label':'Mortalidad','icon': Icons.warning_amber_rounded,'color': Colors.red},
       {'label':'Morbilidad','icon': Icons.medical_information_rounded,'color': Colors.pink},
+      if (esChanchos)
+        {'label':'Gestación','icon': Icons.pregnant_woman_rounded,'color': Colors.brown},
     ];
 
     return Scaffold(
@@ -903,6 +907,8 @@ class HomePage extends StatelessWidget {
                         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoricoAlimentacionPage()));
                       } else if (label == 'Lotes') {
                         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LotesDashboardPage()));
+                      } else if (label == 'Gestación') {
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GestacionPage(modoEdicion: false)));
                       }
                     },
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

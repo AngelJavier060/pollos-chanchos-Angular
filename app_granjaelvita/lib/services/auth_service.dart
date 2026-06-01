@@ -40,7 +40,11 @@ class AuthService {
   final ApiClient _api = ApiClient(baseUrl: apiBaseUrl);
 
   Future<LoginResult> login(String username, String password) async {
-    final body = {'username': username, 'password': password, 'rememberMe': true};
+    final body = {
+      'username': username.trim(),
+      'password': password,
+      'rememberMe': true,
+    };
     final res = await _api.post(authLoginPath, body);
     final roles = (res['roles'] is List)
         ? (res['roles'] as List).map((e) => e.toString()).toList()

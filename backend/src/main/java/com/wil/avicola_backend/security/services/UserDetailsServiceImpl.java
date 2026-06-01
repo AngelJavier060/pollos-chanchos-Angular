@@ -16,6 +16,9 @@ import java.util.Optional;
 public class UserDetailsServiceImpl implements UserDetailsService {
     @Autowired
     UsuarioRepository usuarioRepository;
+
+    @Autowired
+    LoginIdentifierResolver loginIdentifierResolver;
     
     /**
      * Carga el usuario por username o email.
@@ -27,31 +30,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
-        Optional<Usuario> usuarioOpt;
-        
-        // Determinar si es email o username
-        if (identifier != null && identifier.contains("@")) {
-            // Buscar por email (case-insensitive es aceptable para emails)
-            usuarioOpt = usuarioRepository.findByEmail(identifier);
-        } else {
-            // Buscar por username - CASE SENSITIVE
-            // Primero buscamos el usuario
-            usuarioOpt = usuarioRepository.findByUsernameIgnoreCase(identifier);
-            
-            // Si existe, validamos que el username coincida EXACTAMENTE (case-sensitive)
-            if (usuarioOpt.isPresent()) {
-                Usuario usuario = usuarioOpt.get();
-                // Comparación estricta: el username debe coincidir exactamente
-                if (!usuario.getUsername().equals(identifier)) {
-                    throw new UsernameNotFoundException(
-                        "Usuario no encontrado. Verifique mayúsculas y minúsculas: " + identifier);
-                }
-            }
-        }
-        
-        Usuario usuario = usuarioOpt.orElseThrow(() -> 
-            new UsernameNotFoundException("Usuario no encontrado: " + identifier));
-
+        String normalized = identifier != null ? identifier.trim() : "";
+        Usuario usuario = loginIdentifierResolver.resolve(normalized)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + normalized));
         return UserDetailsImpl.build(usuario);
     }
 }

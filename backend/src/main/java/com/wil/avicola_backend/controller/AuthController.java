@@ -10,6 +10,7 @@ import com.wil.avicola_backend.model.UserSession;
 import com.wil.avicola_backend.repository.UserSessionRepository;
 import com.wil.avicola_backend.repository.UsuarioRepository;
 import com.wil.avicola_backend.security.jwt.JwtUtils;
+import com.wil.avicola_backend.security.services.LoginIdentifierResolver;
 import com.wil.avicola_backend.security.services.UserDetailsImpl;
 import com.wil.avicola_backend.service.UserService;
 
@@ -48,37 +49,28 @@ public class AuthController {
     private final UserSessionRepository userSessionRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final LoginIdentifierResolver loginIdentifierResolver;
 
     @PostMapping({"/signin", "/login"})
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
-        String identifier = loginRequest.getUsername();
+        String identifier = loginRequest.getIdentifier();
         boolean isEmail = loginRequest.isEmail();
         
         log.info("Intento de login con {}: '{}'", isEmail ? "email" : "usuario", identifier);
         
         try {
-            // Buscar usuario en la base de datos (por username o email)
-            var usuarioOpt = isEmail 
-                ? usuarioRepository.findByEmail(identifier)
-                : usuarioRepository.findByUsernameIgnoreCase(identifier);
+            var usuarioOpt = loginIdentifierResolver.resolve(identifier);
             
             if (usuarioOpt.isEmpty()) {
                 log.warn("{} '{}' no encontrado en la base de datos", isEmail ? "Email" : "Usuario", identifier);
                 Map<String, String> response = new HashMap<>();
-                response.put("message", "Usuario o contraseña incorrectos");
+                response.put("message", isEmail
+                        ? "Correo no registrado o incorrecto"
+                        : "Usuario o contraseña incorrectos");
                 return ResponseEntity.status(401).body(response);
             }
             
             var usuario = usuarioOpt.get();
-            
-            // Si es username, validar CASE-SENSITIVE
-            if (!isEmail && !usuario.getUsername().equals(identifier)) {
-                log.warn("Username no coincide exactamente: esperado='{}', recibido='{}'", 
-                    usuario.getUsername(), identifier);
-                Map<String, String> response = new HashMap<>();
-                response.put("message", "Usuario o contraseña incorrectos. Verifique mayúsculas y minúsculas.");
-                return ResponseEntity.status(401).body(response);
-            }
             
             log.info("Usuario encontrado: username='{}', activo={}, roles={}", 
                 usuario.getUsername(), usuario.isActive(), usuario.getRoles());
