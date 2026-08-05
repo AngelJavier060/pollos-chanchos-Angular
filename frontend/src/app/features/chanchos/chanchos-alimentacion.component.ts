@@ -284,11 +284,16 @@ export class ChanchosAlimentacionComponent implements OnInit {
    */
   calcularDiasDeVida(fechaNacimiento: Date | null): number {
     if (!fechaNacimiento) return 0;
-    
-    const hoy = new Date();
+
     const fechaNac = new Date(fechaNacimiento);
-    const diffTime = Math.abs(hoy.getTime() - fechaNac.getTime());
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const hoy = new Date();
+    if (isNaN(fechaNac.getTime())) return 0;
+
+    fechaNac.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
+
+    const diffTime = hoy.getTime() - fechaNac.getTime();
+    return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
   }
 
   // ===== Helpers de formato y estadísticas para UI tipo Pollos =====
@@ -301,22 +306,40 @@ export class ChanchosAlimentacionComponent implements OnInit {
     return `Lote${num.toString().padStart(3, '0')}`;
   }
 
-  private calcularMesesYDiasDesde(fecha: Date | string): { meses: number; dias: number } {
-    const fechaObj = typeof fecha === 'string' ? new Date(fecha) : fecha;
+  /**
+   * Calcular meses y días exactos desde la fecha de nacimiento hasta hoy.
+   * Los días son el remanente después de los meses calendario (0–31), no el total de días de vida.
+   */
+  private calcularMesesYDiasDesde(fecha: Date | string | null): { meses: number; dias: number } {
+    if (!fecha) return { meses: 0, dias: 0 };
+
+    const inicio = typeof fecha === 'string' ? new Date(fecha) : new Date(fecha);
     const hoy = new Date();
-    let meses = (hoy.getFullYear() - fechaObj.getFullYear()) * 12 + (hoy.getMonth() - fechaObj.getMonth());
-    const ajusteDia = hoy.getDate() - fechaObj.getDate();
-    if (ajusteDia < 0) meses -= 1;
-    const ref = new Date(hoy.getFullYear(), hoy.getMonth() - meses, fechaObj.getDate());
-    const diffTime = Math.abs(hoy.getTime() - ref.getTime());
-    const dias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return { meses: Math.max(0, meses), dias: Math.max(0, dias) };
+
+    if (isNaN(inicio.getTime())) return { meses: 0, dias: 0 };
+
+    inicio.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
+
+    let meses = (hoy.getFullYear() - inicio.getFullYear()) * 12 + (hoy.getMonth() - inicio.getMonth());
+    if (hoy.getDate() < inicio.getDate()) {
+      meses -= 1;
+    }
+
+    const referencia = new Date(inicio);
+    referencia.setMonth(referencia.getMonth() + meses);
+
+    const diffMs = hoy.getTime() - referencia.getTime();
+    const dias = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+    return { meses: Math.max(0, meses), dias };
   }
 
   getEdadEnMesesTexto(lote: Lote | null): string {
     if (!lote || !lote.birthdate) return '0 meses';
     const { meses, dias } = this.calcularMesesYDiasDesde(lote.birthdate);
     const mesesTxt = meses === 1 ? '1 mes' : `${meses} meses`;
+    if (dias <= 0) return mesesTxt;
     const diasTxt = dias === 1 ? '1 día' : `${dias} días`;
     return `${mesesTxt} y ${diasTxt}`;
   }
