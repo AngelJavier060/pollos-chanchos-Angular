@@ -1,10 +1,10 @@
 ﻿// Configuración de API — app móvil Granja Elviata
 //
 // Cambia [useProduction] para alternar entre producción y desarrollo local.
-// Después de cambiar: flutter clean && flutter pub get (recomendado en release).
+// Compatible con Android, iOS, Windows y Web (Chrome) — no usa dart:io.
 
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 /// true = servidor en producción | false = backend local (puerto 8088)
 const bool useProduction = true;
@@ -26,12 +26,11 @@ String _decideBaseUrl() {
   }
   if (forceLAN) return apiBaseUrlLAN;
   if (kIsWeb) return apiBaseUrlLocalhost;
-  try {
-    if (Platform.isAndroid) return apiBaseUrlAndroidEmulator;
-    return apiBaseUrlLocalhost;
-  } catch (_) {
-    return apiBaseUrlLocalhost;
+  // Emulador Android: 10.0.2.2 apunta al localhost de la PC
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    return apiBaseUrlAndroidEmulator;
   }
+  return apiBaseUrlLocalhost;
 }
 
 final String apiBaseUrl = _decideBaseUrl();

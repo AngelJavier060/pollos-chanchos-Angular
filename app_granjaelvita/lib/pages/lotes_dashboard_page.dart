@@ -4,7 +4,10 @@ import '../services/lote_service.dart';
 import '../services/plan_nutricional_service.dart';
 
 class LotesDashboardPage extends StatefulWidget {
-  const LotesDashboardPage({super.key});
+  /// 'chanchos' | 'pollos' | null (admin: ve ambos)
+  final String? tipoAnimalInicial;
+
+  const LotesDashboardPage({super.key, this.tipoAnimalInicial});
 
   @override
   State<LotesDashboardPage> createState() => _LotesDashboardPageState();
@@ -13,19 +16,38 @@ class LotesDashboardPage extends StatefulWidget {
 class _LotesDashboardPageState extends State<LotesDashboardPage> {
   final LoteServiceMobile _loteService = LoteServiceMobile();
   final PlanNutricionalService _planService = PlanNutricionalService();
-  
+
+  static const Color _primary = Color(0xFF005EB8);
+  static const Color _surface = Color(0xFFF7FAFC);
+
   bool _loading = true;
   String? _error;
   List<LoteDto> _lotes = [];
   List<LoteDto> _lotesFiltrados = [];
   List<RazaDto> _razas = [];
-  
+
   // Consumo por lote
   Map<String, double> _consumoPorLote = {};
-  
+
   // Tabs y filtros
   String _activeTab = 'activos'; // 'activos' | 'historico'
   String _filtroAnimal = 'todos'; // 'todos' | 'pollos' | 'chanchos'
+
+  /// Usuario de un solo tipo (chanchos o pollos): no mezcla datos.
+  bool get _soloUnTipo =>
+      widget.tipoAnimalInicial == 'chanchos' || widget.tipoAnimalInicial == 'pollos';
+  bool get _esScopeChanchos => widget.tipoAnimalInicial == 'chanchos';
+  bool get _esScopePollos => widget.tipoAnimalInicial == 'pollos';
+
+  Color get _themePrimary => _esScopePollos ? const Color(0xFF2E7D32) : _primary;
+
+  String get _tituloApp => _esScopeChanchos
+      ? 'Gestión de Chanchos'
+      : (_esScopePollos ? 'Gestión de Pollos' : 'Gestión de Lotes');
+
+  String get _tituloResumen => _esScopeChanchos
+      ? 'Resumen de Chanchos'
+      : (_esScopePollos ? 'Resumen de Pollos' : 'Resumen de Lotes');
   
   // Formulario
   bool _showForm = false;
@@ -47,6 +69,12 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   @override
   void initState() {
     super.initState();
+    // Fijar filtro al tipo del usuario (evita mezcla pollos/chanchos)
+    if (widget.tipoAnimalInicial == 'chanchos') {
+      _filtroAnimal = 'chanchos';
+    } else if (widget.tipoAnimalInicial == 'pollos') {
+      _filtroAnimal = 'pollos';
+    }
     _cargarDatos();
   }
 
@@ -66,21 +94,39 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       _error = null;
     });
     try {
-      final lotes = _activeTab == 'activos'
+      var lotes = _activeTab == 'activos'
           ? await _loteService.getActivos()
           : await _loteService.getHistorico();
+
+      // Aislar datos por rol: usuario chanchos nunca ve pollos/gallinas (y viceversa)
+      if (_esScopeChanchos) {
+        lotes = lotes.where((l) => l.esChancho).toList();
+      } else if (_esScopePollos) {
+        lotes = lotes.where((l) => l.esPollo).toList();
+      }
+
       final razas = await _loteService.getRazas();
-      
-      // Cargar consumos por lote
-      await _cargarConsumosPorLote(lotes);
-      
+      var razasFiltradas = razas;
+      if (_esScopeChanchos) {
+        razasFiltradas = razas.where((r) => r.esChancho).toList();
+      } else if (_esScopePollos) {
+        razasFiltradas = razas.where((r) => r.esPollo).toList();
+      }
+
+      if (!mounted) return;
+      // Mostrar lotes ya; consumo en segundo plano
       setState(() {
         _lotes = lotes;
-        _razas = razas;
+        _razas = razasFiltradas;
         _aplicarFiltro();
         _loading = false;
       });
+
+      _cargarConsumosPorLote(lotes).then((_) {
+        if (mounted) setState(() {});
+      });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -123,7 +169,8 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   }
 
   void _aplicarFiltro() {
-    if (_filtroAnimal == 'todos') {
+    // Con scope de rol, _lotes ya viene filtrado; el chip solo afina si es admin
+    if (_soloUnTipo || _filtroAnimal == 'todos') {
       _lotesFiltrados = List.from(_lotes);
     } else if (_filtroAnimal == 'pollos') {
       _lotesFiltrados = _lotes.where((l) => l.esPollo).toList();
@@ -132,11 +179,10 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
     }
   }
 
-  // Métricas
+  // Métricas (sobre lotes ya aislados por rol)
   int get _totalLotes => _lotes.length;
   int get _totalAnimales => _lotes.fold(0, (sum, l) => sum + l.quantity);
   double get _inversionTotal => _lotes.fold(0.0, (sum, l) => sum + l.cost);
-
   Map<String, dynamic> get _metricasPollos {
     final pollos = _lotes.where((l) => l.esPollo).toList();
     return {
@@ -160,12 +206,13 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: _surface,
       appBar: AppBar(
-        title: const Text('Gestión de Lotes'),
-        backgroundColor: const Color(0xFF2563EB),
+        title: Text(_tituloApp, style: const TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: _themePrimary,
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 2,
+        shadowColor: Colors.black26,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -176,8 +223,15 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       body: _showForm ? _buildFormulario() : _buildDashboard(),
       floatingActionButton: !_showForm
           ? FloatingActionButton.extended(
-              onPressed: () => setState(() => _showForm = true),
-              backgroundColor: const Color(0xFF2563EB),
+              onPressed: () {
+                setState(() {
+                  _showForm = true;
+                  // Usuario chanchos/pollos: saltar selector y ir directo al form
+                  if (_esScopeChanchos) _tipoAnimalForm = 'chanchos';
+                  if (_esScopePollos) _tipoAnimalForm = 'pollos';
+                });
+              },
+              backgroundColor: _themePrimary,
               icon: const Icon(Icons.add),
               label: const Text('Nuevo Lote'),
             )
@@ -205,6 +259,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
     }
 
     return RefreshIndicator(
+      color: _themePrimary,
       onRefresh: _cargarDatos,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -212,31 +267,21 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Título
-            const Text(
-              'Resumen de Lotes',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+            Text(
+              _tituloResumen,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF191C1E)),
             ),
-            const SizedBox(height: 16),
-
-            // KPIs generales
+            const SizedBox(height: 12),
             _buildKPIsGenerales(),
             const SizedBox(height: 16),
-
-            // Tarjetas por tipo de animal
             _buildTarjetasAnimales(),
-            const SizedBox(height: 24),
-
-            // Tabs Activos/Histórico
+            const SizedBox(height: 20),
             _buildTabs(),
             const SizedBox(height: 16),
-
-            // Filtros por tipo
             _buildFiltros(),
-            const SizedBox(height: 16),
-
-            // Tabla de lotes
+            const SizedBox(height: 12),
             _buildTablaLotes(),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -246,26 +291,26 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   Widget _buildKPIsGenerales() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - 24) / 3; // 24 = 2 espacios de 12px
+        final cardWidth = (constraints.maxWidth - 24) / 3;
         const cardHeight = 90.0;
         return Row(
           children: [
             SizedBox(
               width: cardWidth,
               height: cardHeight,
-              child: _buildKPICard('Total de\nLotes', _totalLotes.toString(), const Color(0xFF2563EB)),
+              child: _buildKPICard('Total de\nLotes', _totalLotes.toString(), _themePrimary),
             ),
             const SizedBox(width: 12),
             SizedBox(
               width: cardWidth,
               height: cardHeight,
-              child: _buildKPICard('Total de\nAnimales', _totalAnimales.toString(), const Color(0xFF2563EB)),
+              child: _buildKPICard('Total de\nAnimales', _totalAnimales.toString(), _themePrimary),
             ),
             const SizedBox(width: 12),
             SizedBox(
               width: cardWidth,
               height: cardHeight,
-              child: _buildKPICard('Inversión\nTotal', '\$${_inversionTotal.toStringAsFixed(0)}', const Color(0xFF2563EB)),
+              child: _buildKPICard('Inversión\nTotal', '\$${_inversionTotal.toStringAsFixed(0)}', _themePrimary),
             ),
           ],
         );
@@ -278,18 +323,18 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC3C7C9)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.2),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF434749), height: 1.2),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
@@ -306,10 +351,41 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   }
 
   Widget _buildTarjetasAnimales() {
+    // Usuario chanchos: solo tarjeta chanchos (sin pollos)
+    if (_esScopeChanchos) {
+      return _buildTarjetaAnimal(
+        emoji: '🐷',
+        nombre: 'Chanchos',
+        colorFondo: Colors.white,
+        colorBorde: _primary,
+        colorTexto: const Color(0xFF191C1E),
+        colorValor: const Color(0xFF191C1E),
+        lotes: _metricasChanchos['lotes'] as int,
+        animales: _metricasChanchos['animales'] as int,
+        inversion: _metricasChanchos['inversion'] as double,
+        registrados: _metricasChanchos['registrados'] as int,
+        destacada: true,
+      );
+    }
+    if (_esScopePollos) {
+      return _buildTarjetaAnimal(
+        emoji: '🐔',
+        nombre: 'Pollos',
+        colorFondo: Colors.white,
+        colorBorde: _themePrimary,
+        colorTexto: const Color(0xFF191C1E),
+        colorValor: const Color(0xFF191C1E),
+        lotes: _metricasPollos['lotes'] as int,
+        animales: _metricasPollos['animales'] as int,
+        inversion: _metricasPollos['inversion'] as double,
+        registrados: _metricasPollos['registrados'] as int,
+        destacada: true,
+      );
+    }
+    // Admin: ambas tarjetas
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Pollos
         Expanded(
           child: _buildTarjetaAnimal(
             emoji: '🐔',
@@ -325,7 +401,6 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
           ),
         ),
         const SizedBox(width: 12),
-        // Chanchos
         Expanded(
           child: _buildTarjetaAnimal(
             emoji: '🐷',
@@ -355,42 +430,52 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
     required int animales,
     required double inversion,
     required int registrados,
+    bool destacada = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorFondo,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorBorde, width: 2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorBorde, width: destacada ? 2 : 1.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(
         children: [
-          // Header con emoji y nombre
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 6),
-              Text(nombre, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorTexto)),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: destacada ? const Color(0xFFFCE7F3) : colorBorde.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+              ),
+              const SizedBox(width: 8),
+              Text(nombre, style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: colorTexto)),
             ],
           ),
-          const SizedBox(height: 10),
-          // Métricas en columnas con dimensiones iguales
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(child: _buildMiniMetricaColumna('Lotes', '$lotes', colorValor)),
-              Container(width: 1, height: 40, color: colorBorde.withValues(alpha: 0.3)),
+              Container(width: 1, height: 40, color: colorBorde.withValues(alpha: 0.25)),
               Expanded(child: _buildMiniMetricaColumna('Animales', '$animales', colorValor)),
-              Container(width: 1, height: 40, color: colorBorde.withValues(alpha: 0.3)),
+              Container(width: 1, height: 40, color: colorBorde.withValues(alpha: 0.25)),
               Expanded(child: _buildMiniMetricaColumna('Inversión', '\$${inversion.toStringAsFixed(0)}', colorValor)),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,
             child: Text(
               'Registrados: $registrados',
-              style: TextStyle(fontSize: 10, color: colorTexto.withOpacity(0.9), fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 11, color: colorTexto.withValues(alpha: 0.7), fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -446,15 +531,19 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2563EB) : Colors.white,
+          color: isActive ? _themePrimary : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2563EB)),
+          border: Border.all(color: _themePrimary),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1)),
+          ],
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF2563EB),
+            color: isActive ? Colors.white : _themePrimary,
             fontWeight: FontWeight.w600,
+            fontSize: 14,
           ),
         ),
       ),
@@ -462,15 +551,28 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
   }
 
   Widget _buildFiltros() {
+    final tituloLista = _activeTab == 'activos' ? 'Lotes Activos' : 'Lotes Históricos';
     return Row(
       children: [
-        const Text('Lotes Activos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(tituloLista, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF191C1E))),
         const Spacer(),
-        _buildFiltroChip('Todos', 'todos'),
-        const SizedBox(width: 8),
-        _buildFiltroChip('Pollos', 'pollos'),
-        const SizedBox(width: 8),
-        _buildFiltroChip('Chanchos', 'chanchos'),
+        // Solo admin ve filtros Pollos/Chanchos; usuario de rol ve "Todos" de su tipo
+        if (_soloUnTipo)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _themePrimary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text('Todos', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500)),
+          )
+        else ...[
+          _buildFiltroChip('Todos', 'todos'),
+          const SizedBox(width: 8),
+          _buildFiltroChip('Pollos', 'pollos'),
+          const SizedBox(width: 8),
+          _buildFiltroChip('Chanchos', 'chanchos'),
+        ],
       ],
     );
   }
@@ -485,11 +587,11 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2563EB) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          color: isActive ? _themePrimary : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: isActive ? _themePrimary : const Color(0xFFC3C7C9)),
         ),
         child: Text(
           label,
@@ -685,7 +787,7 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Selector de tipo de animal
+                  // Selector de tipo (solo admin). Usuarios de rol ya vienen con tipo fijado.
                   if (_tipoAnimalForm == null) ...[
                     const Text(
                       '¿Qué tipo de animal vas a registrar?',
@@ -694,9 +796,11 @@ class _LotesDashboardPageState extends State<LotesDashboardPage> {
                     const SizedBox(height: 24),
                     Row(
                       children: [
-                        Expanded(child: _buildSelectorAnimal('pollos', '🐔', 'Pollos', const Color(0xFFEC4899))),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildSelectorAnimal('chanchos', '🐷', 'Chanchos', const Color(0xFF2563EB))),
+                        if (!_esScopeChanchos)
+                          Expanded(child: _buildSelectorAnimal('pollos', '🐔', 'Pollos', const Color(0xFFEC4899))),
+                        if (!_esScopeChanchos && !_esScopePollos) const SizedBox(width: 16),
+                        if (!_esScopePollos)
+                          Expanded(child: _buildSelectorAnimal('chanchos', '🐷', 'Chanchos', _primary)),
                       ],
                     ),
                   ] else ...[

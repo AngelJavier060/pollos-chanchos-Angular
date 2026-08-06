@@ -1,60 +1,64 @@
 ﻿import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
   final int statusCode;
   final String message;
   ApiException(this.statusCode, this.message);
   @override
-  String toString() => 'ApiException(' + statusCode.toString() + '): ' + message;
+  String toString() => 'ApiException($statusCode): $message';
 }
 
+/// Cliente HTTP compatible con Android, iOS, Windows y Web (Chrome).
 class ApiClient {
   final String baseUrl;
   ApiClient({required this.baseUrl});
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body, {Map<String, String>? headers}) async {
-    final client = HttpClient();
-    try {
-      final uri = Uri.parse(baseUrl + path);
-      final req = await client.postUrl(uri);
-      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      headers?.forEach((k, v) => req.headers.set(k, v));
-      req.add(utf8.encode(json.encode(body)));
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      final status = res.statusCode;
-      final data = text.isNotEmpty ? json.decode(text) : {};
-      if (status >= 200 && status < 300) {
-        if (data is Map<String, dynamic>) return data;
-        return {'data': data};
-      }
-      final msg = (data is Map && data['message'] is String) ? data['message'] as String : 'Error HTTP ' + status.toString();
-      throw ApiException(status, msg);
-    } finally {
-      client.close(force: true);
-    }
+  Future<Map<String, dynamic>> post(
+    String path,
+    Map<String, dynamic> body, {
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final res = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        ...?headers,
+      },
+      body: json.encode(body),
+    );
+    return _decodeMap(res);
   }
 
-  Future<dynamic> get(String path, {Map<String, String>? headers, Map<String, String>? query}) async {
-    final client = HttpClient();
-    try {
-      final uri = Uri.parse(baseUrl + path).replace(queryParameters: query);
-      final req = await client.getUrl(uri);
-      if (headers != null) {
-        headers.forEach((k, v) => req.headers.set(k, v));
-      }
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      final status = res.statusCode;
-      if (status >= 200 && status < 300) {
-        return text.isNotEmpty ? json.decode(text) : null;
-      }
-      final data = text.isNotEmpty ? json.decode(text) : {};
-      final msg = (data is Map && data['message'] is String) ? data['message'] as String : 'Error HTTP ' + status.toString();
-      throw ApiException(status, msg);
-    } finally {
-      client.close(force: true);
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? headers,
+    Map<String, String>? query,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
+    final res = await http.get(uri, headers: headers);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (res.body.isEmpty) return null;
+      return json.decode(res.body);
     }
+    final data = res.body.isNotEmpty ? json.decode(res.body) : {};
+    final msg = (data is Map && data['message'] is String)
+        ? data['message'] as String
+        : 'Error HTTP ${res.statusCode}';
+    throw ApiException(res.statusCode, msg);
+  }
+
+  Map<String, dynamic> _decodeMap(http.Response res) {
+    final data = res.body.isNotEmpty ? json.decode(res.body) : {};
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (data is Map<String, dynamic>) return data;
+      return {'data': data};
+    }
+    final msg = (data is Map && data['message'] is String)
+        ? data['message'] as String
+        : 'Error HTTP ${res.statusCode}';
+    throw ApiException(res.statusCode, msg);
   }
 }

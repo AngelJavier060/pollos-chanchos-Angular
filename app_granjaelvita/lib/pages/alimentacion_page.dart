@@ -5,7 +5,10 @@ import '../services/auth_service.dart';
 
 /// Página de Alimentación - Detecta automáticamente el tipo de animal del usuario
 class AlimentacionPage extends StatefulWidget {
-  const AlimentacionPage({super.key});
+  /// Si se conoce el tipo (chanchos/pollos), evita leer secure storage al abrir.
+  final String? tipoAnimalInicial;
+
+  const AlimentacionPage({super.key, this.tipoAnimalInicial});
   @override
   State<AlimentacionPage> createState() => _AlimentacionPageState();
 }
@@ -15,10 +18,11 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
   final _planSrv = PlanNutricionalService();
 
   bool _cargando = true;
+  bool _cargandoStats = false;
   String? _error;
   List<LoteDto> _lotes = [];
   String _tipoAnimal = 'pollos'; // Se detecta automáticamente
-  DateTime _fechaSeleccionada = DateTime.now();
+  final DateTime _fechaSeleccionada = DateTime.now();
 
   // Cache de estadísticas por lote
   final Map<String, int> _mortalidadPorLote = {};
@@ -30,38 +34,80 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     _inicializar();
   }
 
-  
   Future<void> _inicializar() async {
-    // Detectar tipo de animal del usuario
-    final tipo = await AuthService.getTipoAnimal();
+    // Usar tipo pasado desde el menú (rápido) o detectar desde sesión
+    String tipo = widget.tipoAnimalInicial ?? '';
+    if (tipo.isEmpty) {
+      tipo = await AuthService.getTipoAnimal();
+    }
+    if (!mounted) return;
     setState(() {
-      _tipoAnimal = tipo == 'admin' ? 'pollos' : tipo; // Admin ve pollos por defecto
+      _tipoAnimal = tipo == 'admin' ? 'pollos' : tipo;
     });
     await _cargarDatos();
   }
 
   Future<void> _cargarDatos() async {
-    setState(() { _cargando = true; _error = null; });
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
     try {
+      // 1) Solo lotes → la pantalla se muestra de inmediato
       final lotes = _tipoAnimal == 'chanchos'
           ? await _loteSrv.getActivosChanchos()
           : await _loteSrv.getActivosPollos();
 
-      // Cargar estadísticas de mortalidad/morbilidad
-      for (final lote in lotes) {
-        try {
-          final mortalidad = await _planSrv.contarMortalidadPorLote(lote.id);
-          final morbilidad = await _planSrv.contarEnfermosPorLote(lote.id);
-          _mortalidadPorLote[lote.id] = mortalidad;
-          _morbilidadPorLote[lote.id] = morbilidad;
-        } catch (_) {}
-      }
+      if (!mounted) return;
+      setState(() {
+        _lotes = lotes;
+        _cargando = false;
+        // Valores iniciales: mortalidad del lote; morbilidad 0 hasta que llegue la API
+        for (final l in lotes) {
+          _mortalidadPorLote[l.id] = l.muertos;
+          _morbilidadPorLote.putIfAbsent(l.id, () => 0);
+        }
+      });
 
-      setState(() { _lotes = lotes; });
+      // 2) Stats en paralelo (no bloquean la apertura)
+      _cargarEstadisticasEnParalelo(lotes);
     } catch (e) {
-      setState(() { _error = e.toString(); });
-    } finally {
-      setState(() { _cargando = false; });
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  /// Mortalidad + morbilidad de todos los lotes en paralelo (antes era secuencial).
+  Future<void> _cargarEstadisticasEnParalelo(List<LoteDto> lotes) async {
+    if (lotes.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _cargandoStats = true);
+
+    try {
+      final resultados = await Future.wait(
+        lotes.map((lote) async {
+          final pair = await Future.wait([
+            _planSrv.contarMortalidadPorLote(lote.id),
+            _planSrv.contarEnfermosPorLote(lote.id),
+          ]);
+          return (lote.id, pair[0], pair[1]);
+        }),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        for (final r in resultados) {
+          _mortalidadPorLote[r.$1] = r.$2;
+          _morbilidadPorLote[r.$1] = r.$3;
+        }
+        _cargandoStats = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cargandoStats = false);
     }
   }
 
@@ -90,7 +136,17 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     return '${dias[fecha.weekday - 1]}, ${fecha.day} de ${meses[fecha.month - 1]} de ${fecha.year}';
   }
 
-  Color get _colorPrimario => _tipoAnimal == 'chanchos' ? Colors.pink : Colors.green;
+  // Paleta diseño profesional (mockup Alimentación)
+  Color get _primary =>
+      _tipoAnimal == 'chanchos' ? const Color(0xFF005EB8) : const Color(0xFF2E7D32);
+  Color get _primaryDark =>
+      _tipoAnimal == 'chanchos' ? const Color(0xFF00478A) : const Color(0xFF1B5E20);
+  Color get _primarySoft =>
+      _tipoAnimal == 'chanchos' ? const Color(0x0D005EB8) : const Color(0x142E7D32);
+  Color get _emojiBg =>
+      _tipoAnimal == 'chanchos' ? const Color(0xFFFCE7F3) : const Color(0xFFE8F5E9);
+  /// Compatibilidad con modal (misma lógica de color).
+  Color get _colorPrimario => _primary;
   String get _emoji => _tipoAnimal == 'chanchos' ? '🐷' : '🐔';
   String get _nombreAnimal => _tipoAnimal == 'chanchos' ? 'Chanchos' : 'Pollos';
   String get _nombreAnimalSingular => _tipoAnimal == 'chanchos' ? 'chancho' : 'pollo';
@@ -130,12 +186,16 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     final totalAnimales = _lotes.fold<int>(0, (sum, l) => sum + l.quantity);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: Text('Alimentación $_nombreAnimal'),
-        backgroundColor: _colorPrimario.shade700,
+        title: Text(
+          'Alimentación $_nombreAnimal',
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
+        backgroundColor: _primary,
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 2,
+        shadowColor: Colors.black26,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -145,115 +205,115 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
         ],
       ),
       body: _cargando
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : RefreshIndicator(
+              color: _primary,
               onRefresh: _cargarDatos,
               child: CustomScrollView(
                 slivers: [
-                  // Header con fecha e información
+                  if (_cargandoStats)
+                    SliverToBoxAdapter(
+                      child: LinearProgressIndicator(minHeight: 2, color: _primary),
+                    ),
+
+                  // Summary card
                   SliverToBoxAdapter(
-                    child: Container(
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [_colorPrimario.shade500, _colorPrimario.shade800],
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: _primaryDark,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _primaryDark.withValues(alpha: 0.35),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _colorPrimario.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.calendar_today, color: Colors.white, size: 24),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _formatearFecha(_fechaSeleccionada),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              child: const Icon(Icons.calendar_today, color: Colors.white, size: 28),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _formatearFecha(_fechaSeleccionada),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${_lotes.length} lotes activos • $totalAnimales $_nombreAnimalSingular${totalAnimales != 1 ? 's' : ''} total',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontSize: 13,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_lotes.length} lotes activos • $totalAnimales $_nombreAnimalSingular${totalAnimales != 1 ? 's' : ''} total',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 13,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
-                  // Error message
                   if (_error != null)
                     SliverToBoxAdapter(
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: const Color(0xFFFFF5F5),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(color: const Color(0xFFFECACA)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade700),
+                            const Icon(Icons.error_outline, color: Color(0xFFE53E3E)),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(_error!, style: TextStyle(color: Colors.red.shade700))),
+                            Expanded(
+                              child: Text(_error!, style: const TextStyle(color: Color(0xFFC53030))),
+                            ),
                           ],
                         ),
                       ),
                     ),
 
-                  // Lista de lotes
                   if (_lotes.isEmpty)
                     SliverFillRemaining(
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(_emoji, style: const TextStyle(fontSize: 80)),
+                            Text(_emoji, style: const TextStyle(fontSize: 72)),
                             const SizedBox(height: 16),
                             Text(
                               'No hay lotes activos de $_nombreAnimalSingular${_lotes.length != 1 ? 's' : ''}',
-                              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                              style: const TextStyle(fontSize: 18, color: Color(0xFF4A5568)),
+                              textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton.icon(
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
                               onPressed: _cargarDatos,
                               icon: const Icon(Icons.refresh),
                               label: const Text('Actualizar'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _colorPrimario,
-                              ),
+                              style: FilledButton.styleFrom(backgroundColor: _primary),
                             ),
                           ],
                         ),
@@ -261,7 +321,7 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) => _buildLoteCard(_lotes[index]),
@@ -282,37 +342,39 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     final morbilidad = _morbilidadPorLote[lote.id] ?? 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF3F4F6)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header del lote
+          // Header lote
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _colorPrimario.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              color: _primarySoft,
+              border: Border(bottom: BorderSide(color: _primary.withValues(alpha: 0.1))),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: _colorPrimario.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                    color: _emojiBg,
+                    shape: BoxShape.circle,
                   ),
-                  child: Center(child: Text(_emoji, style: const TextStyle(fontSize: 28))),
+                  child: Center(child: Text(_emoji, style: const TextStyle(fontSize: 26))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -321,69 +383,106 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
                     children: [
                       Text(
                         lote.name,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
                       ),
                       Text(
                         '${lote.animalName.toUpperCase()} • ${lote.raceName}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF4A5568)),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _colorPrimario,
-                    borderRadius: BorderRadius.circular(20),
+                    color: _primary,
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Text('Activo', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Activo',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Información del lote
+          // Metrics 2x3
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               children: [
                 Row(
                   children: [
-                    Expanded(child: _buildInfoItem('Edad', '$diasVida días', Icons.access_time)),
-                    Expanded(child: _buildInfoItem('Meses', _formatearEdadMeses(lote.birthdate), Icons.calendar_month)),
+                    Expanded(
+                      child: _buildInfoItem('Edad', '$diasVida días', Icons.schedule),
+                    ),
+                    Expanded(
+                      child: _buildInfoItem('Meses', _formatearEdadMeses(lote.birthdate), Icons.calendar_month),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(child: _buildInfoItem('Registrados', '$registrados', Icons.inventory)),
-                    Expanded(child: _buildInfoItem('$_nombreAnimal Vivos', '${lote.quantity}', Icons.favorite, color: Colors.blue)),
+                    Expanded(
+                      child: _buildInfoItem('Registrados', '$registrados', Icons.inventory_2_outlined),
+                    ),
+                    Expanded(
+                      child: _buildInfoItem(
+                        '$_nombreAnimal Vivos',
+                        '${lote.quantity}',
+                        Icons.favorite,
+                        color: _primary,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(child: _buildInfoItem('Morbilidad', '$morbilidad', Icons.medical_services, color: Colors.orange)),
-                    Expanded(child: _buildInfoItem('Mortalidad', '$mortalidad', Icons.warning, color: mortalidad > 0 ? Colors.red : Colors.grey)),
+                    Expanded(
+                      child: _buildInfoItem(
+                        'Morbilidad',
+                        '$morbilidad',
+                        Icons.medical_information_outlined,
+                        color: const Color(0xFFDD6B20),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildInfoItem(
+                        'Mortalidad',
+                        '$mortalidad',
+                        Icons.warning_amber_outlined,
+                        color: mortalidad > 0 ? const Color(0xFFE53E3E) : const Color(0xFF4A5568),
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
 
-          // Botón de acción
+          // CTA
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              height: 48,
+              child: FilledButton.icon(
                 onPressed: () => _abrirModalAlimentacion(lote),
-                icon: const Icon(Icons.restaurant),
-                label: const Text('Ingresar Alimentos Diarios'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _colorPrimario,
+                icon: const Icon(Icons.restaurant, size: 20),
+                label: const Text(
+                  'Ingresar Alimentos Diarios',
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -395,16 +494,25 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
   }
 
   Widget _buildInfoItem(String label, String value, IconData icon, {Color? color}) {
+    final iconColor = color ?? const Color(0xFF4A5568);
+    final valueColor = color ?? const Color(0xFF1F2937);
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: color ?? Colors.grey.shade600),
+        Icon(icon, size: 20, color: iconColor),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-              Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color ?? Colors.black87)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF4A5568)),
+              ),
+              Text(
+                value,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: valueColor),
+              ),
             ],
           ),
         ),

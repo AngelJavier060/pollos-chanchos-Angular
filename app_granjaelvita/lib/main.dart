@@ -43,9 +43,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
-  final _userCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  final _auth = AuthService();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   final List<String> _images = const [
@@ -79,25 +76,35 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _pulseController.dispose();
-    _userCtrl.dispose();
-    _passCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _initBiometrics() async {
     try {
-      final hasSession = await AuthService.hasSavedSession();
-      final enabledFlag = await AuthService.isBiometricEnabled();
+      // Timeout: en emuladores flutter_secure_storage / biometría a veces se cuelga
+      final results = await Future.wait([
+        AuthService.hasSavedSession().timeout(const Duration(seconds: 2), onTimeout: () => false),
+        AuthService.isBiometricEnabled().timeout(const Duration(seconds: 2), onTimeout: () => false),
+        _localAuth.isDeviceSupported().timeout(const Duration(seconds: 2), onTimeout: () => false),
+        _localAuth.canCheckBiometrics.timeout(const Duration(seconds: 2), onTimeout: () => false),
+      ]);
+
+      final hasSession = results[0] as bool;
+      final enabledFlag = results[1] as bool;
+      final deviceSupported = results[2] as bool;
+      final canCheck = results[3] as bool;
+      final biometricsAvailable = deviceSupported && canCheck;
 
       if (!mounted) return;
       setState(() {
         _hasSavedSession = hasSession;
-        _biometricEnabled = enabledFlag && hasSession;
+        // Solo marcar activa si hay hardware real de biometría
+        _biometricEnabled = enabledFlag && hasSession && biometricsAvailable;
         _checkingBiometric = false;
       });
 
-      // Autodisparar autenticación biométrica al abrir si está activada y hay sesión guardada
-      if (enabledFlag && hasSession && !_autoBiometricLaunched) {
+      // No autoabrir huella en emuladores sin biometría (congela la UI / ANR)
+      if (enabledFlag && hasSession && biometricsAvailable && !_autoBiometricLaunched) {
         _autoBiometricLaunched = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -114,22 +121,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
-  Future<void> _doLogin(VoidCallback closeSheet, void Function(String) setError, void Function(bool) setLoading) async {
-    setLoading(true);
-    setError('');
-    try {
-      final res = await _auth.login(_userCtrl.text.trim(), _passCtrl.text);
-      closeSheet();
-      // Navegar directamente sin mostrar diálogo de huella
-      if (!mounted) return;
-      _navigateToHome(res);
-    } catch (e) {
-      setError(e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   void _navigateToHome(LoginResult res) {
     if (res.roles.contains('ROLE_ADMIN')) {
       Navigator.of(context).pushReplacement(
@@ -142,200 +133,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
+  /// Pantalla completa (más fiable en emulador que el bottom sheet).
   void _openLoginSheet() {
-    _userCtrl.clear();
-    _passCtrl.clear();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            bool obscurePassword = true;
-            bool loading = false;
-            String errorMsg = '';
-
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                  child: StatefulBuilder(
-                    builder: (ctx2, setInnerState) {
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Handle bar
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Título
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.lock_outline, color: Color(0xFF2E7D32), size: 24),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Iniciar Sesión',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          // Campo Usuario o Email
-                          TextField(
-                            controller: _userCtrl,
-                            decoration: InputDecoration(
-                              hintText: 'Usuario o Email',
-                              labelText: 'Usuario o Email',
-                              labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-                              floatingLabelStyle: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
-                              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF2E7D32)),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Campo Contraseña
-                          TextField(
-                            controller: _passCtrl,
-                            obscureText: obscurePassword,
-                            decoration: InputDecoration(
-                              hintText: 'Contraseña',
-                              labelText: 'Contraseña',
-                              labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-                              floatingLabelStyle: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF2E7D32)),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                  color: Colors.grey[600],
-                                ),
-                                onPressed: () {
-                                  setInnerState(() {
-                                    obscurePassword = !obscurePassword;
-                                  });
-                                },
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          // Nota sobre case-sensitivity
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Text(
-                              'Usuario y contraseña distinguen mayúsculas/minúsculas',
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // Error message
-                          if (errorMsg.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.red[50],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.red[200]!),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.error_outline, color: Colors.red[700], size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      errorMsg,
-                                      style: TextStyle(color: Colors.red[700], fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 20),
-                          // Botón Ingresar
-                          SizedBox(
-                            height: 56,
-                            child: FilledButton(
-                              onPressed: loading
-                                  ? null
-                                  : () => _doLogin(
-                                        () => Navigator.of(ctx).pop(),
-                                        (err) => setInnerState(() => errorMsg = err),
-                                        (val) => setInnerState(() => loading = val),
-                                      ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E7D32),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: loading
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                                    )
-                                  : const Text('Ingresar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LoginCredentialsPage()),
     );
   }
 
@@ -447,10 +248,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _activateBiometric() async {
     try {
-      // Verificar que puede usar biometría
+      final supported = await _localAuth.isDeviceSupported();
+      final canCheck = await _localAuth.canCheckBiometrics;
+      if (!supported || !canCheck) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este emulador/dispositivo no tiene huella configurada.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
       final didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Confirma tu identidad para activar el acceso con huella',
-        options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
+        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: false),
       );
 
       if (!didAuthenticate) {
@@ -492,11 +305,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      isDismissible: false,
+      isDismissible: true,
+      enableDrag: true,
       builder: (ctx) {
         // Iniciar autenticación automáticamente
         Future.delayed(const Duration(milliseconds: 300), () {
-          _performBiometricAuth(ctx);
+          if (ctx.mounted) _performBiometricAuth(ctx);
         });
 
         return Container(
@@ -570,9 +384,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _performBiometricAuth(BuildContext sheetContext) async {
     try {
+      final supported = await _localAuth.isDeviceSupported();
+      final canCheck = await _localAuth.canCheckBiometrics;
+      if (!supported || !canCheck) {
+        if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este emulador/dispositivo no tiene huella. Usa Usuario / Contraseña.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
       final didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Autentícate con tu huella para entrar',
-        options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
+        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: false),
       );
 
       if (!didAuthenticate) {
@@ -596,7 +424,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       if (sheetContext.mounted) Navigator.of(sheetContext).pop();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error de autenticación: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Huella no disponible. Usa Usuario / Contraseña. ($e)'),
+          backgroundColor: Colors.orange,
+        ),
       );
     }
   }
@@ -624,7 +455,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 .map((path) => SizedBox(
                       width: size.width,
                       height: size.height,
-                      child: Image.asset(path, fit: BoxFit.cover),
+                      child: Image.asset(
+                        path,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF1B5E20),
+                          child: const Center(
+                            child: Icon(Icons.agriculture, size: 80, color: Colors.white54),
+                          ),
+                        ),
+                      ),
                     ))
                 .toList(),
           ),
@@ -814,6 +654,242 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 }
 
+/// Login usuario/contraseña en pantalla completa.
+/// En emuladores el bottom sheet a menudo no recibe teclado; en teléfono físico sí.
+class LoginCredentialsPage extends StatefulWidget {
+  const LoginCredentialsPage({super.key});
+
+  @override
+  State<LoginCredentialsPage> createState() => _LoginCredentialsPageState();
+}
+
+class _LoginCredentialsPageState extends State<LoginCredentialsPage> {
+  final _userCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _userFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final _auth = AuthService();
+  final _formKey = GlobalKey<FormState>();
+
+  bool _obscurePassword = true;
+  bool _loading = false;
+  String _errorMsg = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _userFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _userCtrl.dispose();
+    _passCtrl.dispose();
+    _userFocus.dispose();
+    _passFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _errorMsg = '';
+    });
+    try {
+      final res = await _auth.login(_userCtrl.text.trim(), _passCtrl.text);
+      if (!mounted) return;
+      if (res.roles.contains('ROLE_ADMIN')) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => AdminMenuPage(result: res)),
+          (_) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => HomePage(result: res)),
+          (_) => false,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMsg = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  InputDecoration _decoration({
+    required String label,
+    required IconData icon,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      hintText: label,
+      labelText: label,
+      labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
+      floatingLabelStyle: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
+      prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F8F4),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1B5E20),
+        elevation: 0,
+        title: const Text('Iniciar Sesión', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          behavior: HitTestBehavior.translucent,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.lock_outline, size: 48, color: Color(0xFF2E7D32)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Ingresa con tu usuario o correo',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Color(0xFF334155)),
+                  ),
+                  const SizedBox(height: 28),
+                  TextFormField(
+                    controller: _userCtrl,
+                    focusNode: _userFocus,
+                    enabled: !_loading,
+                    autofocus: true,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    smartDashesType: SmartDashesType.disabled,
+                    smartQuotesType: SmartQuotesType.disabled,
+                    onFieldSubmitted: (_) => _passFocus.requestFocus(),
+                    decoration: _decoration(
+                      label: 'Usuario o Email',
+                      icon: Icons.person_outline,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Ingrese usuario o email' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passCtrl,
+                    focusNode: _passFocus,
+                    enabled: !_loading,
+                    obscureText: _obscurePassword,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    onFieldSubmitted: (_) {
+                      if (!_loading && (_formKey.currentState?.validate() ?? false)) {
+                        _submit();
+                      }
+                    },
+                    decoration: _decoration(
+                      label: 'Contraseña',
+                      icon: Icons.lock_outline,
+                      suffix: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: Colors.grey[600],
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Ingrese la contraseña' : null,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Usuario y contraseña distinguen mayúsculas/minúsculas',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_errorMsg.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMsg,
+                              style: TextStyle(color: Colors.red[700], fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton(
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              if (_formKey.currentState?.validate() ?? false) {
+                                _submit();
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _loading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                            )
+                          : const Text('Ingresar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class HomePage extends StatelessWidget {
   final LoginResult result;
   const HomePage({super.key, required this.result});
@@ -901,12 +977,22 @@ class HomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     onTap: () { 
                       final label = e['label'] as String; 
-                      if (label == 'Alimentación') { 
-                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlimentacionPage())); 
+                      if (label == 'Alimentación') {
+                        final tipo = result.roles.contains('ROLE_PORCINE')
+                            ? 'chanchos'
+                            : (result.roles.contains('ROLE_POULTRY') ? 'pollos' : 'pollos');
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => AlimentacionPage(tipoAnimalInicial: tipo),
+                        ));
                       } else if (label == 'Histórico') {
                         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoricoAlimentacionPage()));
                       } else if (label == 'Lotes') {
-                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LotesDashboardPage()));
+                        final tipoLote = result.roles.contains('ROLE_PORCINE')
+                            ? 'chanchos'
+                            : (result.roles.contains('ROLE_POULTRY') ? 'pollos' : null);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => LotesDashboardPage(tipoAnimalInicial: tipoLote),
+                        ));
                       } else if (label == 'Gestación') {
                         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GestacionPage(modoEdicion: false)));
                       }
