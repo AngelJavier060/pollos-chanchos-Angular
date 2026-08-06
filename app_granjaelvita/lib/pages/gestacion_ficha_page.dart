@@ -98,6 +98,17 @@ class _GestacionFichaPageState extends State<GestacionFichaPage> {
     }
   }
 
+  Future<void> _registrarNoPrenada() async {
+    final ok = await showNoPrenadaSheet(
+      context: context,
+      service: _service,
+      chancha: _chancha,
+    );
+    if (ok == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dias = diasTranscurridos(_chancha.fechaInseminacion);
@@ -125,7 +136,7 @@ class _GestacionFichaPageState extends State<GestacionFichaPage> {
             TextButton(
               onPressed: _registrarParto,
               child: const Text(
-                'Registrar parto',
+                'Parto',
                 style: TextStyle(fontWeight: FontWeight.w700, color: _FichaTheme.primary),
               ),
             ),
@@ -338,7 +349,7 @@ class _GestacionFichaPageState extends State<GestacionFichaPage> {
             ..._partosDeChancha.map((p) => _partoMini(p)),
           ],
           const SizedBox(height: 24),
-          if (widget.modoEdicion && _chancha.activa)
+          if (widget.modoEdicion && _chancha.activa) ...[
             FilledButton(
               onPressed: _registrarParto,
               style: FilledButton.styleFrom(
@@ -349,7 +360,19 @@ class _GestacionFichaPageState extends State<GestacionFichaPage> {
               ),
               child: const Text('Registrar parto', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _registrarNoPrenada,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB45309),
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('No gestante (reiniciar)', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton(
             onPressed: _cerrar,
             style: OutlinedButton.styleFrom(

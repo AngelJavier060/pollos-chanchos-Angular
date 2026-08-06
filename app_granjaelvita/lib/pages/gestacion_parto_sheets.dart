@@ -37,6 +37,23 @@ Future<bool?> showRegistrarPartoSheet({
   );
 }
 
+/// Cierra ciclo porque no quedó prenada; libera cupo para reiniciar.
+Future<bool?> showNoPrenadaSheet({
+  required BuildContext context,
+  required GestacionService service,
+  required GestacionChancha chancha,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: _surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => _NoPrenadaFormSheet(service: service, chancha: chancha),
+  );
+}
+
 Future<void> showVerPartoSheet({
   required BuildContext context,
   required GestacionParto parto,
@@ -445,6 +462,112 @@ class _PartoFormSheetState extends State<_PartoFormSheet> {
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoPrenadaFormSheet extends StatefulWidget {
+  final GestacionService service;
+  final GestacionChancha chancha;
+
+  const _NoPrenadaFormSheet({required this.service, required this.chancha});
+
+  @override
+  State<_NoPrenadaFormSheet> createState() => _NoPrenadaFormSheetState();
+}
+
+class _NoPrenadaFormSheetState extends State<_NoPrenadaFormSheet> {
+  DateTime _fecha = DateTime.now();
+  String _motivo = 'retorno_celo';
+  final _obs = TextEditingController();
+  bool _guardando = false;
+
+  @override
+  void dispose() {
+    _obs.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    try {
+      await widget.service.registrarNoPrenada(widget.chancha.id, {
+        'fechaConfirmacion': DateFormat('yyyy-MM-dd').format(_fecha),
+        'motivo': _motivo,
+        'observaciones': _obs.text.trim(),
+      });
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'No gestante',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${widget.chancha.nombre} — se cierra el ciclo, queda en historial y puede reiniciar con Nueva gestación.',
+              style: const TextStyle(fontSize: 13, color: _variant),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Fecha de confirmación'),
+              subtitle: Text(DateFormat('dd/MM/yyyy').format(_fecha)),
+              trailing: const Icon(Icons.calendar_today_outlined),
+              onTap: () async {
+                final p = await showDatePicker(
+                  context: context,
+                  initialDate: _fecha,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 1)),
+                  locale: const Locale('es', 'ES'),
+                );
+                if (p != null) setState(() => _fecha = p);
+              },
+            ),
+            DropdownButtonFormField<String>(
+              value: _motivo,
+              decoration: const InputDecoration(labelText: 'Motivo'),
+              items: const [
+                DropdownMenuItem(value: 'retorno_celo', child: Text('Retorno a celo')),
+                DropdownMenuItem(value: 'ultrasonido_negativo', child: Text('Ultrasonido negativo')),
+                DropdownMenuItem(value: 'otro', child: Text('Otro')),
+              ],
+              onChanged: (v) => setState(() => _motivo = v ?? 'otro'),
+            ),
+            TextField(
+              controller: _obs,
+              decoration: const InputDecoration(labelText: 'Observaciones'),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _guardando ? null : _guardar,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB45309),
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: Text(_guardando ? 'Guardando…' : 'Confirmar y liberar'),
+            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ],
         ),
       ),
     );

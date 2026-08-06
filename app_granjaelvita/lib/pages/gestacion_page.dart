@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/gestacion_chancha_model.dart';
+import '../models/gestacion_no_prenada_model.dart';
 import '../models/gestacion_parto_model.dart';
 import '../services/gestacion_service.dart';
 import '../services/lote_service.dart';
@@ -88,6 +89,7 @@ class _GestacionPageState extends State<GestacionPage> {
   String? _error;
   List<GestacionChancha> _chanchas = [];
   List<GestacionParto> _partos = [];
+  List<GestacionNoPrenada> _noPrenadas = [];
 
   List<GestacionChancha> get _activas => _chanchas.where((c) => c.activa).toList();
 
@@ -105,15 +107,22 @@ class _GestacionPageState extends State<GestacionPage> {
     try {
       final lista = await _service.listar();
       List<GestacionParto> partos = [];
+      List<GestacionNoPrenada> noPrenadas = [];
       try {
         partos = await _service.listarPartos();
       } catch (_) {
         partos = [];
       }
+      try {
+        noPrenadas = await _service.listarNoPrenadas();
+      } catch (_) {
+        noPrenadas = [];
+      }
       if (!mounted) return;
       setState(() {
         _chanchas = lista;
         _partos = partos;
+        _noPrenadas = noPrenadas;
         _loading = false;
       });
     } catch (e) {
@@ -253,6 +262,26 @@ class _GestacionPageState extends State<GestacionPage> {
                             )),
                       const SizedBox(height: 16),
                       Text(
+                        'Historial — no gestantes (${_noPrenadas.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _GTheme.slate800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_noPrenadas.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('Sin ciclos fallidos registrados.'),
+                        )
+                      else
+                        ..._noPrenadas.map((n) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _buildNoPrenadaCard(n),
+                            )),
+                      const SizedBox(height: 16),
+                      Text(
                         'Historial de partos (${_partos.length})',
                         style: const TextStyle(
                           fontSize: 18,
@@ -274,6 +303,30 @@ class _GestacionPageState extends State<GestacionPage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildNoPrenadaCard(GestacionNoPrenada n) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _GTheme.orange100),
+        boxShadow: _GTheme.softShadow,
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: _GTheme.orange100,
+          child: Icon(Icons.restart_alt_rounded, color: _GTheme.orange600),
+        ),
+        title: Text(n.nombreChancha, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+          '${n.motivoLabel} · ${formatFechaEs(n.fechaConfirmacion)}\n'
+          'Inseminación ${formatFechaEs(n.fechaInseminacion)} · ${n.diasGestacion} días'
+          '${n.observaciones.isNotEmpty ? '\n${n.observaciones}' : ''}',
+        ),
+        isThreeLine: true,
+      ),
     );
   }
 
@@ -710,6 +763,22 @@ class _GestacionPageState extends State<GestacionPage> {
                         hoverBg: _GTheme.emerald50,
                         onPressed: () async {
                           final ok = await showRegistrarPartoSheet(
+                            context: context,
+                            service: _service,
+                            chancha: c,
+                          );
+                          if (ok == true) _cargar();
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: _actionButton(
+                        label: 'No gestante',
+                        icon: Icons.restart_alt_rounded,
+                        color: _GTheme.orange600,
+                        hoverBg: _GTheme.orange50,
+                        onPressed: () async {
+                          final ok = await showNoPrenadaSheet(
                             context: context,
                             service: _service,
                             chancha: c,

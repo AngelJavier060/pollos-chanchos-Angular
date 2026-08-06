@@ -27,6 +27,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.wil.avicola_backend.dto.GestacionChanchaRequestDto;
 import com.wil.avicola_backend.dto.GestacionChanchaResponseDto;
+import com.wil.avicola_backend.dto.GestacionNoPrenadaRequestDto;
+import com.wil.avicola_backend.dto.GestacionNoPrenadaResponseDto;
 import com.wil.avicola_backend.dto.GestacionPartoRequestDto;
 import com.wil.avicola_backend.dto.GestacionPartoResponseDto;
 import com.wil.avicola_backend.service.GestacionService;
@@ -166,6 +168,45 @@ public class GestacionController {
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Error al registrar parto: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping("/no-prenadas")
+    public ResponseEntity<Map<String, Object>> listarNoPrenadas() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<GestacionNoPrenadaResponseDto> data = gestacionService.listarNoPrenadas();
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al listar no gestantes: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @PostMapping("/{id}/no-prenada")
+    public ResponseEntity<Map<String, Object>> registrarNoPrenada(
+            @PathVariable Long id,
+            @RequestBody GestacionNoPrenadaRequestDto body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            GestacionNoPrenadaResponseDto data =
+                    gestacionService.registrarNoPrenada(id, body, usuarioActual());
+            response.put("success", true);
+            response.put("message",
+                    "Registrado como no gestante. Ciclo cerrado y chancha libre para reiniciar.");
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al registrar: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

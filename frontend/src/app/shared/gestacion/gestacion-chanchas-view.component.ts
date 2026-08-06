@@ -6,7 +6,8 @@ import {
   ChanchaGestacion,
   AlertaGestacion,
   StatsGestacion,
-  RegistroPartoGestacion
+  RegistroPartoGestacion,
+  RegistroNoPrenada
 } from './gestacion-chancha.interface';
 import { GestacionStorageService } from './gestacion-storage.service';
 import { LoteService } from '../../features/lotes/services/lote.service';
@@ -67,6 +68,14 @@ interface FormParto {
   loteNombre: string;
 }
 
+interface FormNoPrenada {
+  gestacionId: string;
+  nombreChancha: string;
+  fechaConfirmacion: string;
+  motivo: string;
+  observaciones: string;
+}
+
 @Component({
   selector: 'app-gestacion-chanchas-view',
   standalone: true,
@@ -86,6 +95,7 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
   /** Solo ciclos abiertos — tabla principal */
   chanchasActivas: ChanchaGestacion[] = [];
   partos: RegistroPartoGestacion[] = [];
+  noPrenadas: RegistroNoPrenada[] = [];
   stats: StatsGestacion = { total: 0, gestando: 0, preParto: 0, paridas: 0 };
   alertas: AlertaGestacion[] = [];
   detalle: ChanchaGestacion | null = null;
@@ -95,14 +105,18 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
   mostrarModalParto = false;
   /** Editar parto del historial — solo admin (modo edicion) */
   mostrarModalEditarParto = false;
+  mostrarModalNoPrenada = false;
   form: FormGestacion = this.formularioVacio();
   formParto: FormParto = this.formularioPartoVacio();
   formEditarParto: FormParto = this.formularioPartoVacio();
+  formNoPrenada: FormNoPrenada = this.formularioNoPrenadaVacio();
   mensajeError = '';
   mensajeErrorParto = '';
   mensajeErrorEditarParto = '';
+  mensajeErrorNoPrenada = '';
   guardandoParto = false;
   guardandoEditarParto = false;
+  guardandoNoPrenada = false;
   subiendoFoto = false;
   subiendoFotoParto = false;
   subiendoFotoDetalle = false;
@@ -132,6 +146,7 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
 
   /** Para usar en plantilla */
   etiquetaLote = etiquetaLote;
+  formatFechaEs = formatFechaEs;
 
   get loteSeleccionado(): Lote | undefined {
     return this.lotes.find(l => l.id === this.form.loteId);
@@ -155,6 +170,11 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
     this.subs.add(
       this.storage.listarPartos().subscribe(lista => {
         this.partos = lista;
+      })
+    );
+    this.subs.add(
+      this.storage.listarNoPrenadas().subscribe(lista => {
+        this.noPrenadas = lista;
       })
     );
     this.storage.refrescarDesdeApi().subscribe({
@@ -245,6 +265,68 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
     };
     this.mensajeErrorParto = '';
     this.mostrarModalParto = true;
+  }
+
+  abrirNoPrenada(c: ChanchaGestacion, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.esEdicion || c.activa === false) return;
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    this.formNoPrenada = {
+      gestacionId: c.id,
+      nombreChancha: c.nombre,
+      fechaConfirmacion: `${yyyy}-${mm}-${dd}`,
+      motivo: 'retorno_celo',
+      observaciones: ''
+    };
+    this.mensajeErrorNoPrenada = '';
+    this.mostrarModalNoPrenada = true;
+  }
+
+  cerrarModalNoPrenada(): void {
+    this.mostrarModalNoPrenada = false;
+    this.mensajeErrorNoPrenada = '';
+    this.guardandoNoPrenada = false;
+  }
+
+  guardarNoPrenada(): void {
+    const f = this.formNoPrenada;
+    if (!f.fechaConfirmacion) {
+      this.mensajeErrorNoPrenada = 'La fecha de confirmación es obligatoria.';
+      return;
+    }
+    this.guardandoNoPrenada = true;
+    this.storage
+      .registrarNoPrenada(f.gestacionId, {
+        fechaConfirmacion: f.fechaConfirmacion,
+        motivo: f.motivo || 'otro',
+        observaciones: f.observaciones.trim() || undefined
+      })
+      .subscribe({
+        next: () => {
+          if (this.detalle?.id === f.gestacionId) {
+            this.detalle = null;
+          }
+          this.cerrarModalNoPrenada();
+        },
+        error: err => {
+          this.guardandoNoPrenada = false;
+          this.mensajeErrorNoPrenada = err?.message || 'No se pudo registrar.';
+        }
+      });
+  }
+
+  etiquetaMotivo(motivo?: string): string {
+    switch (motivo) {
+      case 'retorno_celo':
+        return 'Retorno a celo';
+      case 'ultrasonido_negativo':
+        return 'Ultrasonido negativo';
+      default:
+        return 'Otro';
+    }
   }
 
   verPartoHistorial(p: RegistroPartoGestacion): void {
@@ -657,6 +739,13 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
     );
   }
 
+  noPrenadasDeChancha(c: ChanchaGestacion): RegistroNoPrenada[] {
+    if (!c.loteId || c.numeroEnLote == null) return [];
+    return this.noPrenadas.filter(
+      n => n.loteId === c.loteId && n.numeroEnLote === c.numeroEnLote
+    );
+  }
+
   subtituloChancha(c: ChanchaGestacion): string {
     const partes: string[] = [];
     const loteTxt = (c.loteNombre || '').trim() || (c.loteCodigo || '').trim();
@@ -786,6 +875,16 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
       observaciones: '',
       fotoUrl: '',
       loteNombre: ''
+    };
+  }
+
+  private formularioNoPrenadaVacio(): FormNoPrenada {
+    return {
+      gestacionId: '',
+      nombreChancha: '',
+      fechaConfirmacion: '',
+      motivo: 'retorno_celo',
+      observaciones: ''
     };
   }
 }

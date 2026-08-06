@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../config.dart';
 import '../models/gestacion_chancha_model.dart';
+import '../models/gestacion_no_prenada_model.dart';
 import '../models/gestacion_parto_model.dart';
 import 'auth_service.dart';
 
@@ -77,6 +78,30 @@ class GestacionService {
     final url = Uri.parse('$apiBaseUrl/api/gestacion/$gestacionId/parto');
     final response = await http.post(url, headers: headers, body: json.encode(body));
     return _parseParto(response);
+  }
+
+  Future<List<GestacionNoPrenada>> listarNoPrenadas() async {
+    final headers = await _headers();
+    final url = Uri.parse('$apiBaseUrl/api/gestacion/no-prenadas');
+    final response = await http.get(url, headers: headers);
+    final decoded = _decode(response);
+    _ensureOk(response, decoded, 'Error al listar no gestantes');
+    final data = decoded['data'];
+    if (data is! List) return [];
+    return data
+        .whereType<Map>()
+        .map((e) => GestacionNoPrenada.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<GestacionNoPrenada> registrarNoPrenada(String gestacionId, Map<String, dynamic> body) async {
+    final headers = await _headers();
+    final url = Uri.parse('$apiBaseUrl/api/gestacion/$gestacionId/no-prenada');
+    final response = await http.post(url, headers: headers, body: json.encode(body));
+    final decoded = _decode(response);
+    _ensureOk(response, decoded, 'Error al registrar no gestante');
+    if (decoded['data'] is! Map) throw Exception(decoded['message'] ?? 'Error');
+    return GestacionNoPrenada.fromMap(Map<String, dynamic>.from(decoded['data'] as Map));
   }
 
   Future<GestacionParto> actualizarParto(String partoId, Map<String, dynamic> body) async {

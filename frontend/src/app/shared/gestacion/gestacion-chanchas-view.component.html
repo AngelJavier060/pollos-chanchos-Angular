@@ -12,7 +12,8 @@
 
   <p *ngIf="!esEdicion" class="gestacion-aviso-consulta">
     <i class="fas fa-info-circle"></i>
-    Los registros se gestionan desde el panel de administración. Aquí puede consultar gestaciones activas e historial de partos.
+    Solo consulta: gestaciones activas, historial de partos e historial de no gestantes (reinicios).
+    Registrar parto o «No gestante» se hace desde administración.
   </p>
 
   <section class="gestacion-stats" aria-label="Resumen">
@@ -110,6 +111,14 @@
               <button type="button" class="btn btn--sm btn--parto" (click)="abrirRegistrarParto(c, $event)" title="Registrar parto y liberar chancha">
                 Parto
               </button>
+              <button
+                type="button"
+                class="btn btn--sm btn--vacia"
+                (click)="abrirNoPrenada(c, $event)"
+                title="No gestante — cerrar ciclo y liberar para reiniciar"
+              >
+                No gestante
+              </button>
               <button type="button" class="btn btn--sm" (click)="abrirEditar(c)" title="Editar">Editar</button>
               <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)" title="Eliminar">Eliminar</button>
             </ng-container>
@@ -118,6 +127,45 @@
       </tbody>
     </table>
   </div>
+
+  <section class="gestacion-historial" aria-label="Historial no gestantes">
+    <div class="gestacion-topbar">
+      <span class="gestacion-topbar__lbl">Historial — no gestantes / reinicios ({{ noPrenadas.length }})</span>
+    </div>
+    <div class="gestacion-table-wrap">
+      <table class="gestacion-table">
+        <thead>
+          <tr>
+            <th>Chancha</th>
+            <th>Inseminación</th>
+            <th>Confirmación</th>
+            <th>Días</th>
+            <th>Motivo</th>
+            <th>Observaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="noPrenadas.length === 0">
+            <td colspan="6" class="gestacion-empty">
+              Sin registros de ciclos fallidos.
+              <span *ngIf="esEdicion"> Use «No gestante» si no quedó gestante (p. ej. día 21+).</span>
+            </td>
+          </tr>
+          <tr *ngFor="let n of noPrenadas">
+            <td>
+              <strong>{{ n.nombreChancha }}</strong>
+              <div *ngIf="n.loteNombre" class="gestacion-sub">{{ n.loteNombre }}</div>
+            </td>
+            <td>{{ formatFechaEs(n.fechaInseminacion) }}</td>
+            <td>{{ formatFechaEs(n.fechaConfirmacion) }}</td>
+            <td>{{ n.diasGestacion }}</td>
+            <td><span class="badge badge-warning">{{ etiquetaMotivo(n.motivo) }}</span></td>
+            <td>{{ n.observaciones || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="gestacion-historial" aria-label="Historial de partos">
     <div class="gestacion-topbar">
@@ -292,8 +340,28 @@
       </div>
     </div>
 
+    <div *ngIf="noPrenadasDeChancha(detalle).length > 0" class="ficha-block">
+      <h3 class="ficha-block__title">Ciclos no gestantes (reinicios)</h3>
+      <div class="ficha-noprenada-list">
+        <article *ngFor="let n of noPrenadasDeChancha(detalle)" class="ficha-noprenada-card">
+          <strong>{{ etiquetaMotivo(n.motivo) }}</strong>
+          <span>Inseminación: {{ formatFechaEs(n.fechaInseminacion) }}</span>
+          <span>Confirmación: {{ formatFechaEs(n.fechaConfirmacion) }} · {{ n.diasGestacion }} días</span>
+          <span *ngIf="n.observaciones">{{ n.observaciones }}</span>
+        </article>
+      </div>
+    </div>
+
     <div class="ficha-actions">
       <button type="button" class="ficha-btn ficha-btn--ghost" (click)="cerrarDetalle()">Cerrar</button>
+      <button
+        *ngIf="esEdicion && detalle.activa !== false"
+        type="button"
+        class="ficha-btn ficha-btn--vacia"
+        (click)="abrirNoPrenada(detalle)"
+      >
+        No gestante
+      </button>
       <button
         *ngIf="esEdicion && detalle.activa !== false"
         type="button"
@@ -619,6 +687,43 @@
           [disabled]="guardandoEditarParto || subiendoFotoEditarParto"
         >
           {{ guardandoEditarParto ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal No gestante (admin) -->
+  <div *ngIf="mostrarModalNoPrenada && esEdicion" class="gestacion-overlay" (click)="cerrarModalNoPrenada()" role="dialog" aria-modal="true">
+    <div class="gestacion-modal" (click)="$event.stopPropagation()">
+      <h2 class="gestacion-modal__title">No gestante</h2>
+      <p class="gestacion-modal__hint">
+        <strong>{{ formNoPrenada.nombreChancha }}</strong> —
+        se cierra este ciclo, queda en historial y la chancha queda libre para una
+        <strong>nueva gestación</strong> (reinicio).
+      </p>
+      <p *ngIf="mensajeErrorNoPrenada" class="gestacion-modal__error">{{ mensajeErrorNoPrenada }}</p>
+
+      <label class="fg fg--full">
+        <span>Fecha de confirmación *</span>
+        <input type="date" [(ngModel)]="formNoPrenada.fechaConfirmacion" />
+      </label>
+      <label class="fg fg--full">
+        <span>Motivo</span>
+        <select class="gestacion-select" [(ngModel)]="formNoPrenada.motivo">
+          <option value="retorno_celo">Retorno a celo</option>
+          <option value="ultrasonido_negativo">Ultrasonido negativo</option>
+          <option value="otro">Otro</option>
+        </select>
+      </label>
+      <label class="fg fg--full">
+        <span>Observaciones</span>
+        <input type="text" [(ngModel)]="formNoPrenada.observaciones" placeholder="Ej. control día 21, no gestante" />
+      </label>
+
+      <div class="gestacion-modal__actions">
+        <button type="button" class="btn" (click)="cerrarModalNoPrenada()" [disabled]="guardandoNoPrenada">Cancelar</button>
+        <button type="button" class="btn btn--primary btn--vacia" (click)="guardarNoPrenada()" [disabled]="guardandoNoPrenada">
+          {{ guardandoNoPrenada ? 'Guardando…' : 'Confirmar y liberar' }}
         </button>
       </div>
     </div>

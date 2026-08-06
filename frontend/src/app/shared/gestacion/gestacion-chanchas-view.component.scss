@@ -299,6 +299,24 @@
   border-color: #065f46;
 }
 
+.btn--vacia,
+.ficha-btn--vacia {
+  background: #b45309;
+  color: #fff;
+  border-color: #b45309;
+}
+
+.btn--vacia:hover,
+.ficha-btn--vacia:hover {
+  background: #92400e;
+  border-color: #92400e;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .btn--parto:hover {
   background: #047857;
   border-color: #047857;

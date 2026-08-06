@@ -2,7 +2,9 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, tap, catchError, throwError, forkJoin, of, map } from 'rxjs';
 import {
   ChanchaGestacion,
+  RegistrarNoPrenadaPayload,
   RegistrarPartoPayload,
+  RegistroNoPrenada,
   RegistroPartoGestacion
 } from './gestacion-chancha.interface';
 import { GestacionApiService } from './gestacion-api.service';
@@ -11,6 +13,7 @@ import { GestacionApiService } from './gestacion-api.service';
 export class GestacionStorageService {
   private readonly chanchas$ = new BehaviorSubject<ChanchaGestacion[]>([]);
   private readonly partos$ = new BehaviorSubject<RegistroPartoGestacion[]>([]);
+  private readonly noPrenadas$ = new BehaviorSubject<RegistroNoPrenada[]>([]);
   private cargado = false;
 
   constructor(private api: GestacionApiService) {}
@@ -29,6 +32,13 @@ export class GestacionStorageService {
     return this.partos$.asObservable();
   }
 
+  listarNoPrenadas(): Observable<RegistroNoPrenada[]> {
+    if (!this.cargado) {
+      this.refrescarDesdeApi().subscribe();
+    }
+    return this.noPrenadas$.asObservable();
+  }
+
   obtenerSnapshot(): ChanchaGestacion[] {
     return [...this.chanchas$.value];
   }
@@ -40,11 +50,13 @@ export class GestacionStorageService {
   refrescarDesdeApi(): Observable<ChanchaGestacion[]> {
     return forkJoin({
       gestaciones: this.api.listar(),
-      partos: this.api.listarPartos().pipe(catchError(() => of([] as RegistroPartoGestacion[])))
+      partos: this.api.listarPartos().pipe(catchError(() => of([] as RegistroPartoGestacion[]))),
+      noPrenadas: this.api.listarNoPrenadas().pipe(catchError(() => of([] as RegistroNoPrenada[])))
     }).pipe(
-      tap(({ gestaciones, partos }) => {
+      tap(({ gestaciones, partos, noPrenadas }) => {
         this.chanchas$.next(gestaciones);
         this.partos$.next(partos);
+        this.noPrenadas$.next(noPrenadas);
         this.cargado = true;
       }),
       map(({ gestaciones }) => gestaciones),
@@ -108,6 +120,21 @@ export class GestacionStorageService {
           lista[idx] = actualizado;
         }
         this.partos$.next([...lista]);
+      })
+    );
+  }
+
+  registrarNoPrenada(
+    gestacionId: string,
+    payload: RegistrarNoPrenadaPayload
+  ): Observable<RegistroNoPrenada> {
+    return this.api.registrarNoPrenada(gestacionId, payload).pipe(
+      tap(reg => {
+        const lista = this.obtenerSnapshot().map(c =>
+          c.id === gestacionId ? { ...c, activa: false } : c
+        );
+        this.chanchas$.next(lista);
+        this.noPrenadas$.next([reg, ...this.noPrenadas$.value]);
       })
     );
   }

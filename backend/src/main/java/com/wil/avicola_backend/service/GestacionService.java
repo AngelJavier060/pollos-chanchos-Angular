@@ -9,13 +9,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wil.avicola_backend.dto.GestacionChanchaRequestDto;
 import com.wil.avicola_backend.dto.GestacionChanchaResponseDto;
+import com.wil.avicola_backend.dto.GestacionNoPrenadaRequestDto;
+import com.wil.avicola_backend.dto.GestacionNoPrenadaResponseDto;
 import com.wil.avicola_backend.dto.GestacionPartoRequestDto;
 import com.wil.avicola_backend.dto.GestacionPartoResponseDto;
 import com.wil.avicola_backend.model.Lote;
 import com.wil.avicola_backend.model.RegistroGestacion;
+import com.wil.avicola_backend.model.RegistroNoPrenadaGestacion;
 import com.wil.avicola_backend.model.RegistroPartoGestacion;
 import com.wil.avicola_backend.repository.LoteRepository;
 import com.wil.avicola_backend.repository.RegistroGestacionRepository;
+import com.wil.avicola_backend.repository.RegistroNoPrenadaGestacionRepository;
 import com.wil.avicola_backend.repository.RegistroPartoGestacionRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ public class GestacionService {
 
     private final RegistroGestacionRepository gestacionRepository;
     private final RegistroPartoGestacionRepository partoRepository;
+    private final RegistroNoPrenadaGestacionRepository noPrenadaRepository;
     private final LoteRepository loteRepository;
 
     public List<GestacionChanchaResponseDto> listarTodos() {
@@ -172,6 +177,93 @@ public class GestacionService {
         RegistroPartoGestacion parto = partoRepository.findById(partoId)
                 .orElseThrow(() -> new IllegalArgumentException("Registro de parto no encontrado."));
         return toPartoDtoConLote(parto);
+    }
+
+    /**
+     * Confirma que la chancha no quedó prenada: guarda historial, cierra el ciclo
+     * (activa=false) y libera el cupo para reiniciar con una nueva gestación.
+     */
+    @Transactional
+    public GestacionNoPrenadaResponseDto registrarNoPrenada(
+            Long gestacionId,
+            GestacionNoPrenadaRequestDto dto,
+            String usuario) {
+        RegistroGestacion gestacion = gestacionRepository.findById(gestacionId)
+                .orElseThrow(() -> new IllegalArgumentException("Registro de gestación no encontrado."));
+        if (Boolean.FALSE.equals(gestacion.getActiva())) {
+            throw new IllegalArgumentException(
+                    "Esta gestación ya está cerrada. No se puede registrar otro resultado.");
+        }
+        if (dto == null || dto.getFechaConfirmacion() == null || dto.getFechaConfirmacion().isBlank()) {
+            throw new IllegalArgumentException("La fecha de confirmación es obligatoria.");
+        }
+        LocalDate fechaConf;
+        try {
+            fechaConf = LocalDate.parse(dto.getFechaConfirmacion());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Fecha de confirmación inválida. Use formato yyyy-MM-dd.");
+        }
+        if (fechaConf.isBefore(gestacion.getFechaInseminacion())) {
+            throw new IllegalArgumentException(
+                    "La fecha de confirmación no puede ser anterior a la inseminación.");
+        }
+
+        int dias = (int) java.time.temporal.ChronoUnit.DAYS.between(
+                gestacion.getFechaInseminacion(), fechaConf);
+        String motivo = dto.getMotivo() != null && !dto.getMotivo().isBlank()
+                ? dto.getMotivo().trim()
+                : "otro";
+
+        RegistroNoPrenadaGestacion reg = RegistroNoPrenadaGestacion.builder()
+                .gestacionId(gestacion.getId())
+                .loteId(gestacion.getLoteId())
+                .numeroEnLote(gestacion.getNumeroEnLote())
+                .nombreChancha(gestacion.getNombre())
+                .fechaInseminacion(gestacion.getFechaInseminacion())
+                .fechaConfirmacion(fechaConf)
+                .diasGestacion(Math.max(0, dias))
+                .motivo(motivo)
+                .observaciones(dto.getObservaciones())
+                .fotoUrl(dto.getFotoUrl() != null && !dto.getFotoUrl().isBlank()
+                        ? dto.getFotoUrl().trim()
+                        : null)
+                .usuarioRegistro(usuario)
+                .build();
+
+        RegistroNoPrenadaGestacion guardado = noPrenadaRepository.save(reg);
+        gestacion.setActiva(false);
+        gestacionRepository.save(gestacion);
+
+        return toNoPrenadaDto(guardado, gestacion.getLoteNombre());
+    }
+
+    public List<GestacionNoPrenadaResponseDto> listarNoPrenadas() {
+        return noPrenadaRepository.findAllByOrderByFechaConfirmacionDesc().stream()
+                .map(r -> toNoPrenadaDto(r, null))
+                .collect(Collectors.toList());
+    }
+
+    private GestacionNoPrenadaResponseDto toNoPrenadaDto(RegistroNoPrenadaGestacion r, String loteNombre) {
+        String lote = loteNombre;
+        if (lote == null) {
+            lote = gestacionRepository.findById(r.getGestacionId())
+                    .map(RegistroGestacion::getLoteNombre)
+                    .orElse(null);
+        }
+        return GestacionNoPrenadaResponseDto.builder()
+                .id(String.valueOf(r.getId()))
+                .gestacionId(String.valueOf(r.getGestacionId()))
+                .loteId(r.getLoteId())
+                .numeroEnLote(r.getNumeroEnLote())
+                .nombreChancha(r.getNombreChancha())
+                .fechaInseminacion(r.getFechaInseminacion() != null ? r.getFechaInseminacion().toString() : null)
+                .fechaConfirmacion(r.getFechaConfirmacion() != null ? r.getFechaConfirmacion().toString() : null)
+                .diasGestacion(r.getDiasGestacion())
+                .motivo(r.getMotivo())
+                .observaciones(r.getObservaciones())
+                .fotoUrl(r.getFotoUrl())
+                .loteNombre(lote)
+                .build();
     }
 
     /**

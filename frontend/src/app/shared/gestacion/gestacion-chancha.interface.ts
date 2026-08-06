@@ -46,6 +46,29 @@ export interface RegistrarPartoPayload {
   fotoUrl?: string;
 }
 
+/** Ciclo cerrado porque la chancha no quedó prenada */
+export interface RegistroNoPrenada {
+  id: string;
+  gestacionId: string;
+  loteId: string;
+  numeroEnLote: number;
+  nombreChancha: string;
+  fechaInseminacion: string;
+  fechaConfirmacion: string;
+  diasGestacion: number;
+  motivo?: string;
+  observaciones?: string;
+  fotoUrl?: string;
+  loteNombre?: string;
+}
+
+export interface RegistrarNoPrenadaPayload {
+  fechaConfirmacion: string;
+  motivo?: string;
+  observaciones?: string;
+  fotoUrl?: string;
+}
+
 export interface EtapaGestacion {
   nombre: string;
   /** Nombre corto para ficha visual (diseño AgriManager) */

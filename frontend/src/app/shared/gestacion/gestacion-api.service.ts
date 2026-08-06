@@ -4,7 +4,9 @@ import { Observable, map, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ChanchaGestacion,
+  RegistrarNoPrenadaPayload,
   RegistrarPartoPayload,
+  RegistroNoPrenada,
   RegistroPartoGestacion
 } from './gestacion-chancha.interface';
 
@@ -101,6 +103,36 @@ export class GestacionApiService {
       )
       .pipe(
         map(res => this.extractData(res, 'Error al registrar parto')),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  registrarNoPrenada(
+    gestacionId: string,
+    payload: RegistrarNoPrenadaPayload
+  ): Observable<RegistroNoPrenada> {
+    return this.http
+      .post<ApiResponse<RegistroNoPrenada>>(
+        `${this.baseUrl}/${gestacionId}/no-prenada`,
+        payload,
+        this.httpOptions
+      )
+      .pipe(
+        map(res => this.extractData(res, 'Error al registrar no gestante')),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  listarNoPrenadas(): Observable<RegistroNoPrenada[]> {
+    return this.http
+      .get<ApiResponse<RegistroNoPrenada[]>>(`${this.baseUrl}/no-prenadas`, this.httpOptions)
+      .pipe(
+        map(res => {
+          if (res.success === false) {
+            throw new Error(res.message || 'Error al cargar historial de no gestantes');
+          }
+          return Array.isArray(res.data) ? res.data : [];
+        }),
         catchError(err => this.handleError(err))
       );
   }
