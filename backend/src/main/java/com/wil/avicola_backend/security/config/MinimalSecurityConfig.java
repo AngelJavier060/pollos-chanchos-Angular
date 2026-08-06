@@ -102,6 +102,8 @@ public class MinimalSecurityConfig {
                     // Otros endpoints públicos temporales
                     .requestMatchers("/animal/**", "/api/animal/**").permitAll()
                     .requestMatchers("/api/lote/**", "/lote/**").permitAll() // Para cargar lotes en mortalidad
+                    // Gestación (/api/gestacion): API compartida. Permisos UI:
+                    // Admin CRUD en /admin/gestacion; Chanchos solo consulta en /chanchos/gestacion
                     .requestMatchers(HttpMethod.GET, "/api/gestacion/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/gestacion/**").permitAll()
                     .requestMatchers(HttpMethod.PUT, "/api/gestacion/**").permitAll()

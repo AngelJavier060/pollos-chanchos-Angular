@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../config.dart';
@@ -128,8 +129,22 @@ class GestacionService {
     final request = http.MultipartRequest('POST', url);
     request.headers.addAll(headers);
     final bytes = await file.readAsBytes();
-    final name = file.name.isNotEmpty ? file.name : 'foto.jpg';
-    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: name));
+    if (bytes.isEmpty) {
+      throw Exception('La imagen está vacía. Intente tomar la foto de nuevo.');
+    }
+    // En Android/iOS la cámara a veces no envía mime ni extensión; el backend exige image/*
+    final rawName = file.name.trim();
+    final mime = (file.mimeType ?? '').toLowerCase();
+    final filename = _nombreImagenUpload(rawName, mime);
+    final contentType = _mediaTypeImagen(filename, mime);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: contentType,
+      ),
+    );
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     final decoded = _decode(response);
@@ -137,6 +152,41 @@ class GestacionService {
     final urlFoto = (decoded['data'] ?? decoded['url'] ?? '').toString();
     if (urlFoto.isEmpty) throw Exception('No se recibió URL de imagen');
     return urlFoto;
+  }
+
+  /// Asegura nombre con extensión de imagen válida.
+  String _nombreImagenUpload(String rawName, String mime) {
+    final lower = rawName.toLowerCase();
+    if (lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.heic') ||
+        lower.endsWith('.heif')) {
+      return rawName;
+    }
+    if (mime.contains('png')) return 'foto_gestacion.png';
+    if (mime.contains('webp')) return 'foto_gestacion.webp';
+    if (mime.contains('gif')) return 'foto_gestacion.gif';
+    return 'foto_gestacion.jpg';
+  }
+
+  MediaType _mediaTypeImagen(String filename, String mime) {
+    if (mime.startsWith('image/')) {
+      final parts = mime.split('/');
+      if (parts.length == 2 && parts[1].isNotEmpty) {
+        return MediaType('image', parts[1]);
+      }
+    }
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.png')) return MediaType('image', 'png');
+    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+    if (lower.endsWith('.gif')) return MediaType('image', 'gif');
+    if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
+      return MediaType('image', 'heic');
+    }
+    return MediaType('image', 'jpeg');
   }
 
   Map<String, dynamic> _decode(http.Response response) {

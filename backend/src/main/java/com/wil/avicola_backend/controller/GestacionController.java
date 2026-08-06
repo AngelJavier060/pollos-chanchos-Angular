@@ -71,7 +71,9 @@ public class GestacionController {
                 return ResponseEntity.badRequest().body(response);
             }
             String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
+            String original = file.getOriginalFilename();
+            // App móvil a veces envía application/octet-stream o null; validar también por extensión
+            if (!esArchivoImagenPermitido(contentType, original)) {
                 response.put("success", false);
                 response.put("message", "Solo se permiten archivos de imagen.");
                 return ResponseEntity.badRequest().body(response);
@@ -87,11 +89,7 @@ public class GestacionController {
                 Files.createDirectories(uploadPath);
             }
 
-            String original = file.getOriginalFilename();
-            String extension = ".jpg";
-            if (original != null && original.contains(".")) {
-                extension = original.substring(original.lastIndexOf('.')).toLowerCase();
-            }
+            String extension = extensionImagen(contentType, original);
             String fileName = UUID.randomUUID() + extension;
             Files.copy(file.getInputStream(), uploadPath.resolve(fileName));
 
@@ -338,5 +336,50 @@ public class GestacionController {
             return auth.getName();
         }
         return "sistema";
+    }
+
+    private boolean esArchivoImagenPermitido(String contentType, String originalFilename) {
+        if (contentType != null) {
+            String ct = contentType.toLowerCase().trim();
+            if (ct.startsWith("image/")) {
+                return true;
+            }
+            // Multipart desde Flutter/Android suele llegar así
+            if ("application/octet-stream".equals(ct) || "binary/octet-stream".equals(ct)) {
+                return tieneExtensionImagen(originalFilename);
+            }
+        }
+        return tieneExtensionImagen(originalFilename);
+    }
+
+    private boolean tieneExtensionImagen(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return false;
+        }
+        String name = originalFilename.toLowerCase();
+        return name.endsWith(".jpg")
+                || name.endsWith(".jpeg")
+                || name.endsWith(".png")
+                || name.endsWith(".webp")
+                || name.endsWith(".gif")
+                || name.endsWith(".heic")
+                || name.endsWith(".heif");
+    }
+
+    private String extensionImagen(String contentType, String originalFilename) {
+        if (originalFilename != null && originalFilename.contains(".")) {
+            String ext = originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase();
+            if (ext.matches("\\.(jpg|jpeg|png|webp|gif|heic|heif)")) {
+                return ".jpeg".equals(ext) ? ".jpg" : ext;
+            }
+        }
+        if (contentType != null) {
+            String ct = contentType.toLowerCase();
+            if (ct.contains("png")) return ".png";
+            if (ct.contains("webp")) return ".webp";
+            if (ct.contains("gif")) return ".gif";
+            if (ct.contains("heic") || ct.contains("heif")) return ".heic";
+        }
+        return ".jpg";
     }
 }

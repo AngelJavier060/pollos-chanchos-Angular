@@ -46,13 +46,6 @@
           </a>
         </li>
         <li>
-          <a routerLink="gestacion" routerLinkActive="active"
-             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-pink-50 hover:text-pink-800 transition-all duration-200 font-medium">
-            <i class="fas fa-heart text-sm mr-3 text-pink-600"></i>
-            <span class="flex-1">Control de Gestación</span>
-          </a>
-        </li>
-        <li>
           <a routerLink="historico" routerLinkActive="active"
              class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
             <i class="fas fa-archive text-sm mr-3"></i>
@@ -71,6 +64,13 @@
              class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-200 font-medium">
             <i class="fas fa-stethoscope text-sm mr-3"></i>
             <span class="flex-1">Morbilidad</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="gestacion" routerLinkActive="active"
+             class="nav-item group flex items-center px-3 py-2.5 rounded-xl text-gray-700 hover:bg-pink-50 hover:text-pink-800 transition-all duration-200 font-medium">
+            <i class="fas fa-heart text-sm mr-3 text-pink-600"></i>
+            <span class="flex-1">Control de Gestación</span>
           </a>
         </li>
         <li *ngIf="isAdmin()">

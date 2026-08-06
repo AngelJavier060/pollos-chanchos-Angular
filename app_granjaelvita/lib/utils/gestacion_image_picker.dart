@@ -37,9 +37,12 @@ Future<XFile?> pickGestacionImage(BuildContext context) async {
     ),
   );
   if (source == null) return null;
+  // maxWidth/quality ayudan a obtener JPEG usable en Android/iOS
   return ImagePicker().pickImage(
     source: source,
     imageQuality: 85,
+    maxWidth: 1600,
     preferredCameraDevice: CameraDevice.rear,
+    requestFullMetadata: false,
   );
 }
