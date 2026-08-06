@@ -106,22 +106,24 @@
           </td>
           <td><span class="badge" [ngClass]="estadoDe(c).cls">{{ estadoDe(c).label }}</span></td>
           <td class="td-acciones">
-            <button type="button" class="btn btn--sm" (click)="verDetalle(c)" title="Ver detalle">Ver</button>
-            <ng-container *ngIf="esEdicion">
-              <button type="button" class="btn btn--sm btn--parto" (click)="abrirRegistrarParto(c, $event)" title="Registrar parto y liberar chancha">
-                Parto
-              </button>
-              <button
-                type="button"
-                class="btn btn--sm btn--vacia"
-                (click)="abrirNoPrenada(c, $event)"
-                title="No gestante — cerrar ciclo y liberar para reiniciar"
-              >
-                No gestante
-              </button>
-              <button type="button" class="btn btn--sm" (click)="abrirEditar(c)" title="Editar">Editar</button>
-              <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)" title="Eliminar">Eliminar</button>
-            </ng-container>
+            <div class="acciones-btns">
+              <button type="button" class="btn btn--sm" (click)="verDetalle(c)" title="Ver detalle">Ver</button>
+              <ng-container *ngIf="esEdicion">
+                <button type="button" class="btn btn--sm btn--parto" (click)="abrirRegistrarParto(c, $event)" title="Registrar parto y liberar chancha">
+                  Parto
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--sm btn--vacia"
+                  (click)="abrirNoPrenada(c, $event)"
+                  title="No gestante — cerrar ciclo y liberar para reiniciar"
+                >
+                  No gestante
+                </button>
+                <button type="button" class="btn btn--sm" (click)="abrirEditar(c)" title="Editar">Editar</button>
+                <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)" title="Eliminar">Eliminar</button>
+              </ng-container>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -211,16 +213,18 @@
             <td>{{ p.lechonesMuertos }}</td>
             <td>{{ p.observaciones || '—' }}</td>
             <td class="td-acciones">
-              <button type="button" class="btn btn--sm" (click)="verPartoHistorial(p)" title="Ver detalle">Ver</button>
-              <button
-                *ngIf="esEdicion"
-                type="button"
-                class="btn btn--sm"
-                (click)="abrirEditarParto(p)"
-                title="Corregir datos del parto"
-              >
-                Editar
-              </button>
+              <div class="acciones-btns">
+                <button type="button" class="btn btn--sm" (click)="verPartoHistorial(p)" title="Ver detalle">Ver</button>
+                <button
+                  *ngIf="esEdicion"
+                  type="button"
+                  class="btn btn--sm"
+                  (click)="abrirEditarParto(p)"
+                  title="Corregir datos del parto"
+                >
+                  Editar
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>

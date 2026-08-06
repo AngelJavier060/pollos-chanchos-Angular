@@ -1,7 +1,10 @@
 .gestacion-page {
-  max-width: 1100px;
+  max-width: min(100%, 1480px);
+  width: 100%;
   margin: 0 auto;
   font-family: inherit;
+  box-sizing: border-box;
+  padding: 0 0.25rem;
 }
 
 .gestacion-header {
@@ -149,14 +152,17 @@
 .gestacion-table-wrap {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin-bottom: 1.5rem;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  -webkit-overflow-scrolling: touch;
 }
 
 .gestacion-table {
   width: 100%;
+  min-width: 1180px;
   border-collapse: collapse;
   font-size: 0.8125rem;
 }
@@ -193,12 +199,27 @@
   color: #9ca3af;
 }
 
+.th-acciones,
 .td-acciones {
-  white-space: nowrap;
+  min-width: 320px;
+  width: 1%;
 }
 
-.td-acciones .btn + .btn {
-  margin-left: 4px;
+.td-acciones {
+  white-space: normal;
+}
+
+.acciones-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.acciones-btns .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .pbar-lbl {
