@@ -9,5 +9,6 @@ public class GestacionChanchaRequestDto {
     private String fechaInseminacion;
     private Integer numeroParto;
     private String observaciones;
+    private String fotoUrl;
     private Boolean activa;
 }

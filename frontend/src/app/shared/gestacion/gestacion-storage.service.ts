@@ -1,11 +1,16 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, tap, catchError, throwError } from 'rxjs';
-import { ChanchaGestacion } from './gestacion-chancha.interface';
+import { BehaviorSubject, Observable, tap, catchError, throwError, forkJoin, of, map } from 'rxjs';
+import {
+  ChanchaGestacion,
+  RegistrarPartoPayload,
+  RegistroPartoGestacion
+} from './gestacion-chancha.interface';
 import { GestacionApiService } from './gestacion-api.service';
 
 @Injectable({ providedIn: 'root' })
 export class GestacionStorageService {
   private readonly chanchas$ = new BehaviorSubject<ChanchaGestacion[]>([]);
+  private readonly partos$ = new BehaviorSubject<RegistroPartoGestacion[]>([]);
   private cargado = false;
 
   constructor(private api: GestacionApiService) {}
@@ -17,16 +22,32 @@ export class GestacionStorageService {
     return this.chanchas$.asObservable();
   }
 
+  listarPartos(): Observable<RegistroPartoGestacion[]> {
+    if (!this.cargado) {
+      this.refrescarDesdeApi().subscribe();
+    }
+    return this.partos$.asObservable();
+  }
+
   obtenerSnapshot(): ChanchaGestacion[] {
     return [...this.chanchas$.value];
   }
 
+  obtenerPartosSnapshot(): RegistroPartoGestacion[] {
+    return [...this.partos$.value];
+  }
+
   refrescarDesdeApi(): Observable<ChanchaGestacion[]> {
-    return this.api.listar().pipe(
-      tap(lista => {
-        this.chanchas$.next(lista);
+    return forkJoin({
+      gestaciones: this.api.listar(),
+      partos: this.api.listarPartos().pipe(catchError(() => of([] as RegistroPartoGestacion[])))
+    }).pipe(
+      tap(({ gestaciones, partos }) => {
+        this.chanchas$.next(gestaciones);
+        this.partos$.next(partos);
         this.cargado = true;
       }),
+      map(({ gestaciones }) => gestaciones),
       catchError(err => {
         console.error('Error cargando gestaciones:', err);
         return throwError(() => err);
@@ -58,6 +79,45 @@ export class GestacionStorageService {
         this.cargado = true;
       })
     );
+  }
+
+  registrarParto(
+    gestacionId: string,
+    payload: RegistrarPartoPayload
+  ): Observable<RegistroPartoGestacion> {
+    return this.api.registrarParto(gestacionId, payload).pipe(
+      tap(parto => {
+        const lista = this.obtenerSnapshot().map(c =>
+          c.id === gestacionId ? { ...c, activa: false } : c
+        );
+        this.chanchas$.next(lista);
+        this.partos$.next([parto, ...this.obtenerPartosSnapshot()]);
+      })
+    );
+  }
+
+  actualizarParto(
+    partoId: string,
+    payload: RegistrarPartoPayload
+  ): Observable<RegistroPartoGestacion> {
+    return this.api.actualizarParto(partoId, payload).pipe(
+      tap(actualizado => {
+        const lista = this.obtenerPartosSnapshot();
+        const idx = lista.findIndex(p => p.id === partoId || p.id === actualizado.id);
+        if (idx >= 0) {
+          lista[idx] = actualizado;
+        }
+        this.partos$.next([...lista]);
+      })
+    );
+  }
+
+  siguienteNumeroParto(loteId: string, numeroEnLote: number): Observable<number> {
+    return this.api.siguienteNumeroParto(loteId, numeroEnLote);
+  }
+
+  uploadFoto(file: File): Observable<string> {
+    return this.api.uploadFoto(file);
   }
 
   eliminar(id: string): Observable<void> {

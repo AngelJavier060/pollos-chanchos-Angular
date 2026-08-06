@@ -2,17 +2,19 @@ const int diasGestacionTotal = 114;
 
 class EtapaGestacion {
   final String nombre;
+  final String nombreCorto;
+  final String diasLabel;
   final int inicio;
   final int fin;
-  const EtapaGestacion(this.nombre, this.inicio, this.fin);
+  const EtapaGestacion(this.nombre, this.nombreCorto, this.diasLabel, this.inicio, this.fin);
 }
 
 const List<EtapaGestacion> etapasGestacion = [
-  EtapaGestacion('Confirmación', 1, 21),
-  EtapaGestacion('Gestación temprana', 22, 35),
-  EtapaGestacion('Gestación media', 36, 85),
-  EtapaGestacion('Pre-parto', 86, 107),
-  EtapaGestacion('Parto', 108, 114),
+  EtapaGestacion('Confirmación', 'Confirmación', 'Días 1-21', 1, 21),
+  EtapaGestacion('Gestación temprana', 'Temprana', 'Días 22-35', 22, 35),
+  EtapaGestacion('Gestación media', 'Media', 'Días 36-85', 36, 85),
+  EtapaGestacion('Pre-parto', 'Pre-parto', 'Días 86-107', 86, 107),
+  EtapaGestacion('Parto', 'Parto', 'Días 108-114', 108, 114),
 ];
 
 DateTime parseFechaLocal(String fechaISO) {
@@ -48,6 +50,13 @@ int getEtapaIdx(String fechaISO) {
     final e = etapasGestacion[i];
     if (d >= e.inicio && d <= e.fin) return i;
   }
+  return -1;
+}
+
+int etapaIdxFicha(String fechaISO) {
+  final idx = getEtapaIdx(fechaISO);
+  if (idx >= 0) return idx;
+  if (diasTranscurridos(fechaISO) > diasGestacionTotal) return etapasGestacion.length - 1;
   return -1;
 }
 

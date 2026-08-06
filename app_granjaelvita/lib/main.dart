@@ -919,7 +919,7 @@ class HomePage extends StatelessWidget {
       {'label':'Mortalidad','icon': Icons.warning_amber_rounded,'color': Colors.red},
       {'label':'Morbilidad','icon': Icons.medical_information_rounded,'color': Colors.pink},
       if (esChanchos)
-        {'label':'Gestación','icon': Icons.pregnant_woman_rounded,'color': Colors.brown},
+        {'label':'Gestación','icon': Icons.pets_rounded,'color': Colors.brown},
     ];
 
     return Scaffold(

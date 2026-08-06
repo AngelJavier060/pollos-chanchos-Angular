@@ -1,8 +1,12 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, map, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ChanchaGestacion } from './gestacion-chancha.interface';
+import {
+  ChanchaGestacion,
+  RegistrarPartoPayload,
+  RegistroPartoGestacion
+} from './gestacion-chancha.interface';
 
 interface ApiResponse<T> {
   success?: boolean;
@@ -70,6 +74,91 @@ export class GestacionApiService {
       );
   }
 
+  uploadFoto(file: File): Observable<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http
+      .post<ApiResponse<string> & { url?: string }>(`${this.baseUrl}/upload-foto`, formData)
+      .pipe(
+        map(res => {
+          if (res.success === false) {
+            throw new Error(res.message || 'Error al subir imagen');
+          }
+          const url = res.data || res.url;
+          if (!url) throw new Error('No se recibió URL de imagen');
+          return url;
+        }),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  registrarParto(gestacionId: string, payload: RegistrarPartoPayload): Observable<RegistroPartoGestacion> {
+    return this.http
+      .post<ApiResponse<RegistroPartoGestacion>>(
+        `${this.baseUrl}/${gestacionId}/parto`,
+        payload,
+        this.httpOptions
+      )
+      .pipe(
+        map(res => this.extractData(res, 'Error al registrar parto')),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  actualizarParto(partoId: string, payload: RegistrarPartoPayload): Observable<RegistroPartoGestacion> {
+    return this.http
+      .put<ApiResponse<RegistroPartoGestacion>>(
+        `${this.baseUrl}/partos/${partoId}`,
+        payload,
+        this.httpOptions
+      )
+      .pipe(
+        map(res => this.extractData(res, 'Error al actualizar parto')),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  listarPartos(loteId?: string, numeroEnLote?: number): Observable<RegistroPartoGestacion[]> {
+    let params = new HttpParams();
+    if (loteId && numeroEnLote != null) {
+      params = params.set('loteId', loteId).set('numeroEnLote', String(numeroEnLote));
+    }
+    return this.http
+      .get<ApiResponse<RegistroPartoGestacion[]>>(`${this.baseUrl}/partos`, {
+        ...this.httpOptions,
+        params
+      })
+      .pipe(
+        map(res => {
+          if (res.success === false) {
+            throw new Error(res.message || 'Error al cargar historial de partos');
+          }
+          return Array.isArray(res.data) ? res.data : [];
+        }),
+        catchError(err => this.handleError(err))
+      );
+  }
+
+  siguienteNumeroParto(loteId: string, numeroEnLote: number): Observable<number> {
+    const params = new HttpParams()
+      .set('loteId', loteId)
+      .set('numeroEnLote', String(numeroEnLote));
+    return this.http
+      .get<ApiResponse<number>>(`${this.baseUrl}/siguiente-parto`, {
+        ...this.httpOptions,
+        params
+      })
+      .pipe(
+        map(res => {
+          if (res.success === false || res.data == null) {
+            throw new Error(res.message || 'Error al obtener número de parto');
+          }
+          return Number(res.data) || 1;
+        }),
+        catchError(err => this.handleError(err))
+      );
+  }
+
   private toRequest(c: Partial<ChanchaGestacion>) {
     return {
       loteId: c.loteId,
@@ -77,6 +166,7 @@ export class GestacionApiService {
       fechaInseminacion: c.fechaInseminacion,
       numeroParto: c.numeroParto ?? 1,
       observaciones: c.observaciones ?? null,
+      fotoUrl: c.fotoUrl ?? null,
       activa: c.activa !== false
     };
   }

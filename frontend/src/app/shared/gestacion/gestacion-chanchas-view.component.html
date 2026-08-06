@@ -12,7 +12,7 @@
 
   <p *ngIf="!esEdicion" class="gestacion-aviso-consulta">
     <i class="fas fa-info-circle"></i>
-    Los registros se gestionan desde el panel de administración. Aquí puede consultar el estado de cada chancha.
+    Los registros se gestionan desde el panel de administración. Aquí puede consultar gestaciones activas e historial de partos.
   </p>
 
   <section class="gestacion-stats" aria-label="Resumen">
@@ -29,7 +29,7 @@
       <span class="stat-card__val">{{ stats.preParto }}</span>
     </article>
     <article class="stat-card stat-card--ok">
-      <span class="stat-card__lbl">Paridas</span>
+      <span class="stat-card__lbl">Listas / paridas</span>
       <span class="stat-card__val">{{ stats.paridas }}</span>
     </article>
   </section>
@@ -42,9 +42,9 @@
   </section>
 
   <div class="gestacion-topbar">
-    <span class="gestacion-topbar__lbl">Registro de chanchas</span>
+    <span class="gestacion-topbar__lbl">Gestaciones activas</span>
     <button *ngIf="esEdicion" type="button" class="btn btn--primary" (click)="abrirNueva()">
-      + Nueva chancha
+      + Nueva gestación
     </button>
   </div>
 
@@ -63,17 +63,30 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngIf="chanchas.length === 0">
+        <tr *ngIf="chanchasActivas.length === 0">
           <td colspan="8" class="gestacion-empty">
-            No hay chanchas registradas.
-            <span *ngIf="esEdicion"> Agregue la primera con el botón superior.</span>
+            No hay gestaciones activas.
+            <span *ngIf="esEdicion"> Registre una nueva o vuelva a inseminar una chancha libre.</span>
           </td>
         </tr>
-        <tr *ngFor="let c of chanchas" class="gestacion-row">
+        <tr *ngFor="let c of chanchasActivas" class="gestacion-row">
           <td>
-            <strong>{{ c.nombre }}</strong>
-            <div *ngIf="subtituloChancha(c)" class="gestacion-sub">{{ subtituloChancha(c) }}</div>
-            <span *ngIf="c.activa === false" class="badge badge-gray gestacion-badge-baja">Baja</span>
+            <div class="chancha-cell">
+              <button
+                type="button"
+                class="chancha-avatar"
+                (click)="abrirCamaraFotoChancha(c, $event)"
+                [title]="c.fotoUrl ? 'Cambiar foto (cámara o archivo)' : 'Tomar / subir foto de la chancha'"
+              >
+                <img *ngIf="c.fotoUrl" [src]="urlFoto(c.fotoUrl)" [alt]="c.nombre" />
+                <span *ngIf="!c.fotoUrl" class="material-symbols-outlined chancha-avatar__ph">pets</span>
+                <span class="chancha-avatar__cam material-symbols-outlined">photo_camera</span>
+              </button>
+              <div>
+                <strong>{{ c.nombre }}</strong>
+                <div *ngIf="subtituloChancha(c)" class="gestacion-sub">{{ subtituloChancha(c) }}</div>
+              </div>
+            </div>
           </td>
           <td>{{ inseminacionFmt(c) }}</td>
           <td>{{ etapaDe(c) }}</td>
@@ -94,6 +107,9 @@
           <td class="td-acciones">
             <button type="button" class="btn btn--sm" (click)="verDetalle(c)" title="Ver detalle">Ver</button>
             <ng-container *ngIf="esEdicion">
+              <button type="button" class="btn btn--sm btn--parto" (click)="abrirRegistrarParto(c, $event)" title="Registrar parto y liberar chancha">
+                Parto
+              </button>
               <button type="button" class="btn btn--sm" (click)="abrirEditar(c)" title="Editar">Editar</button>
               <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)" title="Eliminar">Eliminar</button>
             </ng-container>
@@ -103,58 +119,201 @@
     </table>
   </div>
 
-  <section *ngIf="detalle" class="gestacion-detalle">
-    <div class="gestacion-detalle__head">
-      <div>
-        <h2 class="gestacion-detalle__nombre">{{ detalle.nombre }}</h2>
-        <p class="gestacion-detalle__sub">{{ detalle.raza || 'Sin raza' }} · Parto #{{ detalle.numeroParto }}</p>
-      </div>
-      <button type="button" class="btn btn--sm" (click)="cerrarDetalle()">Cerrar</button>
+  <section class="gestacion-historial" aria-label="Historial de partos">
+    <div class="gestacion-topbar">
+      <span class="gestacion-topbar__lbl">Historial de partos (lechones)</span>
     </div>
-    <div class="gestacion-detalle__grid">
-      <div class="info-item">
-        <span class="info-item__lbl">Fecha inseminación</span>
-        <span class="info-item__val">{{ inseminacionFmt(detalle) }}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-item__lbl">Días transcurridos</span>
-        <span class="info-item__val">{{ diasDe(detalle) }} de {{ diasTotal }}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-item__lbl">Parto estimado</span>
-        <span class="info-item__val">{{ partoEstimadoDe(detalle) }}</span>
-      </div>
-      <div class="info-item info-item--contador">
-        <span class="info-item__lbl">Faltan para el parto</span>
-        <div [ngClass]="claseContadorDias(detalle)" class="contador-dias-wrap contador-dias-wrap--lg">
-          <span *ngIf="numeroDiasFaltan(detalle) !== null" class="contador-dias__num">{{ numeroDiasFaltan(detalle) }}</span>
-          <span class="contador-dias__lbl">{{ textoDiasFaltan(detalle) }}</span>
-        </div>
-      </div>
-      <div *ngIf="detalle.observaciones" class="info-item info-item--full">
-        <span class="info-item__lbl">Observaciones</span>
-        <span class="info-item__val">{{ detalle.observaciones }}</span>
-      </div>
-    </div>
-    <h3 class="etapas-tit">Etapas de gestación</h3>
-    <div class="etapas-grid">
-      <div
-        *ngFor="let e of etapas; let i = index"
-        class="etapa"
-        [class.etapa--done]="i < etapaIdxDetalle()"
-        [class.etapa--active]="i === etapaIdxDetalle()"
-      >
-        <div class="etapa__nombre">{{ e.nombre }}</div>
-        <div class="etapa__dias">Días {{ e.dias }}</div>
-      </div>
+    <div class="gestacion-table-wrap">
+      <table class="gestacion-table">
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th>Chancha</th>
+            <th>Parto #</th>
+            <th>Fecha parto</th>
+            <th>Nacidos</th>
+            <th>Vivos</th>
+            <th>Muertos</th>
+            <th>Observaciones</th>
+            <th class="th-acciones">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="partos.length === 0">
+            <td colspan="9" class="gestacion-empty">
+              Aún no hay partos registrados.
+              <span *ngIf="esEdicion"> Use el botón «Parto» en una gestación activa.</span>
+            </td>
+          </tr>
+          <tr *ngFor="let p of partos">
+            <td>
+              <div class="hist-thumb">
+                <img *ngIf="p.fotoUrl" [src]="urlFoto(p.fotoUrl)" [alt]="'Parto ' + p.nombreChancha" />
+                <span *ngIf="!p.fotoUrl" class="material-symbols-outlined hist-thumb__ph">image</span>
+              </div>
+            </td>
+            <td>
+              <strong>{{ p.nombreChancha }}</strong>
+              <div *ngIf="p.loteNombre" class="gestacion-sub">{{ p.loteNombre }}</div>
+            </td>
+            <td>#{{ p.numeroParto }}</td>
+            <td>{{ fechaPartoFmt(p) }}</td>
+            <td>{{ p.lechonesNacidos }}</td>
+            <td>{{ p.lechonesVivos }}</td>
+            <td>{{ p.lechonesMuertos }}</td>
+            <td>{{ p.observaciones || '—' }}</td>
+            <td class="td-acciones">
+              <button type="button" class="btn btn--sm" (click)="verPartoHistorial(p)" title="Ver detalle">Ver</button>
+              <button
+                *ngIf="esEdicion"
+                type="button"
+                class="btn btn--sm"
+                (click)="abrirEditarParto(p)"
+                title="Corregir datos del parto"
+              >
+                Editar
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
+  <!-- Ficha profesional AgriManager (admin + consulta) -->
+  <section *ngIf="detalle" id="gestacion-ficha" class="ficha-gestacion" aria-label="Ficha de gestación">
+    <nav class="ficha-gestacion__crumbs">
+      <button type="button" class="ficha-gestacion__crumb-link" (click)="cerrarDetalle()">Gestación</button>
+      <span class="material-symbols-outlined ficha-gestacion__chevron">chevron_right</span>
+      <span class="ficha-gestacion__crumb-current">Ficha: {{ detalle.nombre }}</span>
+    </nav>
+
+    <div class="ficha-hero">
+      <div class="ficha-hero__media">
+        <img
+          *ngIf="detalle.fotoUrl"
+          class="ficha-hero__img"
+          [src]="urlFoto(detalle.fotoUrl)"
+          [alt]="'Fotografía de ' + detalle.nombre"
+        />
+        <div *ngIf="!detalle.fotoUrl" class="ficha-hero__placeholder">
+          <span class="material-symbols-outlined">pets</span>
+          <span>Sin fotografía</span>
+        </div>
+        <label class="ficha-hero__upload" [class.is-busy]="subiendoFotoDetalle">
+          <span class="material-symbols-outlined">photo_camera</span>
+          {{ subiendoFotoDetalle ? 'Subiendo…' : (detalle.fotoUrl ? 'Cambiar foto' : 'Tomar / subir foto') }}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            [id]="fileDetalleInputId"
+            (change)="onSelectFotoDetalle($event)"
+            [disabled]="subiendoFotoDetalle"
+          />
+        </label>
+      </div>
+
+      <div class="ficha-hero__body">
+        <div class="ficha-hero__top">
+          <h2 class="ficha-hero__title">{{ detalle.nombre }}</h2>
+          <div class="ficha-hero__badges">
+            <span *ngIf="detalle.raza" class="ficha-badge ficha-badge--raza">{{ detalle.raza }}</span>
+            <span class="ficha-badge ficha-badge--parto">Parto #{{ detalle.numeroParto }}</span>
+          </div>
+        </div>
+
+        <div class="ficha-hero__grid">
+          <div class="ficha-stat">
+            <span class="ficha-stat__lbl">Fecha Inseminación</span>
+            <span class="ficha-stat__val">{{ inseminacionFmt(detalle) }}</span>
+          </div>
+          <div class="ficha-stat">
+            <span class="ficha-stat__lbl">Días Transcurridos</span>
+            <span class="ficha-stat__val">{{ diasDe(detalle) >= 0 ? diasDe(detalle) : 0 }} / {{ diasTotal }}</span>
+          </div>
+          <div class="ficha-stat">
+            <span class="ficha-stat__lbl">Parto Estimado</span>
+            <span class="ficha-stat__val">{{ partoEstimadoDe(detalle) }}</span>
+          </div>
+        </div>
+
+        <div class="ficha-banner">
+          <div class="ficha-banner__left">
+            <span class="material-symbols-outlined fill">calendar_month</span>
+            <span class="ficha-banner__lbl">Faltan para el parto</span>
+          </div>
+          <span class="ficha-banner__num">{{ textoBannerParto(detalle) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ficha-block">
+      <h3 class="ficha-block__title">Etapas de Gestación</h3>
+      <div class="ficha-etapas">
+        <div
+          *ngFor="let e of etapas; let i = index"
+          class="ficha-etapa"
+          [class.ficha-etapa--active]="i === etapaIdxDetalle()"
+          [class.ficha-etapa--done]="i < etapaIdxDetalle()"
+          [class.ficha-etapa--pending]="i > etapaIdxDetalle()"
+        >
+          <span class="ficha-etapa__dias">{{ e.diasLabel || ('Días ' + e.dias) }}</span>
+          <span class="ficha-etapa__nombre">{{ e.nombreCorto || e.nombre }}</span>
+          <span *ngIf="i <= etapaIdxDetalle() && etapaIdxDetalle() >= 0" class="material-symbols-outlined fill ficha-etapa__check">check_circle</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ficha-block">
+      <h3 class="ficha-block__title">Observaciones</h3>
+      <div class="ficha-obs">
+        <p>{{ detalle.observaciones || 'Sin observaciones registradas.' }}</p>
+      </div>
+    </div>
+
+    <div *ngIf="partosDeChancha(detalle).length > 0" class="ficha-block">
+      <h3 class="ficha-block__title">Historial de partos de esta chancha</h3>
+      <div class="ficha-partos-grid">
+        <article *ngFor="let p of partosDeChancha(detalle)" class="ficha-parto-card">
+          <div class="ficha-parto-card__media">
+            <img *ngIf="p.fotoUrl" [src]="urlFoto(p.fotoUrl)" [alt]="'Foto parto #' + p.numeroParto" />
+            <span *ngIf="!p.fotoUrl" class="material-symbols-outlined">nest_eco_leaf</span>
+          </div>
+          <div class="ficha-parto-card__body">
+            <strong>Parto #{{ p.numeroParto }}</strong>
+            <span>{{ fechaPartoFmt(p) }}</span>
+            <span>{{ p.lechonesVivos }}/{{ p.lechonesNacidos }} vivos
+              <ng-container *ngIf="p.lechonesMuertos"> · {{ p.lechonesMuertos }} muertos</ng-container>
+            </span>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="ficha-actions">
+      <button type="button" class="ficha-btn ficha-btn--ghost" (click)="cerrarDetalle()">Cerrar</button>
+      <button
+        *ngIf="esEdicion && detalle.activa !== false"
+        type="button"
+        class="ficha-btn ficha-btn--primary"
+        (click)="abrirRegistrarParto(detalle)"
+      >
+        Registrar Parto
+      </button>
+    </div>
+  </section>
+
+  <!-- Modal nueva / editar gestación -->
   <div *ngIf="mostrarModal && esEdicion" class="gestacion-overlay" (click)="cerrarModal()" role="dialog" aria-modal="true">
     <div class="gestacion-modal" (click)="$event.stopPropagation()">
-      <h2 class="gestacion-modal__title">{{ form.id ? 'Editar chancha' : 'Registrar chancha' }}</h2>
+      <h2 class="gestacion-modal__title">{{ form.id ? 'Editar gestación' : 'Nueva gestación' }}</h2>
       <p *ngIf="mensajeError" class="gestacion-modal__error">{{ mensajeError }}</p>
       <p *ngIf="lotesError" class="gestacion-modal__error">{{ lotesError }}</p>
+      <p class="gestacion-modal__hint">
+        Solo aparecen chanchas libres (sin gestación activa). Las que ya parieron vuelven a estar disponibles.
+      </p>
 
       <label class="fg fg--full">
         <span>Lote *</span>
@@ -207,6 +366,7 @@
         <label class="fg">
           <span>Número de parto</span>
           <input type="number" min="1" [(ngModel)]="form.numeroParto" />
+          <span class="gestacion-hint">Se calcula automáticamente según el historial</span>
         </label>
       </div>
       <label class="fg fg--full">
@@ -214,9 +374,31 @@
         <input type="text" [(ngModel)]="form.observaciones" placeholder="Notas adicionales..." />
       </label>
 
+      <div class="fg fg--full">
+        <span>Foto de la chancha</span>
+        <div class="foto-upload-row">
+          <div class="foto-preview" *ngIf="form.fotoUrl">
+            <img [src]="urlFoto(form.fotoUrl)" alt="Vista previa" />
+            <button type="button" class="btn btn--sm" (click)="quitarFotoForm()">Quitar</button>
+          </div>
+          <label class="btn btn--sm" [class.is-disabled]="subiendoFoto">
+            {{ subiendoFoto ? 'Subiendo…' : (form.fotoUrl ? 'Cambiar foto' : 'Tomar / subir foto') }}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              [id]="fileGestacionInputId"
+              (change)="onSelectFotoGestacion($event)"
+              [disabled]="subiendoFoto"
+            />
+          </label>
+        </div>
+      </div>
+
       <label class="fg fg--full gestacion-check" *ngIf="form.id">
         <input type="checkbox" [(ngModel)]="form.activa" (ngModelChange)="actualizarOpcionesChancha()" />
-        <span>Chancha activa en el lote (desmarcar si fue vendida o murió)</span>
+        <span>Gestación activa (desmarcar solo si baja por venta/muerte, no por parto)</span>
       </label>
       <div class="gestacion-modal__actions">
         <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
@@ -226,4 +408,229 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal registrar parto -->
+  <div *ngIf="mostrarModalParto && esEdicion" class="gestacion-overlay" (click)="cerrarModalParto()" role="dialog" aria-modal="true">
+    <div class="gestacion-modal gestacion-modal--parto" (click)="$event.stopPropagation()">
+      <h2 class="gestacion-modal__title">Registrar parto</h2>
+      <p class="gestacion-modal__hint">
+        <strong>{{ formParto.nombreChancha }}</strong> — al guardar se cierra el ciclo y la chancha queda libre para una nueva gestación.
+      </p>
+      <p *ngIf="mensajeErrorParto" class="gestacion-modal__error">{{ mensajeErrorParto }}</p>
+
+      <label class="fg fg--full">
+        <span>Fecha de parto *</span>
+        <input type="date" [(ngModel)]="formParto.fechaParto" />
+      </label>
+
+      <div class="gestacion-form-row">
+        <label class="fg">
+          <span>Lechones nacidos *</span>
+          <input type="number" min="0" [(ngModel)]="formParto.lechonesNacidos" />
+        </label>
+        <label class="fg">
+          <span>Lechones vivos *</span>
+          <input type="number" min="0" [(ngModel)]="formParto.lechonesVivos" />
+        </label>
+      </div>
+      <div class="gestacion-form-row">
+        <label class="fg">
+          <span>Lechones muertos</span>
+          <input type="number" min="0" [(ngModel)]="formParto.lechonesMuertos" />
+        </label>
+        <label class="fg">
+          <span>Observaciones</span>
+          <input type="text" [(ngModel)]="formParto.observaciones" placeholder="Opcional" />
+        </label>
+      </div>
+
+      <div class="fg fg--full">
+        <span>Foto post-parto (historial)</span>
+        <div class="foto-upload-row">
+          <div class="foto-preview" *ngIf="formParto.fotoUrl">
+            <img [src]="urlFoto(formParto.fotoUrl)" alt="Vista previa parto" />
+            <button type="button" class="btn btn--sm" (click)="quitarFotoParto()">Quitar</button>
+          </div>
+          <label class="btn btn--sm" [class.is-disabled]="subiendoFotoParto">
+            {{ subiendoFotoParto ? 'Subiendo…' : (formParto.fotoUrl ? 'Cambiar foto' : 'Tomar / subir foto') }}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              [id]="filePartoInputId"
+              (change)="onSelectFotoParto($event)"
+              [disabled]="subiendoFotoParto"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div class="gestacion-modal__actions">
+        <button type="button" class="btn" (click)="cerrarModalParto()" [disabled]="guardandoParto">Cancelar</button>
+        <button type="button" class="btn btn--primary btn--parto" (click)="guardarParto()" [disabled]="guardandoParto || subiendoFotoParto">
+          {{ guardandoParto ? 'Guardando…' : 'Confirmar parto' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal VER parto (admin + consulta) -->
+  <div *ngIf="partoVista" class="gestacion-overlay" (click)="cerrarPartoVista()" role="dialog" aria-modal="true">
+    <div class="gestacion-modal gestacion-modal--parto-vista" (click)="$event.stopPropagation()">
+      <h2 class="gestacion-modal__title">Detalle del parto</h2>
+      <p class="gestacion-modal__hint">
+        <strong>{{ partoVista.nombreChancha }}</strong>
+        <span *ngIf="partoVista.loteNombre"> · {{ partoVista.loteNombre }}</span>
+        · Parto #{{ partoVista.numeroParto }}
+      </p>
+
+      <div class="parto-vista-fotos">
+        <div class="parto-vista-foto">
+          <span class="parto-vista-foto__lbl">Foto de la chancha</span>
+          <div class="parto-vista-media" *ngIf="fotoChanchaDeParto(partoVista); else sinFotoChancha">
+            <img
+              [src]="urlFoto(fotoChanchaDeParto(partoVista))"
+              [alt]="'Foto chancha ' + partoVista.nombreChancha"
+            />
+          </div>
+          <ng-template #sinFotoChancha>
+            <div class="parto-vista-media parto-vista-media--empty">
+              <span class="material-symbols-outlined">pets</span>
+              <span>Sin foto de chancha</span>
+            </div>
+          </ng-template>
+        </div>
+        <div class="parto-vista-foto">
+          <span class="parto-vista-foto__lbl">Foto del parto</span>
+          <div class="parto-vista-media" *ngIf="partoVista.fotoUrl; else sinFotoParto">
+            <img [src]="urlFoto(partoVista.fotoUrl)" [alt]="'Foto parto ' + partoVista.nombreChancha" />
+          </div>
+          <ng-template #sinFotoParto>
+            <div class="parto-vista-media parto-vista-media--empty">
+              <span class="material-symbols-outlined">image</span>
+              <span>Sin foto de parto</span>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+
+      <div class="parto-vista-grid">
+        <div class="info-item">
+          <span class="info-item__lbl">Fecha de parto</span>
+          <span class="info-item__val">{{ fechaPartoFmt(partoVista) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__lbl">Lechones nacidos</span>
+          <span class="info-item__val">{{ partoVista.lechonesNacidos }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__lbl">Lechones vivos</span>
+          <span class="info-item__val">{{ partoVista.lechonesVivos }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__lbl">Lechones muertos</span>
+          <span class="info-item__val">{{ partoVista.lechonesMuertos }}</span>
+        </div>
+        <div class="info-item info-item--full" *ngIf="partoVista.observaciones">
+          <span class="info-item__lbl">Observaciones</span>
+          <span class="info-item__val">{{ partoVista.observaciones }}</span>
+        </div>
+      </div>
+
+      <div class="gestacion-modal__actions">
+        <button type="button" class="btn" (click)="cerrarPartoVista()">Cerrar</button>
+        <button
+          *ngIf="esEdicion"
+          type="button"
+          class="btn btn--primary"
+          (click)="abrirEditarParto(partoVista)"
+        >
+          Editar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal EDITAR parto (solo administrador) -->
+  <div *ngIf="mostrarModalEditarParto && esEdicion" class="gestacion-overlay" (click)="cerrarModalEditarParto()" role="dialog" aria-modal="true">
+    <div class="gestacion-modal gestacion-modal--parto" (click)="$event.stopPropagation()">
+      <h2 class="gestacion-modal__title">Editar parto</h2>
+      <p class="gestacion-modal__hint">
+        Corrija los datos de <strong>{{ formEditarParto.nombreChancha }}</strong> · Parto #{{ formEditarParto.numeroParto }}.
+        Esto no reabre la gestación.
+      </p>
+      <p *ngIf="mensajeErrorEditarParto" class="gestacion-modal__error">{{ mensajeErrorEditarParto }}</p>
+
+      <label class="fg fg--full">
+        <span>Fecha de parto *</span>
+        <input type="date" [(ngModel)]="formEditarParto.fechaParto" />
+      </label>
+
+      <div class="gestacion-form-row">
+        <label class="fg">
+          <span>Lechones nacidos *</span>
+          <input type="number" min="0" [(ngModel)]="formEditarParto.lechonesNacidos" />
+        </label>
+        <label class="fg">
+          <span>Lechones vivos *</span>
+          <input type="number" min="0" [(ngModel)]="formEditarParto.lechonesVivos" />
+        </label>
+      </div>
+      <div class="gestacion-form-row">
+        <label class="fg">
+          <span>Lechones muertos</span>
+          <input type="number" min="0" [(ngModel)]="formEditarParto.lechonesMuertos" />
+        </label>
+        <label class="fg">
+          <span>Observaciones</span>
+          <input type="text" [(ngModel)]="formEditarParto.observaciones" placeholder="Opcional" />
+        </label>
+      </div>
+
+      <div class="fg fg--full">
+        <span>Foto post-parto</span>
+        <div class="foto-upload-row">
+          <div class="foto-preview" *ngIf="formEditarParto.fotoUrl">
+            <img [src]="urlFoto(formEditarParto.fotoUrl)" alt="Vista previa parto" />
+            <button type="button" class="btn btn--sm" (click)="quitarFotoEditarParto()">Quitar</button>
+          </div>
+          <label class="btn btn--sm" [class.is-disabled]="subiendoFotoEditarParto">
+            {{ subiendoFotoEditarParto ? 'Subiendo…' : (formEditarParto.fotoUrl ? 'Cambiar foto' : 'Tomar / subir foto') }}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              [id]="fileEditarPartoInputId"
+              (change)="onSelectFotoEditarParto($event)"
+              [disabled]="subiendoFotoEditarParto"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div class="gestacion-modal__actions">
+        <button type="button" class="btn" (click)="cerrarModalEditarParto()" [disabled]="guardandoEditarParto">Cancelar</button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          (click)="guardarEditarParto()"
+          [disabled]="guardandoEditarParto || subiendoFotoEditarParto"
+        >
+          {{ guardandoEditarParto ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- input oculto para foto rápida desde la lista (admin y consulta) -->
+  <input
+    #inputFotoLista
+    type="file"
+    accept="image/*"
+    capture="environment"
+    hidden
+    (change)="onSelectFotoLista($event)"
+  />
 </div>

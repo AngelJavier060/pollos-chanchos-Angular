@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,12 +21,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "gestacion_chancha")
-public class RegistroGestacion {
+@Table(name = "gestacion_parto")
+public class RegistroPartoGestacion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "gestacion_id", nullable = false)
+    private Long gestacionId;
 
     @Column(name = "lote_id", nullable = false, length = 255)
     private String loteId;
@@ -35,33 +37,30 @@ public class RegistroGestacion {
     @Column(name = "numero_en_lote", nullable = false)
     private Integer numeroEnLote;
 
-    @Column(nullable = false, length = 100)
-    private String nombre;
-
-    @Column(length = 150)
-    private String raza;
-
-    @Column(name = "fecha_inseminacion", nullable = false)
-    private LocalDate fechaInseminacion;
+    @Column(name = "nombre_chancha", nullable = false, length = 100)
+    private String nombreChancha;
 
     @Column(name = "numero_parto", nullable = false)
-    private Integer numeroParto = 1;
+    private Integer numeroParto;
+
+    @Column(name = "fecha_parto", nullable = false)
+    private LocalDate fechaParto;
+
+    @Column(name = "lechones_nacidos", nullable = false)
+    private Integer lechonesNacidos = 0;
+
+    @Column(name = "lechones_vivos", nullable = false)
+    private Integer lechonesVivos = 0;
+
+    @Column(name = "lechones_muertos", nullable = false)
+    private Integer lechonesMuertos = 0;
 
     @Column(columnDefinition = "TEXT")
     private String observaciones;
 
-    /** Foto de la chancha durante la gestación (URL relativa /uploads/...) */
+    /** Foto post-parto / camada (URL relativa /uploads/...) */
     @Column(name = "foto_url", length = 500)
     private String fotoUrl;
-
-    @Column(nullable = false)
-    private Boolean activa = true;
-
-    @Column(name = "lote_codigo", length = 50)
-    private String loteCodigo;
-
-    @Column(name = "lote_nombre", length = 255)
-    private String loteNombre;
 
     @Column(name = "usuario_registro", length = 255)
     private String usuarioRegistro;
@@ -69,8 +68,4 @@ public class RegistroGestacion {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 }

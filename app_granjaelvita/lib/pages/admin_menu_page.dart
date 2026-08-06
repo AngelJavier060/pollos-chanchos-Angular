@@ -110,7 +110,7 @@ class AdminMenuPage extends StatelessWidget {
       },
       {
         'label': 'Gestación',
-        'icon': Icons.pregnant_woman_rounded,
+        'icon': Icons.pets_rounded,
         'colorLight': const Color(0xFFBCAAA4),
         'colorDark': const Color(0xFF6D4C41),
       },

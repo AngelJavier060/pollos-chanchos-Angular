@@ -9,11 +9,11 @@ import {
 export const DIAS_GESTACION_TOTAL = 114;
 
 export const ETAPAS_GESTACION: EtapaGestacion[] = [
-  { nombre: 'Confirmación', dias: '1–21', inicio: 1, fin: 21 },
-  { nombre: 'Gestación temprana', dias: '22–35', inicio: 22, fin: 35 },
-  { nombre: 'Gestación media', dias: '36–85', inicio: 36, fin: 85 },
-  { nombre: 'Pre-parto', dias: '86–107', inicio: 86, fin: 107 },
-  { nombre: 'Parto', dias: '108–114', inicio: 108, fin: 114 }
+  { nombre: 'Confirmación', nombreCorto: 'Confirmación', dias: '1–21', diasLabel: 'Días 1-21', inicio: 1, fin: 21 },
+  { nombre: 'Gestación temprana', nombreCorto: 'Temprana', dias: '22–35', diasLabel: 'Días 22-35', inicio: 22, fin: 35 },
+  { nombre: 'Gestación media', nombreCorto: 'Media', dias: '36–85', diasLabel: 'Días 36-85', inicio: 36, fin: 85 },
+  { nombre: 'Pre-parto', nombreCorto: 'Pre-parto', dias: '86–107', diasLabel: 'Días 86-107', inicio: 86, fin: 107 },
+  { nombre: 'Parto', nombreCorto: 'Parto', dias: '108–114', diasLabel: 'Días 108-114', inicio: 108, fin: 114 }
 ];
 
 export function parseFechaLocal(fechaISO: string): Date {

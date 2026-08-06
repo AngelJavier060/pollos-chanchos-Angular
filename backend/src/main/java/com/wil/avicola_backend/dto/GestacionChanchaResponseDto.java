@@ -16,6 +16,7 @@ public class GestacionChanchaResponseDto {
     private String fechaInseminacion;
     private Integer numeroParto;
     private String observaciones;
+    private String fotoUrl;
     private String loteId;
     private String loteCodigo;
     private String loteNombre;

@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/gestacion_chancha_model.dart';
+import '../models/gestacion_parto_model.dart';
 import '../services/gestacion_service.dart';
 import '../services/lote_service.dart';
 import '../utils/gestacion_calculo.dart';
+import '../utils/gestacion_image_picker.dart';
 import '../utils/gestacion_lote_helper.dart';
+import '../utils/gestacion_media.dart';
+import 'gestacion_ficha_page.dart';
+import 'gestacion_parto_sheets.dart';
 
 /// Paleta alineada al mockup Tailwind (slate / emerald / amber).
 abstract final class _GTheme {
@@ -82,6 +87,9 @@ class _GestacionPageState extends State<GestacionPage> {
   bool _loading = true;
   String? _error;
   List<GestacionChancha> _chanchas = [];
+  List<GestacionParto> _partos = [];
+
+  List<GestacionChancha> get _activas => _chanchas.where((c) => c.activa).toList();
 
   @override
   void initState() {
@@ -96,9 +104,16 @@ class _GestacionPageState extends State<GestacionPage> {
     });
     try {
       final lista = await _service.listar();
+      List<GestacionParto> partos = [];
+      try {
+        partos = await _service.listarPartos();
+      } catch (_) {
+        partos = [];
+      }
       if (!mounted) return;
       setState(() {
         _chanchas = lista;
+        _partos = partos;
         _loading = false;
       });
     } catch (e) {
@@ -107,6 +122,38 @@ class _GestacionPageState extends State<GestacionPage> {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _abrirFicha(GestacionChancha c) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => GestacionFichaPage(
+          chancha: c,
+          modoEdicion: widget.modoEdicion,
+          partosIniciales: _partos,
+        ),
+      ),
+    );
+    if (changed == true) _cargar();
+  }
+
+  /// Usuario y admin pueden tomar/subir foto en vivo y guardarla en el servidor.
+  Future<void> _actualizarFotoChancha(GestacionChancha c) async {
+    final file = await pickGestacionImage(context);
+    if (file == null) return;
+    try {
+      final url = await _service.uploadFoto(file);
+      final body = c.toRequestBody()..['fotoUrl'] = url;
+      await _service.actualizar(c.id, body);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto de la chancha guardada')),
+      );
+      _cargar();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -133,9 +180,10 @@ class _GestacionPageState extends State<GestacionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = calcularStats(_chanchas.map((c) => c.fechaInseminacion).toList());
+    final activas = _activas;
+    final stats = calcularStats(activas.map((c) => c.fechaInseminacion).toList());
     final alertas = calcularAlertas(
-      _chanchas.map((c) => (nombre: c.nombre, fechaInseminacion: c.fechaInseminacion)).toList(),
+      activas.map((c) => (nombre: c.nombre, fechaInseminacion: c.fechaInseminacion)).toList(),
     );
 
     return Scaffold(
@@ -185,7 +233,7 @@ class _GestacionPageState extends State<GestacionPage> {
                       ],
                       const SizedBox(height: 24),
                       Text(
-                        'Registro de chanchas (${_chanchas.length})',
+                        'Gestaciones activas (${activas.length})',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -193,21 +241,109 @@ class _GestacionPageState extends State<GestacionPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      if (_chanchas.isEmpty)
+                      if (activas.isEmpty)
                         const Padding(
                           padding: EdgeInsets.all(24),
-                          child: Center(child: Text('No hay chanchas registradas.')),
+                          child: Center(child: Text('No hay gestaciones activas.')),
                         )
                       else
-                        ..._chanchas.map((c) => Padding(
+                        ...activas.map((c) => Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: _buildCard(c),
+                            )),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Historial de partos (${_partos.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _GTheme.slate800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_partos.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('Aún no hay partos registrados.'),
+                        )
+                      else
+                        ..._partos.map((p) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _buildPartoCard(p),
                             )),
                     ],
                   ),
                 ),
     );
   }
+
+  Widget _buildPartoCard(GestacionParto p) {
+    final thumb = resolveGestacionMediaUrl(
+      p.fotoUrl.isNotEmpty ? p.fotoUrl : p.fotoChanchaUrl,
+    );
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _GTheme.slate100),
+        boxShadow: _GTheme.softShadow,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: thumb.isNotEmpty
+                ? Image.network(thumb, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _partoPh())
+                : _partoPh(),
+          ),
+        ),
+        title: Text(p.nombreChancha, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+          'Parto #${p.numeroParto} · ${formatFechaEs(p.fechaParto)}\n'
+          '${p.lechonesVivos}/${p.lechonesNacidos} vivos'
+          '${p.loteNombre.isNotEmpty ? ' · ${p.loteNombre}' : ''}',
+        ),
+        isThreeLine: true,
+        trailing: Wrap(
+          spacing: 0,
+          children: [
+            IconButton(
+              tooltip: 'Ver',
+              icon: const Icon(Icons.visibility_outlined, color: _GTheme.slate700),
+              onPressed: () => showVerPartoSheet(
+                context: context,
+                parto: p,
+                modoEdicion: widget.modoEdicion,
+                service: _service,
+                onUpdated: (_) => _cargar(),
+              ),
+            ),
+            if (widget.modoEdicion)
+              IconButton(
+                tooltip: 'Editar',
+                icon: const Icon(Icons.edit_outlined, color: _GTheme.emerald600),
+                onPressed: () async {
+                  final u = await showEditarPartoSheet(
+                    context: context,
+                    service: _service,
+                    parto: p,
+                  );
+                  if (u != null) _cargar();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _partoPh() => Container(
+        color: _GTheme.slate100,
+        child: const Icon(Icons.pets_rounded, color: _GTheme.slate500),
+      );
 
   Widget _buildFab() {
     return Material(
@@ -230,7 +366,7 @@ class _GestacionPageState extends State<GestacionPage> {
                 Icon(Icons.add, color: _GTheme.slate900, size: 28),
                 SizedBox(width: 12),
                 Text(
-                  'Nueva chancha',
+                  'Nueva gestación',
                   style: TextStyle(
                     color: _GTheme.slate900,
                     fontWeight: FontWeight.bold,
@@ -279,7 +415,7 @@ class _GestacionPageState extends State<GestacionPage> {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Solo consulta. Los registros se gestionan desde administración.',
+              'Consulta: puede ver y tomar/subir foto de la chancha. Registrar parto y editar datos es en administración.',
               style: TextStyle(fontSize: 13, color: _GTheme.slate700, fontWeight: FontWeight.w500),
             ),
           ),
@@ -390,6 +526,8 @@ class _GestacionPageState extends State<GestacionPage> {
     final parto = fechaPartoEstimada(c.fechaInseminacion);
     final diasTrans = diasTranscurridos(c.fechaInseminacion);
 
+    final foto = resolveGestacionMediaUrl(c.fotoUrl);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -409,27 +547,71 @@ class _GestacionPageState extends State<GestacionPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    GestureDetector(
+                      onTap: () => _actualizarFotoChancha(c),
+                      child: Stack(
                         children: [
-                          Text(
-                            c.nombre,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: _GTheme.slate900,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 64,
+                              height: 64,
+                              child: foto.isNotEmpty
+                                  ? Image.network(
+                                      foto,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _partoPh(),
+                                    )
+                                  : _partoPh(),
                             ),
                           ),
-                          if (c.subtituloLote.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                c.subtituloLote,
-                                style: const TextStyle(fontSize: 12, color: _GTheme.slate500),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: _GTheme.emerald600,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(color: Colors.white, width: 1.5),
+                              ),
+                              child: const Icon(Icons.photo_camera, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _abrirFicha(c),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.nombre,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _GTheme.slate900,
                               ),
                             ),
-                        ],
+                            if (c.subtituloLote.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  c.subtituloLote,
+                                  style: const TextStyle(fontSize: 12, color: _GTheme.slate500),
+                                ),
+                              ),
+                            const SizedBox(height: 2),
+                            Text(
+                              foto.isNotEmpty ? 'Toca la foto para cambiarla' : 'Toca para tomar foto',
+                              style: const TextStyle(fontSize: 11, color: _GTheme.emerald600),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     if (!c.activa) _badge('Baja', _GTheme.slate100, _GTheme.slate500),
@@ -503,32 +685,58 @@ class _GestacionPageState extends State<GestacionPage> {
               ],
             ),
           ),
-          if (widget.modoEdicion)
-            Container(
+          Container(
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: Color(0xFFF8FAFC))),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
               child: Row(
                 children: [
                   Expanded(
                     child: _actionButton(
-                      label: 'Editar',
-                      icon: Icons.edit_outlined,
-                      color: _GTheme.emerald600,
-                      hoverBg: _GTheme.emerald50,
-                      onPressed: () => _abrirFormulario(existente: c),
+                      label: 'Ver',
+                      icon: Icons.visibility_outlined,
+                      color: _GTheme.slate700,
+                      hoverBg: _GTheme.slate100,
+                      onPressed: () => _abrirFicha(c),
                     ),
                   ),
-                  Expanded(
-                    child: _actionButton(
-                      label: 'Eliminar',
-                      icon: Icons.delete_outline,
-                      color: _GTheme.rose500,
-                      hoverBg: _GTheme.rose50,
-                      onPressed: () => _confirmarEliminar(c),
+                  if (widget.modoEdicion) ...[
+                    Expanded(
+                      child: _actionButton(
+                        label: 'Parto',
+                        icon: Icons.pets_rounded,
+                        color: _GTheme.emerald700,
+                        hoverBg: _GTheme.emerald50,
+                        onPressed: () async {
+                          final ok = await showRegistrarPartoSheet(
+                            context: context,
+                            service: _service,
+                            chancha: c,
+                          );
+                          if (ok == true) _cargar();
+                        },
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: _actionButton(
+                        label: 'Editar',
+                        icon: Icons.edit_outlined,
+                        color: _GTheme.emerald600,
+                        hoverBg: _GTheme.emerald50,
+                        onPressed: () => _abrirFormulario(existente: c),
+                      ),
+                    ),
+                    Expanded(
+                      child: _actionButton(
+                        label: 'Eliminar',
+                        icon: Icons.delete_outline,
+                        color: _GTheme.rose500,
+                        hoverBg: _GTheme.rose50,
+                        onPressed: () => _confirmarEliminar(c),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -730,6 +938,7 @@ class _GestacionFormSheet extends StatefulWidget {
 
 class _GestacionFormSheetState extends State<_GestacionFormSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _service = GestacionService();
   LoteDto? _lote;
   int? _numeroChancha;
   DateTime _fechaInseminacion = DateTime.now();
@@ -737,6 +946,8 @@ class _GestacionFormSheetState extends State<_GestacionFormSheet> {
   final _partoController = TextEditingController(text: '1');
   bool _activa = true;
   bool _guardando = false;
+  bool _subiendoFoto = false;
+  String _fotoUrl = '';
 
   @override
   void initState() {
@@ -753,6 +964,7 @@ class _GestacionFormSheetState extends State<_GestacionFormSheet> {
       _obsController.text = e.observaciones;
       _partoController.text = e.numeroParto.toString();
       _activa = e.activa;
+      _fotoUrl = e.fotoUrl;
     } else if (widget.lotes.isNotEmpty) {
       _lote = widget.lotes.first;
     }
@@ -774,6 +986,32 @@ class _GestacionFormSheetState extends State<_GestacionFormSheet> {
     );
   }
 
+  Future<void> _onNumeroChanged(int? v) async {
+    setState(() => _numeroChancha = v);
+    if (widget.existente != null || _lote == null || v == null) return;
+    try {
+      final n = await _service.siguienteNumeroParto(_lote!.id, v);
+      if (!mounted) return;
+      setState(() => _partoController.text = '$n');
+    } catch (_) {}
+  }
+
+  Future<void> _pickFoto() async {
+    final file = await pickGestacionImage(context);
+    if (file == null) return;
+    setState(() => _subiendoFoto = true);
+    try {
+      final url = await _service.uploadFoto(file);
+      if (!mounted) return;
+      setState(() => _fotoUrl = url);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _subiendoFoto = false);
+    }
+  }
+
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate() || _lote == null || _numeroChancha == null) return;
     setState(() => _guardando = true);
@@ -784,6 +1022,7 @@ class _GestacionFormSheetState extends State<_GestacionFormSheet> {
         'fechaInseminacion': DateFormat('yyyy-MM-dd').format(_fechaInseminacion),
         'numeroParto': int.tryParse(_partoController.text.trim()) ?? 1,
         'observaciones': _obsController.text.trim(),
+        'fotoUrl': _fotoUrl.isEmpty ? null : _fotoUrl,
         'activa': _activa,
       };
       await widget.onGuardar(body, widget.existente?.id);
@@ -929,10 +1168,40 @@ class _GestacionFormSheetState extends State<_GestacionFormSheet> {
                                     ),
                                   ))
                               .toList(),
-                          onChanged: widget.existente != null
-                              ? null
-                              : (v) => setState(() => _numeroChancha = v),
+                          onChanged: widget.existente != null ? null : _onNumeroChanged,
                           validator: (v) => v == null ? 'Seleccione la chancha' : null,
+                        ),
+                        const SizedBox(height: 24),
+                        _formLabel('Foto de la chancha'),
+                        Row(
+                          children: [
+                            if (_fotoUrl.isNotEmpty)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  resolveGestacionMediaUrl(_fotoUrl),
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox(width: 64, height: 64),
+                                ),
+                              ),
+                            if (_fotoUrl.isNotEmpty) const SizedBox(width: 10),
+                            OutlinedButton.icon(
+                              onPressed: _subiendoFoto ? null : _pickFoto,
+                              icon: const Icon(Icons.pets_rounded, size: 18),
+                              label: Text(
+                                _subiendoFoto
+                                    ? 'Subiendo…'
+                                    : (_fotoUrl.isEmpty ? 'Tomar / subir' : 'Cambiar'),
+                              ),
+                            ),
+                            if (_fotoUrl.isNotEmpty)
+                              IconButton(
+                                onPressed: () => setState(() => _fotoUrl = ''),
+                                icon: const Icon(Icons.close),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 24),
                         _formLabel('Fecha de inseminación'),

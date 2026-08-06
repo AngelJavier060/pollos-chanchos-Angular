@@ -9,10 +9,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wil.avicola_backend.dto.GestacionChanchaRequestDto;
 import com.wil.avicola_backend.dto.GestacionChanchaResponseDto;
+import com.wil.avicola_backend.dto.GestacionPartoRequestDto;
+import com.wil.avicola_backend.dto.GestacionPartoResponseDto;
 import com.wil.avicola_backend.model.Lote;
 import com.wil.avicola_backend.model.RegistroGestacion;
+import com.wil.avicola_backend.model.RegistroPartoGestacion;
 import com.wil.avicola_backend.repository.LoteRepository;
 import com.wil.avicola_backend.repository.RegistroGestacionRepository;
+import com.wil.avicola_backend.repository.RegistroPartoGestacionRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,6 +27,7 @@ public class GestacionService {
     public static final int DIAS_GESTACION = 114;
 
     private final RegistroGestacionRepository gestacionRepository;
+    private final RegistroPartoGestacionRepository partoRepository;
     private final LoteRepository loteRepository;
 
     public List<GestacionChanchaResponseDto> listarTodos() {
@@ -44,6 +49,9 @@ public class GestacionService {
         validarCupoDisponible(lote, dto.getNumeroEnLote(), null);
 
         boolean activa = dto.getActiva() == null || dto.getActiva();
+        if (dto.getNumeroParto() == null || dto.getNumeroParto() <= 0) {
+            dto.setNumeroParto(siguienteNumeroParto(lote.getId(), dto.getNumeroEnLote()));
+        }
         RegistroGestacion reg = construirEntidad(dto, lote, activa, usuario);
         return toDto(gestacionRepository.save(reg));
     }
@@ -67,6 +75,9 @@ public class GestacionService {
         reg.setFechaInseminacion(LocalDate.parse(dto.getFechaInseminacion()));
         reg.setNumeroParto(dto.getNumeroParto() != null && dto.getNumeroParto() > 0 ? dto.getNumeroParto() : 1);
         reg.setObservaciones(dto.getObservaciones());
+        if (dto.getFotoUrl() != null) {
+            reg.setFotoUrl(dto.getFotoUrl().isBlank() ? null : dto.getFotoUrl().trim());
+        }
         reg.setActiva(activa);
         reg.setLoteCodigo(lote.getCodigo());
         reg.setLoteNombre(lote.getName());
@@ -85,8 +96,167 @@ public class GestacionService {
         gestacionRepository.deleteById(id);
     }
 
+    /**
+     * Registra el parto, guarda lechones en historial y cierra el ciclo
+     * (activa=false) para liberar el cupo de la chancha.
+     */
+    @Transactional
+    public GestacionPartoResponseDto registrarParto(Long gestacionId, GestacionPartoRequestDto dto, String usuario) {
+        RegistroGestacion gestacion = gestacionRepository.findById(gestacionId)
+                .orElseThrow(() -> new IllegalArgumentException("Registro de gestación no encontrado."));
+        if (Boolean.FALSE.equals(gestacion.getActiva())) {
+            throw new IllegalArgumentException(
+                    "Esta gestación ya está cerrada. No se puede registrar otro parto sobre ella.");
+        }
+        validarPartoRequest(dto);
+
+        LocalDate fechaParto = LocalDate.parse(dto.getFechaParto());
+        if (fechaParto.isBefore(gestacion.getFechaInseminacion())) {
+            throw new IllegalArgumentException(
+                    "La fecha de parto no puede ser anterior a la fecha de inseminación.");
+        }
+
+        int numeroParto = gestacion.getNumeroParto() != null && gestacion.getNumeroParto() > 0
+                ? gestacion.getNumeroParto()
+                : siguienteNumeroParto(gestacion.getLoteId(), gestacion.getNumeroEnLote());
+
+        RegistroPartoGestacion parto = RegistroPartoGestacion.builder()
+                .gestacionId(gestacion.getId())
+                .loteId(gestacion.getLoteId())
+                .numeroEnLote(gestacion.getNumeroEnLote())
+                .nombreChancha(gestacion.getNombre())
+                .numeroParto(numeroParto)
+                .fechaParto(fechaParto)
+                .lechonesNacidos(dto.getLechonesNacidos())
+                .lechonesVivos(dto.getLechonesVivos())
+                .lechonesMuertos(dto.getLechonesMuertos() != null ? dto.getLechonesMuertos() : 0)
+                .observaciones(dto.getObservaciones())
+                .fotoUrl(dto.getFotoUrl() != null && !dto.getFotoUrl().isBlank() ? dto.getFotoUrl().trim() : null)
+                .usuarioRegistro(usuario)
+                .build();
+
+        RegistroPartoGestacion guardado = partoRepository.save(parto);
+
+        gestacion.setActiva(false);
+        gestacionRepository.save(gestacion);
+
+        return toPartoDto(guardado, gestacion.getLoteNombre(), gestacion.getFotoUrl());
+    }
+
+    public List<GestacionPartoResponseDto> listarPartos() {
+        return partoRepository.findAllByOrderByFechaPartoDesc().stream()
+                .map(this::toPartoDtoConLote)
+                .collect(Collectors.toList());
+    }
+
+    public List<GestacionPartoResponseDto> listarPartosPorChancha(String loteId, Integer numeroEnLote) {
+        if (loteId == null || loteId.isBlank() || numeroEnLote == null || numeroEnLote <= 0) {
+            throw new IllegalArgumentException("Lote y número de chancha son obligatorios.");
+        }
+        return partoRepository.findByLoteIdAndNumeroEnLoteOrderByNumeroPartoAsc(loteId, numeroEnLote).stream()
+                .map(this::toPartoDtoConLote)
+                .collect(Collectors.toList());
+    }
+
+    private GestacionPartoResponseDto toPartoDtoConLote(RegistroPartoGestacion p) {
+        return gestacionRepository.findById(p.getGestacionId())
+                .map(g -> toPartoDto(p, g.getLoteNombre(), g.getFotoUrl()))
+                .orElseGet(() -> toPartoDto(p, null, null));
+    }
+
+    public int siguienteNumeroParto(String loteId, Integer numeroEnLote) {
+        return partoRepository.maxNumeroParto(loteId, numeroEnLote) + 1;
+    }
+
+    public GestacionPartoResponseDto obtenerParto(Long partoId) {
+        RegistroPartoGestacion parto = partoRepository.findById(partoId)
+                .orElseThrow(() -> new IllegalArgumentException("Registro de parto no encontrado."));
+        return toPartoDtoConLote(parto);
+    }
+
+    /**
+     * Corrige datos de un parto ya registrado (solo admin vía frontend).
+     * No reabre el ciclo de gestación.
+     */
+    @Transactional
+    public GestacionPartoResponseDto actualizarParto(Long partoId, GestacionPartoRequestDto dto) {
+        RegistroPartoGestacion parto = partoRepository.findById(partoId)
+                .orElseThrow(() -> new IllegalArgumentException("Registro de parto no encontrado."));
+        validarPartoRequest(dto);
+
+        LocalDate fechaParto = LocalDate.parse(dto.getFechaParto());
+        parto.setFechaParto(fechaParto);
+        parto.setLechonesNacidos(dto.getLechonesNacidos());
+        parto.setLechonesVivos(dto.getLechonesVivos());
+        parto.setLechonesMuertos(dto.getLechonesMuertos() != null ? dto.getLechonesMuertos() : 0);
+        parto.setObservaciones(dto.getObservaciones());
+        if (dto.getFotoUrl() != null) {
+            parto.setFotoUrl(dto.getFotoUrl().isBlank() ? null : dto.getFotoUrl().trim());
+        }
+
+        return toPartoDtoConLote(partoRepository.save(parto));
+    }
+
     public static String nombreChancha(int numero) {
         return String.format("Chancha-%02d", numero);
+    }
+
+    private void validarPartoRequest(GestacionPartoRequestDto dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("Datos de parto requeridos.");
+        }
+        if (dto.getFechaParto() == null || dto.getFechaParto().isBlank()) {
+            throw new IllegalArgumentException("La fecha de parto es obligatoria.");
+        }
+        try {
+            LocalDate.parse(dto.getFechaParto());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Fecha de parto inválida. Use formato yyyy-MM-dd.");
+        }
+        int nacidos = dto.getLechonesNacidos() != null ? dto.getLechonesNacidos() : -1;
+        int vivos = dto.getLechonesVivos() != null ? dto.getLechonesVivos() : -1;
+        int muertos = dto.getLechonesMuertos() != null ? dto.getLechonesMuertos() : 0;
+        if (nacidos < 0) {
+            throw new IllegalArgumentException("Lechones nacidos debe ser 0 o mayor.");
+        }
+        if (vivos < 0) {
+            throw new IllegalArgumentException("Lechones vivos debe ser 0 o mayor.");
+        }
+        if (muertos < 0) {
+            throw new IllegalArgumentException("Lechones muertos debe ser 0 o mayor.");
+        }
+        if (vivos > nacidos) {
+            throw new IllegalArgumentException("Lechones vivos no puede superar a nacidos.");
+        }
+        if (muertos > nacidos) {
+            throw new IllegalArgumentException("Lechones muertos no puede superar a nacidos.");
+        }
+        if (vivos + muertos > nacidos) {
+            throw new IllegalArgumentException(
+                    "La suma de vivos y muertos no puede superar a nacidos.");
+        }
+    }
+
+    private GestacionPartoResponseDto toPartoDto(
+            RegistroPartoGestacion p,
+            String loteNombre,
+            String fotoChanchaUrl) {
+        return GestacionPartoResponseDto.builder()
+                .id(String.valueOf(p.getId()))
+                .gestacionId(String.valueOf(p.getGestacionId()))
+                .loteId(p.getLoteId())
+                .numeroEnLote(p.getNumeroEnLote())
+                .nombreChancha(p.getNombreChancha())
+                .numeroParto(p.getNumeroParto())
+                .fechaParto(p.getFechaParto() != null ? p.getFechaParto().toString() : null)
+                .lechonesNacidos(p.getLechonesNacidos())
+                .lechonesVivos(p.getLechonesVivos())
+                .lechonesMuertos(p.getLechonesMuertos())
+                .observaciones(p.getObservaciones())
+                .fotoUrl(p.getFotoUrl())
+                .fotoChanchaUrl(fotoChanchaUrl)
+                .loteNombre(loteNombre)
+                .build();
     }
 
     private void validarRequest(GestacionChanchaRequestDto dto) {
@@ -157,6 +327,7 @@ public class GestacionService {
                 .fechaInseminacion(LocalDate.parse(dto.getFechaInseminacion()))
                 .numeroParto(dto.getNumeroParto() != null && dto.getNumeroParto() > 0 ? dto.getNumeroParto() : 1)
                 .observaciones(dto.getObservaciones())
+                .fotoUrl(dto.getFotoUrl() != null && !dto.getFotoUrl().isBlank() ? dto.getFotoUrl().trim() : null)
                 .activa(activa)
                 .loteCodigo(lote.getCodigo())
                 .loteNombre(lote.getName())
@@ -209,6 +380,7 @@ public class GestacionService {
                 .fechaInseminacion(reg.getFechaInseminacion().toString())
                 .numeroParto(reg.getNumeroParto())
                 .observaciones(reg.getObservaciones())
+                .fotoUrl(reg.getFotoUrl())
                 .loteId(reg.getLoteId())
                 .loteCodigo(reg.getLoteCodigo())
                 .loteNombre(reg.getLoteNombre())
