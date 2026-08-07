@@ -56,6 +56,8 @@ public class MinimalSecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
+            // Evita 403 confuso: sin JWT debe ser 401, no anónimo con Access Denied
+            .anonymous(anonymous -> anonymous.disable())
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
@@ -153,10 +155,12 @@ public class MinimalSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         // 🔧 CRÍTICO: No usar "*" con allowCredentials=true
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:4200", 
+            "http://localhost:4200",
             "http://localhost:*",
             "https://granja.improvement-solution.com",
-            "http://granja.improvement-solution.com"
+            "http://granja.improvement-solution.com",
+            "https://granja.elvita.improvement-solution.com",
+            "http://75.119.128.166*"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"));

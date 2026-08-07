@@ -38,7 +38,11 @@ import org.slf4j.LoggerFactory;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = {
+        "http://localhost:4200",
+        "https://granja.improvement-solution.com",
+        "https://granja.elvita.improvement-solution.com"
+})
 public class UserController {
     
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
