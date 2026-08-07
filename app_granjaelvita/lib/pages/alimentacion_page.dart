@@ -136,6 +136,12 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     return '${dias[fecha.weekday - 1]}, ${fecha.day} de ${meses[fecha.month - 1]} de ${fecha.year}';
   }
 
+  String _formatearFechaCorta(DateTime fecha) {
+    final d = fecha.day.toString().padLeft(2, '0');
+    final m = fecha.month.toString().padLeft(2, '0');
+    return '$d/$m/${fecha.year}';
+  }
+
   // Paleta diseño profesional (mockup Alimentación)
   Color get _primary =>
       _tipoAnimal == 'chanchos' ? const Color(0xFF005EB8) : const Color(0xFF2E7D32);
@@ -430,6 +436,19 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
                 Row(
                   children: [
                     Expanded(
+                      child: _buildInfoItem(
+                        'Nacimiento',
+                        lote.birthdate != null ? _formatearFechaCorta(lote.birthdate!) : '—',
+                        Icons.cake_outlined,
+                      ),
+                    ),
+                    const Expanded(child: SizedBox()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
                       child: _buildInfoItem('Registrados', '$registrados', Icons.inventory_2_outlined),
                     ),
                     Expanded(
@@ -578,6 +597,12 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
   int get _diasVida {
     if (widget.lote.birthdate == null) return 0;
     return DateTime.now().difference(widget.lote.birthdate!).inDays;
+  }
+
+  String _formatearFechaNacimiento(DateTime fecha) {
+    final d = fecha.day.toString().padLeft(2, '0');
+    final m = fecha.month.toString().padLeft(2, '0');
+    return '$d/$m/${fecha.year}';
   }
 
   String get _nombreAnimal => widget.tipoAnimal == 'chanchos' ? 'Chanchos' : 'Pollos';
@@ -829,6 +854,14 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
           Row(
             children: [
               _buildInfoCard('Edad', '$_diasVida días', Colors.green.shade100),
+              const SizedBox(width: 8),
+              _buildInfoCard(
+                'Nacimiento',
+                widget.lote.birthdate != null
+                    ? _formatearFechaNacimiento(widget.lote.birthdate!)
+                    : '—',
+                Colors.teal.shade100,
+              ),
               const SizedBox(width: 8),
               _buildInfoCard('Raza', widget.lote.raceName, Colors.orange.shade100),
             ],
