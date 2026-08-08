@@ -81,9 +81,11 @@ function ocupaCupo(
 export function construirOpcionesChancha(
   lote: Lote,
   registros: ChanchaGestacion[],
-  excluirRegistroId?: string | null
+  excluirRegistroId?: string | null,
+  /** Admin: muestra avisos pero permite seleccionar cualquier cupo para corregir. */
+  correccionAdmin = false
 ): OpcionChanchaLote[] {
-  const cupos = cuposHembrasLote(lote);
+  const cupos = Math.max(cuposHembrasLote(lote), hembrasVivasEnLote(lote), 1);
   const vivas = hembrasVivasEnLote(lote);
   const opciones: OpcionChanchaLote[] = [];
 
@@ -100,7 +102,19 @@ export function construirOpcionesChancha(
       motivoNoDisponible = 'Ya registrada en gestación';
     }
 
-    opciones.push({ numero: n, etiqueta, disponible, motivoNoDisponible });
+    // En corrección admin se puede elegir igual (el backend fuerza y cierra conflictos)
+    if (correccionAdmin) {
+      disponible = true;
+    }
+
+    opciones.push({
+      numero: n,
+      etiqueta,
+      disponible,
+      motivoNoDisponible: correccionAdmin && motivoNoDisponible
+        ? `Corrección admin — ${motivoNoDisponible}`
+        : motivoNoDisponible
+    });
   }
 
   return opciones;

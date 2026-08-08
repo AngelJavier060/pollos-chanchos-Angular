@@ -30,6 +30,7 @@ import {
 } from './gestacion-calculo.util';
 import {
   OpcionChanchaLote,
+  esLoteChancho,
   esLoteElegibleGestacion,
   construirOpcionesChancha,
   resolverNombreChancha,
@@ -94,6 +95,8 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
   chanchas: ChanchaGestacion[] = [];
   /** Solo ciclos abiertos — tabla principal */
   chanchasActivas: ChanchaGestacion[] = [];
+  /** Ciclos cerrados (parto / no gestante) — solo admin para corregir/reabrir */
+  chanchasCerradas: ChanchaGestacion[] = [];
   partos: RegistroPartoGestacion[] = [];
   noPrenadas: RegistroNoPrenada[] = [];
   stats: StatsGestacion = { total: 0, gestando: 0, preParto: 0, paridas: 0 };
@@ -157,6 +160,7 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
       this.storage.listar().subscribe(lista => {
         this.chanchas = lista;
         this.chanchasActivas = lista.filter(c => c.activa !== false);
+        this.chanchasCerradas = lista.filter(c => c.activa === false);
         if (this.detalle) {
           const actualizada = lista.find(c => c.id === this.detalle!.id);
           this.detalle = actualizada || null;
@@ -194,8 +198,9 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
     this.lotesError = '';
     this.loteService.getLotes().subscribe({
       next: lotes => {
+        // Admin: incluye lotes de chanchos aunque quantity esté en 0 (corrección)
         this.lotes = lotes
-          .filter(esLoteElegibleGestacion)
+          .filter(l => (this.esEdicion ? esLoteChancho(l) && !l.fechaCierre : esLoteElegibleGestacion(l)))
           .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || ''));
         this.lotesCargando = false;
       },
@@ -527,8 +532,13 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
       this.opcionesChancha = [];
       return;
     }
-    // Solo gestaciones activas ocupan cupo — las que ya parieron quedan libres
-    this.opcionesChancha = construirOpcionesChancha(lote, this.chanchas, this.form.id);
+    // Admin puede elegir cualquier cupo (corrección); consulta sigue reglas normales
+    this.opcionesChancha = construirOpcionesChancha(
+      lote,
+      this.chanchas,
+      this.form.id,
+      this.esEdicion
+    );
   }
 
   guardar(): void {
@@ -552,7 +562,8 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
     }
 
     const opcion = this.opcionesChancha.find(o => o.numero === this.form.numeroEnLote);
-    if (this.form.activa && opcion && !opcion.disponible) {
+    // Solo bloquea disponibilidad fuera del modo admin (admin usa correccionAdmin)
+    if (!this.esEdicion && this.form.activa && opcion && !opcion.disponible) {
       this.mensajeError = opcion.motivoNoDisponible || 'Esta chancha no está disponible.';
       return;
     }
@@ -572,7 +583,7 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
       numeroEnLote: this.form.numeroEnLote,
       activa: this.form.activa
     };
-    this.storage.guardar(chancha).subscribe({
+    this.storage.guardar(chancha, { correccionAdmin: this.esEdicion }).subscribe({
       next: guardada => {
         if (this.detalle?.id === chancha.id) {
           this.detalle = guardada;
@@ -583,6 +594,39 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
         this.mensajeError = err?.message || 'No se pudo guardar el registro.';
       }
     });
+  }
+
+  reactivarGestacion(c: ChanchaGestacion, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.esEdicion) return;
+    if (
+      !confirm(
+        `¿Reabrir ${c.nombre} a gestaciones activas?\nPodrá editar lote/chancha e iniciar o corregir el ciclo.`
+      )
+    ) {
+      return;
+    }
+    this.storage.reactivar(c.id).subscribe({
+      next: () => {
+        /* lista se refresca en storage */
+      },
+      error: err => alert(err?.message || 'No se pudo reactivar.')
+    });
+  }
+
+  gestacionCerradaDeParto(p: RegistroPartoGestacion): boolean {
+    const g = this.chanchas.find(c => c.id === p.gestacionId);
+    return !!g && g.activa === false;
+  }
+
+  reactivarDesdeParto(p: RegistroPartoGestacion, event?: Event): void {
+    event?.stopPropagation();
+    const g = this.chanchas.find(c => c.id === p.gestacionId);
+    if (!g) {
+      alert('No se encontró la gestación vinculada a este parto.');
+      return;
+    }
+    this.reactivarGestacion(g, event);
   }
 
   eliminar(c: ChanchaGestacion, event?: Event): void {

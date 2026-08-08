@@ -11,4 +11,9 @@ public class GestacionChanchaRequestDto {
     private String observaciones;
     private String fotoUrl;
     private Boolean activa;
+    /**
+     * Solo admin (frontend modo edición): permite corregir cupo/lote aunque
+     * la chancha figure ocupada o marcada como vendida, y cierra conflictos.
+     */
+    private Boolean correccionAdmin;
 }

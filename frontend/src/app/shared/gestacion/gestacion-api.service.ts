@@ -63,6 +63,15 @@ export class GestacionApiService {
       );
   }
 
+  reactivar(id: string): Observable<ChanchaGestacion> {
+    return this.http
+      .post<ApiResponse<ChanchaGestacion>>(`${this.baseUrl}/${id}/reactivar`, {}, this.httpOptions)
+      .pipe(
+        map(res => this.extractData(res, 'Error al reactivar gestación')),
+        catchError(err => this.handleError(err))
+      );
+  }
+
   eliminar(id: string): Observable<void> {
     return this.http
       .delete<ApiResponse<void>>(`${this.baseUrl}/${id}`, this.httpOptions)
@@ -191,7 +200,7 @@ export class GestacionApiService {
       );
   }
 
-  private toRequest(c: Partial<ChanchaGestacion>) {
+  private toRequest(c: Partial<ChanchaGestacion> & { correccionAdmin?: boolean }) {
     return {
       loteId: c.loteId,
       numeroEnLote: c.numeroEnLote,
@@ -199,7 +208,8 @@ export class GestacionApiService {
       numeroParto: c.numeroParto ?? 1,
       observaciones: c.observaciones ?? null,
       fotoUrl: c.fotoUrl ?? null,
-      activa: c.activa !== false
+      activa: c.activa !== false,
+      correccionAdmin: c.correccionAdmin === true
     };
   }
 

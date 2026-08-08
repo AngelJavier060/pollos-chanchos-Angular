@@ -311,6 +311,27 @@ public class GestacionController {
         }
     }
 
+    /** Admin: vuelve a poner una gestación cerrada en la lista de activas. */
+    @PostMapping("/{id}/reactivar")
+    public ResponseEntity<Map<String, Object>> reactivar(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            GestacionChanchaResponseDto data = gestacionService.reactivar(id, usuarioActual());
+            response.put("success", true);
+            response.put("message", "Gestación reactivada. Ya aparece en gestaciones activas.");
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al reactivar: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> eliminar(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();

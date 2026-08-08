@@ -130,6 +130,54 @@
     </table>
   </div>
 
+  <!-- Admin: ciclos cerrados para corregir / reabrir -->
+  <section *ngIf="esEdicion" class="gestacion-historial" aria-label="Gestaciones cerradas">
+    <div class="gestacion-topbar">
+      <span class="gestacion-topbar__lbl">Gestaciones cerradas — corregir / reabrir ({{ chanchasCerradas.length }})</span>
+    </div>
+    <p class="gestacion-aviso-consulta" style="margin-top: 0">
+      Aquí están ciclos ya cerrados por parto o «No gestante». Use <strong>Reabrir</strong> para volverlos a activas,
+      o <strong>Editar</strong> para corregir lote/chancha/parto y marcar «Gestación activa».
+    </p>
+    <div class="gestacion-table-wrap">
+      <table class="gestacion-table">
+        <thead>
+          <tr>
+            <th>Chancha / Lote</th>
+            <th>Inseminación</th>
+            <th>Parto #</th>
+            <th>Estado</th>
+            <th class="th-acciones">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="chanchasCerradas.length === 0">
+            <td colspan="5" class="gestacion-empty">No hay gestaciones cerradas.</td>
+          </tr>
+          <tr *ngFor="let c of chanchasCerradas">
+            <td>
+              <strong>{{ c.nombre }}</strong>
+              <div class="gestacion-sub">{{ subtituloChancha(c) }}</div>
+            </td>
+            <td>{{ formatFechaEs(c.fechaInseminacion) }}</td>
+            <td>#{{ c.numeroParto }}</td>
+            <td><span class="badge badge-gray">Cerrada</span></td>
+            <td class="td-acciones">
+              <div class="acciones-btns">
+                <button type="button" class="btn btn--sm" (click)="verDetalle(c)">Ver</button>
+                <button type="button" class="btn btn--sm btn--parto" (click)="reactivarGestacion(c, $event)">
+                  Reabrir
+                </button>
+                <button type="button" class="btn btn--sm" (click)="abrirEditar(c)">Editar</button>
+                <button type="button" class="btn btn--sm btn--danger" (click)="eliminar(c, $event)">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="gestacion-historial" aria-label="Historial no gestantes">
     <div class="gestacion-topbar">
       <span class="gestacion-topbar__lbl">Historial — no gestantes / reinicios ({{ noPrenadas.length }})</span>
@@ -220,9 +268,18 @@
                   type="button"
                   class="btn btn--sm"
                   (click)="abrirEditarParto(p)"
-                  title="Corregir datos del parto"
+                  title="Corregir lechones / fecha del parto"
                 >
-                  Editar
+                  Editar parto
+                </button>
+                <button
+                  *ngIf="esEdicion && gestacionCerradaDeParto(p)"
+                  type="button"
+                  class="btn btn--sm btn--parto"
+                  (click)="reactivarDesdeParto(p, $event)"
+                  title="Reabrir la gestación vinculada a este parto"
+                >
+                  Reabrir gestación
                 </button>
               </div>
             </td>
@@ -384,7 +441,14 @@
       <p *ngIf="mensajeError" class="gestacion-modal__error">{{ mensajeError }}</p>
       <p *ngIf="lotesError" class="gestacion-modal__error">{{ lotesError }}</p>
       <p class="gestacion-modal__hint">
-        Solo aparecen chanchas libres (sin gestación activa). Las que ya parieron vuelven a estar disponibles.
+        <ng-container *ngIf="!esEdicion">
+          Solo aparecen chanchas libres (sin gestación activa). Las que ya parieron vuelven a estar disponibles.
+        </ng-container>
+        <ng-container *ngIf="esEdicion">
+          <strong>Modo administrador:</strong> puede elegir cualquier lote/chancha para corregir.
+          Si el cupo estaba ocupado, el sistema cierra el conflicto automáticamente.
+          Marque «Gestación activa» para devolverla a la lista de activas.
+        </ng-container>
       </p>
 
       <label class="fg fg--full">
@@ -413,9 +477,9 @@
           <option
             *ngFor="let o of opcionesChancha"
             [ngValue]="o.numero"
-            [disabled]="!o.disponible && form.activa"
+            [disabled]="!esEdicion && !o.disponible && form.activa"
           >
-            {{ o.etiqueta }}{{ o.disponible ? '' : ' — ' + (o.motivoNoDisponible || 'No disponible') }}
+            {{ o.etiqueta }}{{ o.motivoNoDisponible ? ' — ' + o.motivoNoDisponible : '' }}
           </option>
         </select>
       </label>
@@ -470,7 +534,11 @@
 
       <label class="fg fg--full gestacion-check" *ngIf="form.id">
         <input type="checkbox" [(ngModel)]="form.activa" (ngModelChange)="actualizarOpcionesChancha()" />
-        <span>Gestación activa (desmarcar solo si baja por venta/muerte, no por parto)</span>
+        <span>
+          Gestación activa
+          <em *ngIf="esEdicion"> (márquela para devolverla a «Gestaciones activas» y poder seguir el ciclo)</em>
+          <em *ngIf="!esEdicion"> (desmarcar solo si baja por venta/muerte, no por parto)</em>
+        </span>
       </label>
       <div class="gestacion-modal__actions">
         <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>

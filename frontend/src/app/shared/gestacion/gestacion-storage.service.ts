@@ -67,19 +67,28 @@ export class GestacionStorageService {
     );
   }
 
-  guardar(chancha: ChanchaGestacion): Observable<ChanchaGestacion> {
+  guardar(
+    chancha: ChanchaGestacion,
+    opciones?: { correccionAdmin?: boolean }
+  ): Observable<ChanchaGestacion> {
     const esEdicion =
       !!chancha.id &&
       !chancha.id.startsWith('tmp-') &&
       !chancha.id.startsWith('ch-') &&
       !chancha.id.startsWith('demo-') &&
       /^\d+$/.test(chancha.id);
+    const payload = {
+      ...chancha,
+      correccionAdmin: opciones?.correccionAdmin === true
+    };
     const op = esEdicion
-      ? this.api.actualizar(chancha.id, chancha)
-      : this.api.crear(chancha);
+      ? this.api.actualizar(chancha.id, payload)
+      : this.api.crear(payload);
 
     return op.pipe(
       tap(guardada => {
+        // Recargar lista completa: corrección admin puede haber cerrado otros cupos
+        this.refrescarDesdeApi().subscribe({ error: () => { /* keep optimistic */ } });
         const lista = this.obtenerSnapshot();
         const idx = lista.findIndex(c => c.id === chancha.id || c.id === guardada.id);
         if (idx >= 0) {
@@ -89,6 +98,22 @@ export class GestacionStorageService {
         }
         this.chanchas$.next([...lista]);
         this.cargado = true;
+      })
+    );
+  }
+
+  reactivar(id: string): Observable<ChanchaGestacion> {
+    return this.api.reactivar(id).pipe(
+      tap(reactivada => {
+        const lista = this.obtenerSnapshot();
+        const idx = lista.findIndex(c => c.id === id || c.id === reactivada.id);
+        if (idx >= 0) {
+          lista[idx] = reactivada;
+        } else {
+          lista.push(reactivada);
+        }
+        // Otras gestaciones del mismo cupo pueden haberse cerrado
+        this.refrescarDesdeApi().subscribe({ error: () => this.chanchas$.next([...lista]) });
       })
     );
   }

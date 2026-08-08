@@ -50,10 +50,17 @@ public class GestacionService {
     @Transactional
     public GestacionChanchaResponseDto crear(GestacionChanchaRequestDto dto, String usuario) {
         validarRequest(dto);
-        Lote lote = cargarLoteValido(dto.getLoteId());
-        validarCupoDisponible(lote, dto.getNumeroEnLote(), null);
-
+        boolean correccion = Boolean.TRUE.equals(dto.getCorreccionAdmin());
+        Lote lote = cargarLoteValido(dto.getLoteId(), correccion);
         boolean activa = dto.getActiva() == null || dto.getActiva();
+        if (activa) {
+            if (correccion) {
+                liberarCupoConflicto(lote.getId(), dto.getNumeroEnLote(), null);
+            } else {
+                validarCupoDisponible(lote, dto.getNumeroEnLote(), null);
+            }
+        }
+
         if (dto.getNumeroParto() == null || dto.getNumeroParto() <= 0) {
             dto.setNumeroParto(siguienteNumeroParto(lote.getId(), dto.getNumeroEnLote()));
         }
@@ -66,11 +73,16 @@ public class GestacionService {
         validarRequest(dto);
         RegistroGestacion reg = gestacionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Registro de gestación no encontrado."));
-        Lote lote = cargarLoteValido(dto.getLoteId());
+        boolean correccion = Boolean.TRUE.equals(dto.getCorreccionAdmin());
+        Lote lote = cargarLoteValido(dto.getLoteId(), correccion);
 
         boolean activa = dto.getActiva() == null || dto.getActiva();
         if (activa) {
-            validarCupoDisponible(lote, dto.getNumeroEnLote(), id);
+            if (correccion) {
+                liberarCupoConflicto(lote.getId(), dto.getNumeroEnLote(), id);
+            } else {
+                validarCupoDisponible(lote, dto.getNumeroEnLote(), id);
+            }
         }
 
         reg.setLoteId(lote.getId());
@@ -90,6 +102,25 @@ public class GestacionService {
             reg.setUsuarioRegistro(usuario);
         }
 
+        return toDto(gestacionRepository.save(reg));
+    }
+
+    /**
+     * Admin: reabre un ciclo cerrado (parto / no gestante) y lo vuelve a gestaciones activas.
+     */
+    @Transactional
+    public GestacionChanchaResponseDto reactivar(Long id, String usuario) {
+        RegistroGestacion reg = gestacionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Registro de gestación no encontrado."));
+        if (!Boolean.FALSE.equals(reg.getActiva())) {
+            throw new IllegalArgumentException("Esta gestación ya está activa.");
+        }
+        Lote lote = cargarLoteValido(reg.getLoteId(), true);
+        liberarCupoConflicto(lote.getId(), reg.getNumeroEnLote(), id);
+        reg.setActiva(true);
+        if (usuario != null && !usuario.isBlank()) {
+            reg.setUsuarioRegistro(usuario);
+        }
         return toDto(gestacionRepository.save(reg));
     }
 
@@ -372,12 +403,16 @@ public class GestacionService {
     }
 
     private Lote cargarLoteValido(String loteId) {
+        return cargarLoteValido(loteId, false);
+    }
+
+    private Lote cargarLoteValido(String loteId, boolean correccionAdmin) {
         Lote lote = loteRepository.findById(loteId)
                 .orElseThrow(() -> new IllegalArgumentException("Lote no encontrado."));
-        if (lote.getQuantity() <= 0) {
+        if (!correccionAdmin && lote.getQuantity() <= 0) {
             throw new IllegalArgumentException("El lote no tiene animales vivos.");
         }
-        if (lote.getFechaCierre() != null) {
+        if (!correccionAdmin && lote.getFechaCierre() != null) {
             throw new IllegalArgumentException("El lote está cerrado.");
         }
         if (!esLoteChancho(lote)) {
@@ -404,6 +439,18 @@ public class GestacionService {
         if (ocupado) {
             throw new IllegalArgumentException("Ya existe una gestación activa para esta chancha en el lote.");
         }
+    }
+
+    /** Cierra otra gestación activa del mismo cupo para permitir corrección admin. */
+    private void liberarCupoConflicto(String loteId, int numeroEnLote, Long excluirId) {
+        gestacionRepository.findByLoteIdAndNumeroEnLoteAndActivaTrue(loteId, numeroEnLote)
+                .ifPresent(otra -> {
+                    if (excluirId != null && excluirId.equals(otra.getId())) {
+                        return;
+                    }
+                    otra.setActiva(false);
+                    gestacionRepository.save(otra);
+                });
     }
 
     private RegistroGestacion construirEntidad(
