@@ -621,12 +621,37 @@ export class GestacionChanchasViewComponent implements OnInit, OnDestroy {
 
   reactivarDesdeParto(p: RegistroPartoGestacion, event?: Event): void {
     event?.stopPropagation();
+    if (!this.esEdicion) return;
     const g = this.chanchas.find(c => c.id === p.gestacionId);
     if (!g) {
       alert('No se encontró la gestación vinculada a este parto.');
       return;
     }
+    if (g.activa !== false) {
+      alert(`${g.nombre} ya está en gestaciones activas. Puede editarla desde la tabla superior.`);
+      this.abrirEditar(g);
+      return;
+    }
     this.reactivarGestacion(g, event);
+  }
+
+  eliminarPartoHistorial(p: RegistroPartoGestacion, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.esEdicion) return;
+    const ok = confirm(
+      `¿Eliminar del historial el parto #${p.numeroParto} de ${p.nombreChancha}?\n` +
+        `Nacidos: ${p.lechonesNacidos} · Vivos: ${p.lechonesVivos}\n\n` +
+        `Use esto para borrar duplicados o registros mal cargados. Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+    this.storage.eliminarParto(p.id).subscribe({
+      next: () => {
+        if (this.partoVista?.id === p.id) {
+          this.partoVista = null;
+        }
+      },
+      error: err => alert(err?.message || 'No se pudo eliminar el parto.')
+    });
   }
 
   eliminar(c: ChanchaGestacion, event?: Event): void {

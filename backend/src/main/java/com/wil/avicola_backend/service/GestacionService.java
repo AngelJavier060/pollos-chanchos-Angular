@@ -320,6 +320,15 @@ public class GestacionService {
         return toPartoDtoConLote(partoRepository.save(parto));
     }
 
+    /** Admin: elimina un registro duplicado o incorrecto del historial de partos. */
+    @Transactional
+    public void eliminarParto(Long partoId) {
+        if (!partoRepository.existsById(partoId)) {
+            throw new IllegalArgumentException("Registro de parto no encontrado.");
+        }
+        partoRepository.deleteById(partoId);
+    }
+
     public static String nombreChancha(int numero) {
         return String.format("Chancha-%02d", numero);
     }

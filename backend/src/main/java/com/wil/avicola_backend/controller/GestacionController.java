@@ -250,6 +250,25 @@ public class GestacionController {
         }
     }
 
+    @DeleteMapping("/partos/{partoId}")
+    public ResponseEntity<Map<String, Object>> eliminarParto(@PathVariable Long partoId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            gestacionService.eliminarParto(partoId);
+            response.put("success", true);
+            response.put("message", "Registro de parto eliminado del historial");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error al eliminar parto: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> obtener(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();

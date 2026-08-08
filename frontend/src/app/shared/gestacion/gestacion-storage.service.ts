@@ -149,6 +149,14 @@ export class GestacionStorageService {
     );
   }
 
+  eliminarParto(partoId: string): Observable<void> {
+    return this.api.eliminarParto(partoId).pipe(
+      tap(() => {
+        this.partos$.next(this.obtenerPartosSnapshot().filter(p => p.id !== partoId));
+      })
+    );
+  }
+
   registrarNoPrenada(
     gestacionId: string,
     payload: RegistrarNoPrenadaPayload

@@ -159,6 +159,19 @@ export class GestacionApiService {
       );
   }
 
+  eliminarParto(partoId: string): Observable<void> {
+    return this.http
+      .delete<ApiResponse<void>>(`${this.baseUrl}/partos/${partoId}`, this.httpOptions)
+      .pipe(
+        map(res => {
+          if (res.success === false) {
+            throw new Error(res.message || 'Error al eliminar parto');
+          }
+        }),
+        catchError(err => this.handleError(err))
+      );
+  }
+
   listarPartos(loteId?: string, numeroEnLote?: number): Observable<RegistroPartoGestacion[]> {
     let params = new HttpParams();
     if (loteId && numeroEnLote != null) {

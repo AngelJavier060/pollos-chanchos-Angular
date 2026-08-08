@@ -263,24 +263,32 @@
             <td class="td-acciones">
               <div class="acciones-btns">
                 <button type="button" class="btn btn--sm" (click)="verPartoHistorial(p)" title="Ver detalle">Ver</button>
-                <button
-                  *ngIf="esEdicion"
-                  type="button"
-                  class="btn btn--sm"
-                  (click)="abrirEditarParto(p)"
-                  title="Corregir lechones / fecha del parto"
-                >
-                  Editar parto
-                </button>
-                <button
-                  *ngIf="esEdicion && gestacionCerradaDeParto(p)"
-                  type="button"
-                  class="btn btn--sm btn--parto"
-                  (click)="reactivarDesdeParto(p, $event)"
-                  title="Reabrir la gestación vinculada a este parto"
-                >
-                  Reabrir gestación
-                </button>
+                <ng-container *ngIf="esEdicion">
+                  <button
+                    type="button"
+                    class="btn btn--sm"
+                    (click)="abrirEditarParto(p)"
+                    title="Corregir lechones / fecha del parto"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn--sm btn--parto"
+                    (click)="reactivarDesdeParto(p, $event)"
+                    title="Reabrir la gestación vinculada a este parto"
+                  >
+                    Reabrir
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn--sm btn--danger"
+                    (click)="eliminarPartoHistorial(p, $event)"
+                    title="Eliminar este registro del historial (p. ej. duplicado)"
+                  >
+                    Eliminar
+                  </button>
+                </ng-container>
               </div>
             </td>
           </tr>
@@ -680,14 +688,11 @@
 
       <div class="gestacion-modal__actions">
         <button type="button" class="btn" (click)="cerrarPartoVista()">Cerrar</button>
-        <button
-          *ngIf="esEdicion"
-          type="button"
-          class="btn btn--primary"
-          (click)="abrirEditarParto(partoVista)"
-        >
-          Editar
-        </button>
+        <ng-container *ngIf="esEdicion && partoVista">
+          <button type="button" class="btn btn--primary" (click)="abrirEditarParto(partoVista)">Editar</button>
+          <button type="button" class="btn btn--parto" (click)="reactivarDesdeParto(partoVista, $event)">Reabrir</button>
+          <button type="button" class="btn btn--danger" (click)="eliminarPartoHistorial(partoVista, $event)">Eliminar</button>
+        </ng-container>
       </div>
     </div>
   </div>
