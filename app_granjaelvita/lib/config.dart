@@ -1,4 +1,4 @@
-﻿// Configuración de API — app móvil Granja Elviata
+﻿// Configuración de API — app móvil Granja Elvita
 //
 // Cambia [useProduction] para alternar entre producción y desarrollo local.
 // Compatible con Android, iOS, Windows y Web (Chrome) — no usa dart:io.

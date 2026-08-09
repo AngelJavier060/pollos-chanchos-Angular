@@ -1,11 +1,11 @@
 {
-    "name": "flutter_granjaelvita",
-    "short_name": "flutter_granjaelvita",
+    "name": "Granja Elvita",
+    "short_name": "Granja Elvita",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F8F4EC",
+    "theme_color": "#2E7D32",
+    "description": "Sistema de Gestión Granja Elvita 2026",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -10,14 +10,14 @@ import 'pages/historico_alimentacion_page.dart';
 import 'pages/lotes_dashboard_page.dart';
 import 'pages/gestacion_page.dart';
 
-void main() => runApp(const GranjaElviataApp());
+void main() => runApp(const GranjaElvitaApp());
 
-class GranjaElviataApp extends StatelessWidget {
-  const GranjaElviataApp({super.key});
+class GranjaElvitaApp extends StatelessWidget {
+  const GranjaElvitaApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Granja Elviata',
+      title: 'Granja Elvita',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.green), useMaterial3: true),
       home: const LoginPage(),
       debugShowCheckedModeBanner: false,
@@ -491,8 +491,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             child: Column(
               children: [
                 Container(
-                  width: 90,
-                  height: 90,
+                  width: 120,
+                  height: 120,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
@@ -504,7 +505,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.agriculture, size: 50, color: Color(0xFF2E7D32)),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/logo_granja_elvita.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.agriculture,
+                        size: 50,
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -518,7 +529,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sistema de Gestión',
+                  'Sistema de Gestión 2026',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white.withValues(alpha: 0.9),
@@ -923,7 +934,24 @@ class HomePage extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Granja Elviata')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/logo_granja_elvita.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.agriculture),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text('Granja Elvita'),
+          ],
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
