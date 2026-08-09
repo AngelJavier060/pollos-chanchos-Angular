@@ -271,9 +271,106 @@
        style="z-index: 9999 !important;"
        (click)="cerrarModal()">
     
-    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+         [class.max-w-4xl]="!alertaPlanNutricional?.activa"
          (click)="$event.stopPropagation()">
-      
+
+      <!-- ========== ALERTA PLAN NUTRICIONAL SIN RANGO ========== -->
+      <ng-container *ngIf="alertaPlanNutricional?.activa; else modalAlimentacionPollosNormal">
+        <div class="relative overflow-hidden rounded-xl" (click)="$event.stopPropagation()">
+          <div class="absolute inset-0 z-0">
+            <div class="absolute inset-0 bg-gradient-to-br from-green-900 via-green-800 to-emerald-900"></div>
+            <div class="absolute inset-0 bg-black/40"></div>
+          </div>
+          <div class="relative z-10 p-4 md:p-8">
+            <div class="flex justify-end mb-2">
+              <button (click)="cerrarModal()"
+                      class="text-white/80 hover:text-white transition-colors bg-black/20 rounded-full w-10 h-10 flex items-center justify-center"
+                      aria-label="Cerrar">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            <div class="bg-white rounded-[1.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-red-200/60">
+              <div class="w-full lg:w-5/12 bg-white p-8 md:p-12 flex items-center justify-center border-b lg:border-b-0 lg:border-r border-gray-200 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-red-100/40 to-transparent"></div>
+                <img
+                  alt="Ilustración error de plan nutricional"
+                  class="w-full max-w-md object-contain relative z-10 drop-shadow-xl"
+                  src="assets/alerta-plan-nutricional.png"
+                />
+              </div>
+              <div class="w-full lg:w-7/12 p-8 md:p-12 flex flex-col justify-center">
+                <div class="flex items-center gap-2 text-red-600 mb-4">
+                  <span class="material-symbols-outlined fill text-3xl">error</span>
+                  <span class="text-xs font-bold tracking-widest uppercase">Alerta de Sistema</span>
+                </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                  Error de Plan Nutricional — Día {{ alertaPlanNutricional?.diasVida }}
+                </h1>
+                <p class="text-base text-gray-600 mb-6 max-w-2xl leading-relaxed">
+                  No hay etapas del plan nutricional para
+                  <strong>{{ alertaPlanNutricional?.diasVida }}</strong> días de edad.
+                  Rangos configurados en admin:
+                  <strong>{{ alertaPlanNutricional?.rangoTexto }}</strong> días.
+                </p>
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-5 mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                  <div class="bg-red-600 text-white w-12 h-12 rounded-full flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined fill text-2xl">build</span>
+                  </div>
+                  <div>
+                    <h2 class="text-xs font-bold text-red-900 uppercase tracking-wider mb-1">Acción requerida</h2>
+                    <p class="text-base text-red-900 font-semibold">
+                      Revise Plan Nutricional y agregue una etapa que cubra el día {{ alertaPlanNutricional?.diasVida }}.
+                    </p>
+                  </div>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                  <div class="bg-amber-600 text-white w-12 h-12 rounded-full flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined fill text-2xl">support_agent</span>
+                  </div>
+                  <div>
+                    <h2 class="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1">Soporte</h2>
+                    <p class="text-base text-amber-950 font-semibold">
+                      Contáctese con el administrador para actualizar el plan nutricional.
+                    </p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3 pt-6 border-t border-gray-200">
+                  <div class="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                    <span class="material-symbols-outlined text-gray-500 text-[24px]">tag</span>
+                    <div class="flex flex-col">
+                      <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Lote</span>
+                      <span class="font-bold text-gray-900 text-base">{{ alertaPlanNutricional?.loteCodigo }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                    <span class="material-symbols-outlined text-gray-500 text-[24px]">calendar_today</span>
+                    <div class="flex flex-col">
+                      <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Edad</span>
+                      <span class="font-bold text-gray-900 text-base">{{ alertaPlanNutricional?.diasVida }} días</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                    <span class="material-symbols-outlined text-gray-500 text-[24px]">pets</span>
+                    <div class="flex flex-col">
+                      <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Población</span>
+                      <span class="font-bold text-gray-900 text-base">{{ alertaPlanNutricional?.poblacion }} Pollos</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-8 flex justify-end">
+                  <button (click)="cerrarModal()"
+                          class="px-6 py-2.5 bg-gray-900 hover:bg-black text-white rounded-lg font-semibold transition-colors">
+                    Entendido
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #modalAlimentacionPollosNormal>
       <!-- Header del Modal -->
       <div class="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-xl">
         <div class="flex items-center justify-between">
@@ -727,6 +824,7 @@
           </div>
         </div>
       </div>
+      </ng-template>
     </div>
   </div>
 </div>

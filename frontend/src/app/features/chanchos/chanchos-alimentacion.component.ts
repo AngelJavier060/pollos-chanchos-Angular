@@ -153,6 +153,15 @@ export class ChanchosAlimentacionComponent implements OnInit {
   // Mensajes de UI para validación de stock
   uiMessageError: string = '';
   uiMessageSuccess: string = '';
+
+  /** Alerta contundente cuando la edad del lote no cae en ningún rango del plan */
+  alertaPlanNutricional: {
+    activa: boolean;
+    diasVida: number;
+    rangoTexto: string;
+    loteCodigo: string;
+    poblacion: number;
+  } | null = null;
   
   // Registro completo
   registroCompleto: RegistroAlimentacionCompleto = {
@@ -391,6 +400,9 @@ export class ChanchosAlimentacionComponent implements OnInit {
   abrirModalAlimentacion(lote: Lote): void {
     this.loteSeleccionado = lote;
     this.modalAbierto = true;
+    this.alertaPlanNutricional = null;
+    this.uiMessageError = '';
+    this.uiMessageSuccess = '';
     this.inicializarRegistroCompleto();
     this.prepararDatosModal(lote);
 
@@ -405,48 +417,35 @@ export class ChanchosAlimentacionComponent implements OnInit {
         next: (planChanchos) => {
           console.log('✅ [Chanchos] Plan nutricional REAL recibido:', planChanchos);
           if (planChanchos && planChanchos.etapas && planChanchos.etapas.length > 0) {
-            // Etapas que contienen el día actual (diagnóstico)
+            // SOLO etapas cuyo rango dayStart–dayEnd incluye la edad del lote
             const etapasCorrespondientes = planChanchos.etapas.filter((e: any) =>
-              diasVida >= e.diasEdad.min && diasVida <= e.diasEdad.max
+              diasVida >= (e.diasEdad?.min ?? -1) && diasVida <= (e.diasEdad?.max ?? -1)
             );
             console.log(`🔍 [Chanchos] Etapas para ${diasVida} días:`, etapasCorrespondientes);
 
-            // Determinar plan principal usando TODAS las etapas
-            const planPrincipal = this.determinarPlanPrincipal(planChanchos.etapas, diasVida);
-            this.planPrincipalNombre = planPrincipal?.nombre || (etapasCorrespondientes[0]?.planNombre || null);
-            this.planPrincipalRango = {
-              min: planPrincipal?.rango?.min ?? null,
-              max: planPrincipal?.rango?.max ?? null
-            };
-            console.log('🧭 [Chanchos] Plan principal:', this.planPrincipalNombre, this.planPrincipalRango);
-
-            // Filtrar sub-etapas del plan principal SIN limitar al día actual
-            let etapasDelPlanPrincipal: any[] = [];
-            if (this.planPrincipalRango.min != null && this.planPrincipalRango.max != null) {
-              const minP = this.planPrincipalRango.min as number;
-              const maxP = this.planPrincipalRango.max as number;
-              etapasDelPlanPrincipal = planChanchos.etapas.filter((e: any) => {
-                const r = this.extraerRangoDesdeNombre(e.planNombre);
-                if (r) return r.min === minP && r.max === maxP;
-                return e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP;
-              });
-              // Unificar por rango para robustez
-              const candidatasPorRango = planChanchos.etapas.filter((e: any) => e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP);
-              const unicas: any[] = [];
-              const vistos = new Set<number | string>();
-              [...etapasDelPlanPrincipal, ...candidatasPorRango].forEach((e: any) => {
-                const key = e.id ?? `${e.producto?.id}-${e.diasEdad?.min}-${e.diasEdad?.max}`;
-                if (!vistos.has(key)) { vistos.add(key); unicas.push(e); }
-              });
-              etapasDelPlanPrincipal = unicas;
-            } else if (this.planPrincipalNombre) {
-              etapasDelPlanPrincipal = planChanchos.etapas.filter((e: any) => e.planNombre === this.planPrincipalNombre);
-            } else {
-              etapasDelPlanPrincipal = etapasCorrespondientes;
+            if (!etapasCorrespondientes.length) {
+              const mins = planChanchos.etapas.map((e: any) => e.diasEdad?.min ?? 0);
+              const maxs = planChanchos.etapas.map((e: any) => e.diasEdad?.max ?? 0);
+              const rangoMin = Math.min(...mins);
+              const rangoMax = Math.max(...maxs);
+              this.activarAlertaPlanSinRango(diasVida, rangoMin, rangoMax, lote);
+              console.warn('⚠️ [Chanchos] Sin etapa para edad', diasVida, 'rangos', rangoMin, rangoMax);
+              return;
             }
 
-            // Ordenar por rango y mapear a etapas disponibles
-            const etapasOrdenadas = [...etapasDelPlanPrincipal].sort((a: any, b: any) => {
+            this.alertaPlanNutricional = null;
+            this.uiMessageError = '';
+
+            // Plan principal solo a partir de etapas que sí cubren la edad (sin fallback a 1-22)
+            const planPrincipal = this.determinarPlanPrincipal(etapasCorrespondientes, diasVida);
+            this.planPrincipalNombre = planPrincipal?.nombre || etapasCorrespondientes[0]?.planNombre || null;
+            this.planPrincipalRango = {
+              min: planPrincipal?.rango?.min ?? etapasCorrespondientes[0]?.diasEdad?.min ?? null,
+              max: planPrincipal?.rango?.max ?? etapasCorrespondientes[0]?.diasEdad?.max ?? null
+            };
+            console.log('🧭 [Chanchos] Plan principal (por edad):', this.planPrincipalNombre, this.planPrincipalRango);
+
+            const etapasOrdenadas = [...etapasCorrespondientes].sort((a: any, b: any) => {
               if (a.diasEdad?.min !== b.diasEdad?.min) return (a.diasEdad?.min || 0) - (b.diasEdad?.min || 0);
               return (a.diasEdad?.max || 0) - (b.diasEdad?.max || 0);
             });
@@ -469,8 +468,7 @@ export class ChanchosAlimentacionComponent implements OnInit {
               productoId: etapa.producto?.id
             }));
 
-            // Establecer etapa actual visible en el cintillo (la que contiene el día actual)
-            const actual = etapasOrdenadas.find((e: any) => diasVida >= e.diasEdad?.min && diasVida <= e.diasEdad?.max) || etapasOrdenadas[0] || null;
+            const actual = etapasOrdenadas[0];
             this.etapaActualChanchos = actual
               ? {
                   id: 0,
@@ -514,7 +512,35 @@ export class ChanchosAlimentacionComponent implements OnInit {
     this.modalAbierto = false;
     this.loteSeleccionado = null;
     this.etapaActualChanchos = null;
+    this.alertaPlanNutricional = null;
+    this.uiMessageError = '';
+    this.uiMessageSuccess = '';
     this.resetearRegistro();
+  }
+
+  /** Bloquea el formulario y muestra alerta profesional de plan nutricional sin rango */
+  private activarAlertaPlanSinRango(
+    diasVida: number,
+    rangoMin: number,
+    rangoMax: number,
+    lote: Lote
+  ): void {
+    this.etapasDisponiblesLote = [];
+    this.etapaActualChanchos = null;
+    this.planPrincipalNombre = null;
+    this.planPrincipalRango = { min: null, max: null };
+    this.alimentosSeleccionados = [];
+    this.uiMessageError = '';
+    this.alertaPlanNutricional = {
+      activa: true,
+      diasVida,
+      rangoTexto:
+        Number.isFinite(rangoMin) && Number.isFinite(rangoMax)
+          ? `${rangoMin}–${rangoMax}`
+          : 'sin rangos',
+      loteCodigo: this.formatLoteCodigo(lote?.codigo) || '—',
+      poblacion: lote?.quantity || 0
+    };
   }
 
   /**
@@ -606,16 +632,19 @@ export class ChanchosAlimentacionComponent implements OnInit {
 
   private determinarPlanPrincipal(etapas: any[], diasVida: number): { nombre: string, rango?: { min: number, max: number } } | null {
     if (!etapas || etapas.length === 0) return null;
+    // Solo planes cuyo nombre/rango realmente cubre la edad (nunca fallback a la primera etapa)
     for (const e of etapas) {
       const parsed = this.extraerRangoDesdeNombre(e.planNombre);
       if (parsed && diasVida >= parsed.min && diasVida <= parsed.max) {
         return { nombre: e.planNombre, rango: parsed };
       }
     }
-    const nombre = etapas[0]?.planNombre || null;
-    if (nombre) {
-      const parsed = this.extraerRangoDesdeNombre(nombre);
-      return { nombre, rango: parsed || undefined } as any;
+    const e0 = etapas[0];
+    if (e0 && diasVida >= (e0.diasEdad?.min ?? -1) && diasVida <= (e0.diasEdad?.max ?? -1)) {
+      return {
+        nombre: e0.planNombre || e0.nombre || 'Etapa actual',
+        rango: { min: e0.diasEdad.min, max: e0.diasEdad.max }
+      };
     }
     return null;
   }

@@ -133,6 +133,15 @@ export class PollosAlimentacionComponent implements OnInit {
   uiMessageSuccess: string | null = null;
   uiMessageError: string | null = null;
 
+  /** Alerta contundente cuando la edad del lote no cae en ningún rango del plan */
+  alertaPlanNutricional: {
+    activa: boolean;
+    diasVida: number;
+    rangoTexto: string;
+    loteCodigo: string;
+    poblacion: number;
+  } | null = null;
+
   // Cache de productos para resolver IDs por nombre
   private productosCache: any[] = [];
   private productoByNameNorm = new Map<string, any>();
@@ -256,18 +265,18 @@ export class PollosAlimentacionComponent implements OnInit {
   // ================= UTILIDADES DE PLAN PRINCIPAL =================
   private determinarPlanPrincipal(etapas: any[], diasVida: number): { nombre: string, rango?: { min: number, max: number } } | null {
     if (!etapas || etapas.length === 0) return null;
-    // 1) Preferir un plan cuyo nombre contenga un rango x-y que incluya diasVida
     for (const e of etapas) {
       const parsed = this.extraerRangoDesdeNombre(e.planNombre);
       if (parsed && diasVida >= parsed.min && diasVida <= parsed.max) {
         return { nombre: e.planNombre, rango: parsed };
       }
     }
-    // 2) Si ninguno tiene rango en el nombre, agrupar por planNombre y usar el primero
-    const nombre = etapas[0]?.planNombre || null;
-    if (nombre) {
-      const parsed = this.extraerRangoDesdeNombre(nombre);
-      return { nombre, rango: parsed || undefined } as any;
+    const e0 = etapas[0];
+    if (e0 && diasVida >= (e0.diasEdad?.min ?? -1) && diasVida <= (e0.diasEdad?.max ?? -1)) {
+      return {
+        nombre: e0.planNombre || e0.nombre || 'Etapa actual',
+        rango: { min: e0.diasEdad.min, max: e0.diasEdad.max }
+      };
     }
     return null;
   }
@@ -532,6 +541,9 @@ export class PollosAlimentacionComponent implements OnInit {
     this.registroCompleto = this.getRegistroVacio();
     this.registroCompleto.loteId = String(lote.id || '');
     this.registroCompleto.animalesVivos = lote.quantity || 0;
+    this.alertaPlanNutricional = null;
+    this.uiMessageError = null;
+    this.uiMessageSuccess = null;
     this.modalAbierto = true;
     
     // Calcular días de vida del lote
@@ -610,6 +622,8 @@ export class PollosAlimentacionComponent implements OnInit {
             
             // ✅ VALIDAR QUE EXISTAN ETAPAS ANTES DE PROCESAR
             if (etapasCorrespondientes && etapasCorrespondientes.length > 0) {
+              this.alertaPlanNutricional = null;
+              this.uiMessageError = null;
               console.log(`✅ Procesando ${etapasCorrespondientes.length} etapas para ${diasVida} días`);
               
               // 🚨 DEBUG: Verificar los rangos que llegan del backend
@@ -624,52 +638,16 @@ export class PollosAlimentacionComponent implements OnInit {
                 });
               });
               
-              // 🧭 DETERMINAR PLAN PRINCIPAL SEGÚN NOMBRE CON RANGO QUE CONTENGA LA EDAD (buscar en TODAS las etapas)
-              const planPrincipal = this.determinarPlanPrincipal(planPollos.etapas, diasVida);
+              // Solo etapas cuyo dayStart–dayEnd incluye la edad (nunca mostrar 1-22 si el lote tiene 58)
+              const planPrincipal = this.determinarPlanPrincipal(etapasCorrespondientes, diasVida);
               this.planPrincipalNombre = planPrincipal?.nombre || (etapasCorrespondientes[0]?.planNombre || null);
               this.planPrincipalRango = {
-                min: planPrincipal?.rango?.min ?? null,
-                max: planPrincipal?.rango?.max ?? null
+                min: planPrincipal?.rango?.min ?? etapasCorrespondientes[0]?.diasEdad?.min ?? null,
+                max: planPrincipal?.rango?.max ?? etapasCorrespondientes[0]?.diasEdad?.max ?? null
               };
-              console.log('🧭 Plan principal detectado:', this.planPrincipalNombre, this.planPrincipalRango);
+              console.log('🧭 Plan principal (por edad):', this.planPrincipalNombre, this.planPrincipalRango);
 
-              // Filtrar sub-etapas por rango principal detectado (min-max) SIN limitar al día actual
-              let etapasDelPlanPrincipal: any[] = [];
-              if (this.planPrincipalRango.min != null && this.planPrincipalRango.max != null) {
-                const minP = this.planPrincipalRango.min as number;
-                const maxP = this.planPrincipalRango.max as number;
-                etapasDelPlanPrincipal = planPollos.etapas.filter((e: any) => {
-                  const r = this.extraerRangoDesdeNombre(e.planNombre);
-                  // Preferir emparejar por rango del nombre del plan
-                  if (r) return r.min === minP && r.max === maxP;
-                  // Si no hay rango en el nombre del plan, al menos exigir que la sub-etapa esté contenida en el rango
-                  return e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP;
-                });
-
-                // 🔁 Fallback de robustez: si por inconsistencias de nombre se perdió alguna sub-etapa del rango, unir con todas las sub-etapas contenidas
-                const candidatasPorRango = planPollos.etapas.filter((e: any) => e.diasEdad?.min >= minP && e.diasEdad?.max <= maxP);
-                const unicas: any[] = [];
-                const vistos = new Set<number | string>();
-                [...etapasDelPlanPrincipal, ...candidatasPorRango].forEach((e: any) => {
-                  const key = e.id ?? `${e.producto?.id}-${e.diasEdad?.min}-${e.diasEdad?.max}`;
-                  if (!vistos.has(key)) {
-                    vistos.add(key);
-                    unicas.push(e);
-                  }
-                });
-                etapasDelPlanPrincipal = unicas;
-              } else if (this.planPrincipalNombre) {
-                // Fallback: agrupar por nombre exacto del plan si no pudimos extraer rango
-                etapasDelPlanPrincipal = planPollos.etapas.filter((e: any) => e.planNombre === this.planPrincipalNombre);
-              } else {
-                // Último fallback: usar solo las etapas correspondientes al día actual
-                etapasDelPlanPrincipal = etapasCorrespondientes;
-              }
-              console.log('📋 Sub-etapas del plan principal:', etapasDelPlanPrincipal);
-
-              // ✅ CREAR TODAS LAS OPCIONES DE ALIMENTOS DISPONIBLES SOLO DEL PLAN PRINCIPAL
-              // Ordenar por rango
-              const etapasOrdenadas = [...etapasDelPlanPrincipal].sort((a: any, b: any) => {
+              const etapasOrdenadas = [...etapasCorrespondientes].sort((a: any, b: any) => {
                 if (a.diasEdad?.min !== b.diasEdad?.min) return (a.diasEdad?.min || 0) - (b.diasEdad?.min || 0);
                 return (a.diasEdad?.max || 0) - (b.diasEdad?.max || 0);
               });
@@ -677,41 +655,33 @@ export class PollosAlimentacionComponent implements OnInit {
               this.etapasDisponiblesLote = etapasOrdenadas.map((etapa, index) => ({
                 id: index + 1,
                 alimentoRecomendado: etapa.producto?.name || etapa.tipoAlimento,
-                quantityPerAnimal: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
+                quantityPerAnimal: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
                 unidad: 'kg',
-                // ✅ Seleccionar por defecto TODAS las opciones disponibles del plan principal
                 seleccionado: true,
                 productosDetalle: [
                   {
                     nombre: etapa.producto?.name || etapa.tipoAlimento,
-                    cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
+                    cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
                     unidad: 'kg'
                   }
                 ],
-                // ✅ Sub-rango visual
                 dayStart: etapa.diasEdad?.min,
                 dayEnd: etapa.diasEdad?.max,
-                // ✅ ID real del producto para inventario
                 productoId: etapa.producto?.id
               }));
-              
-              // ✅ CONFIGURAR ETAPA ACTUAL CON INFORMACIÓN COMBINADA
-              const etapaActual = etapasOrdenadas.find((e: any) => {
-                const min = Number(e?.diasEdad?.min);
-                const max = Number(e?.diasEdad?.max);
-                return Number.isFinite(min) && Number.isFinite(max) && diasVida >= min && diasVida <= max;
-              }) || etapasOrdenadas[0];
+
+              const etapaActual = etapasOrdenadas[0];
               const todasLasEtapas = etapasOrdenadas.map(etapa => ({
                 nombre: etapa.producto?.name || etapa.tipoAlimento,
-                cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
+                cantidad: parseFloat((etapa.quantityPerAnimal || (etapa.consumoDiario.min / 1000)).toFixed(2)),
                 unidad: 'kg'
               }));
-              
+
               this.etapaActualLote = {
                 nombre: `Etapa ${etapaActual.diasEdad.min}-${etapaActual.diasEdad.max} días` + (this.planPrincipalNombre ? ` • ${this.planPrincipalNombre}` : ''),
                 descripcion: `${etapasOrdenadas.length} opciones de alimentación disponibles`,
                 alimentoRecomendado: `${etapasOrdenadas.length} opciones: ${etapasOrdenadas.map(e => e.producto?.name || e.tipoAlimento).join(', ')}`,
-                quantityPerAnimal: parseFloat((etapaActual.quantityPerAnimal || (etapaActual.consumoDiario.min / 1000)).toFixed(2)), // ✅ FORMATO X.XX
+                quantityPerAnimal: parseFloat((etapaActual.quantityPerAnimal || (etapaActual.consumoDiario.min / 1000)).toFixed(2)),
                 diasInicio: etapaActual.diasEdad.min,
                 diasFin: etapaActual.diasEdad.max,
                 productosDetalle: todasLasEtapas
@@ -722,9 +692,9 @@ export class PollosAlimentacionComponent implements OnInit {
               
             } else {
               console.warn(`⚠️ No se encontró etapa para ${diasVida} días en los planes del administrador.`);
-              this.etapasDisponiblesLote = [];
-              this.etapaActualLote = null;
-              this.uiMessageError = `No hay etapas configuradas para ${diasVida} días. Configure los rangos en Admin > Plan Nutricional > Etapas.`;
+              const rangoMinimo = Math.min(...planPollos.etapas.map((e: any) => Number(e.diasEdad?.min) || 0));
+              const rangoMaximo = Math.max(...planPollos.etapas.map((e: any) => Number(e.diasEdad?.max) || 0));
+              this.activarAlertaPlanSinRango(diasVida, rangoMinimo, rangoMaximo, lote);
             }
             
             // Actualizar alimentos seleccionados
@@ -1631,6 +1601,32 @@ export class PollosAlimentacionComponent implements OnInit {
     this.etapasDisponiblesLote = [];
     this.alimentosSeleccionados = [];
     this.etapaActualLote = null;
+    this.alertaPlanNutricional = null;
+    this.uiMessageError = null;
+    this.uiMessageSuccess = null;
+  }
+
+  /** Bloquea el formulario y muestra alerta profesional de plan nutricional sin rango */
+  private activarAlertaPlanSinRango(
+    diasVida: number,
+    rangoMin: number,
+    rangoMax: number,
+    lote: Lote
+  ): void {
+    this.etapasDisponiblesLote = [];
+    this.etapaActualLote = null;
+    this.alimentosSeleccionados = [];
+    this.uiMessageError = null;
+    this.alertaPlanNutricional = {
+      activa: true,
+      diasVida,
+      rangoTexto:
+        Number.isFinite(rangoMin) && Number.isFinite(rangoMax)
+          ? `${rangoMin}–${rangoMax}`
+          : 'sin rangos',
+      loteCodigo: this.formatLoteCodigo(lote?.codigo) || '—',
+      poblacion: lote?.quantity || 0
+    };
   }
 
   // ✅ MÉTODOS PARA DROPDOWN DE CAUSAS DE MORTALIDAD

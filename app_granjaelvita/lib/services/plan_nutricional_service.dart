@@ -98,36 +98,10 @@ class PlanNutricionalActivo {
 
   /// Obtener todas las etapas del mismo rango principal
   List<EtapaNutricional> etapasDelRangoPrincipal(int dias) {
-    // 1) Regla principal: devolver TODAS las etapas que contienen el día
-    //    (esto cubre el caso de múltiples opciones en el mismo rango, p.ej. 180-365)
+    // Solo etapas cuyo rango incluye el día de vida (nunca devolver 1-22 si el lote tiene 58)
     final porDia = etapasParaDia(dias);
     if (porDia.isNotEmpty) return porDia;
-
-    // 2) Si no hay coincidencias exactas por día, intentar agrupar por nombre del plan
-    //    Encontrar una etapa de referencia (la que contenga el día o la primera disponible)
-    final etapaActual = etapas.firstWhere(
-      (e) => e.contieneD(dias),
-      orElse: () => etapas.isNotEmpty
-          ? etapas.first
-          : EtapaNutricional(
-              nombre: '', planNombre: '', diasMin: 0, diasMax: 0,
-              alimentoRecomendado: '', cantidadPorAnimal: 0,
-            ),
-    );
-
-    // Extraer rango del nombre del plan (ej: "Plan 1-30" -> min=1, max=30)
-    final rango = _extraerRangoDeNombre(etapaActual.planNombre);
-    if (rango != null) {
-      // Filtrar todas las etapas que pertenecen a ese rango detectado
-      return etapas.where((e) {
-        final r = _extraerRangoDeNombre(e.planNombre);
-        if (r != null) return r['min'] == rango['min'] && r['max'] == rango['max'];
-        return e.diasMin >= rango['min']! && e.diasMax <= rango['max']!;
-      }).toList();
-    }
-
-    // 3) Fallback final: agrupar por los mismos límites min/max exactos
-    return etapas.where((e) => e.diasMin == etapaActual.diasMin && e.diasMax == etapaActual.diasMax).toList();
+    return [];
   }
 
   Map<String, int>? _extraerRangoDeNombre(String? nombre) {
