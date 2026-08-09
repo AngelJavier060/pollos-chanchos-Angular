@@ -122,6 +122,8 @@ class RazaDto {
 }
 
 class LoteServiceMobile {
+  static const _httpTimeout = Duration(seconds: 12);
+
   /// Obtiene los headers con autenticación, intentando cargar sesión si es necesario
   static Future<Map<String, String>> _getHeaders() async {
     // Si no hay token en memoria, intentar cargar la sesión guardada
@@ -143,7 +145,7 @@ class LoteServiceMobile {
   Future<dynamic> _get(String path) async {
     final headers = await _getHeaders();
     final url = Uri.parse('$apiBaseUrl$path');
-    final response = await http.get(url, headers: headers);
+    final response = await http.get(url, headers: headers).timeout(_httpTimeout);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body.isNotEmpty ? json.decode(response.body) : null;
     }

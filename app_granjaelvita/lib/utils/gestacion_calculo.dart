@@ -108,21 +108,24 @@ class StatsGestacion {
   });
 }
 
-StatsGestacion calcularStats(List<String> fechasInseminacion) {
+/// [paridasHistorial] = partos registrados (no se infiere solo por días > 114).
+StatsGestacion calcularStats(
+  List<String> fechasInseminacionActivas, {
+  int paridasHistorial = 0,
+}) {
   var gestando = 0;
   var preParto = 0;
-  var paridas = 0;
-  for (final f in fechasInseminacion) {
+  for (final f in fechasInseminacionActivas) {
     final d = diasTranscurridos(f);
-    if (d >= 0 && d <= diasGestacionTotal) gestando++;
+    // Ciclo activo = gestando (incluye pre-parto y parto próximo)
+    if (d >= 0) gestando++;
     if (d >= 86 && d <= diasGestacionTotal) preParto++;
-    if (d > diasGestacionTotal) paridas++;
   }
   return StatsGestacion(
-    total: fechasInseminacion.length,
+    total: fechasInseminacionActivas.length + paridasHistorial,
     gestando: gestando,
     preParto: preParto,
-    paridas: paridas,
+    paridas: paridasHistorial,
   );
 }
 

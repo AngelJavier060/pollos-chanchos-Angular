@@ -912,6 +912,49 @@ class HomePage extends StatelessWidget {
     return 'Usuario';
   }
 
+  Future<void> _cerrarSesion(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.logout, color: Colors.red.shade600, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text('Cerrar Sesión', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: const Text('¿Está seguro que desea salir del sistema?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      await AuthService.logout();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bannerImages = const [
@@ -948,9 +991,27 @@ class HomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('Granja Elvita'),
+            const Flexible(
+              child: Text(
+                'Granja Elvita',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _cerrarSesion(context),
+            icon: Icon(Icons.logout_rounded, color: Colors.red.shade700, size: 20),
+            label: Text(
+              'Salir',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

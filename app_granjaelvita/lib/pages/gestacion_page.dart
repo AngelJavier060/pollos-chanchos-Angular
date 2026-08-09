@@ -13,37 +13,43 @@ import '../utils/gestacion_media.dart';
 import 'gestacion_ficha_page.dart';
 import 'gestacion_parto_sheets.dart';
 
-/// Paleta alineada al mockup Tailwind (slate / emerald / amber).
+/// Paleta alineada al mockup AgroPig / Granja Elvita.
 abstract final class _GTheme {
-  static const bg = Color(0xFFF8FAFC);
-  static const slate900 = Color(0xFF0F172A);
+  static const bg = Color(0xFFF8FAF8);
+  static const primary = Color(0xFF00450D);
+  static const primaryContainer = Color(0xFF1B5E20);
+  static const onPrimary = Color(0xFFFFFFFF);
+  static const onPrimaryContainer = Color(0xFF90D689);
+  static const surfaceLowest = Color(0xFFFFFFFF);
+  static const surfaceLow = Color(0xFFF2F4F2);
+  static const surfaceHigh = Color(0xFFE6E9E7);
+  static const surfaceVariant = Color(0xFFE1E3E1);
+  static const outline = Color(0xFF717A6D);
+  static const outlineVariant = Color(0xFFC0C9BB);
+  static const onSurface = Color(0xFF191C1B);
+  static const onSurfaceVariant = Color(0xFF41493E);
+  static const slate900 = Color(0xFF191C1B);
   static const slate800 = Color(0xFF1E293B);
   static const slate700 = Color(0xFF334155);
-  static const slate600 = Color(0xFF475569);
   static const slate500 = Color(0xFF64748B);
-  static const slate400 = Color(0xFF94A3B8);
-  static const slate200 = Color(0xFFE2E8F0);
   static const slate100 = Color(0xFFF1F5F9);
-  static const emerald500 = Color(0xFF10B981);
-  static const emerald600 = Color(0xFF059669);
-  static const emerald700 = Color(0xFF047857);
-  static const emerald100 = Color(0xFFD1FAE5);
+  static const emerald600 = Color(0xFF1B5E20);
+  static const emerald700 = Color(0xFF00450D);
   static const emerald50 = Color(0xFFECFDF5);
-  static const emerald300 = Color(0xFF6EE7B7);
+  static const emerald300 = Color(0xFF91D78A);
   static const orange50 = Color(0xFFFFF7ED);
   static const orange100 = Color(0xFFFFEDD5);
   static const orange600 = Color(0xFFEA580C);
   static const blue50 = Color(0xFFEFF6FF);
   static const blue100 = Color(0xFFDBEAFE);
   static const blue600 = Color(0xFF2563EB);
-  static const blue700 = Color(0xFF1D4ED8);
   static const amber50 = Color(0xFFFFFBEB);
   static const amber100 = Color(0xFFFEF3C7);
   static const amber200 = Color(0xFFFDE68A);
   static const amber600 = Color(0xFFD97706);
   static const amber900 = Color(0xFF78350F);
-  static const rose500 = Color(0xFFF43F5E);
-  static const rose50 = Color(0xFFFFF1F2);
+  static const rose500 = Color(0xFFBA1A1A);
+  static const rose50 = Color(0xFFFFDAD6);
 
   static List<BoxShadow> get softShadow => [
         BoxShadow(
@@ -105,24 +111,13 @@ class _GestacionPageState extends State<GestacionPage> {
       _error = null;
     });
     try {
-      final lista = await _service.listar();
-      List<GestacionParto> partos = [];
-      List<GestacionNoPrenada> noPrenadas = [];
-      try {
-        partos = await _service.listarPartos();
-      } catch (_) {
-        partos = [];
-      }
-      try {
-        noPrenadas = await _service.listarNoPrenadas();
-      } catch (_) {
-        noPrenadas = [];
-      }
+      // Una sola ronda HTTP en paralelo (headers compartidos + timeout)
+      final data = await _service.cargarResumenInicial();
       if (!mounted) return;
       setState(() {
-        _chanchas = lista;
-        _partos = partos;
-        _noPrenadas = noPrenadas;
+        _chanchas = data.chanchas;
+        _partos = data.partos;
+        _noPrenadas = data.noPrenadas;
         _loading = false;
       });
     } catch (e) {
@@ -166,31 +161,14 @@ class _GestacionPageState extends State<GestacionPage> {
     }
   }
 
-  ({Color bg, Color fg}) _badgeEstado(ColorKind kind) {
-    switch (kind) {
-      case ColorKind.info:
-        return (bg: _GTheme.blue100, fg: _GTheme.blue700);
-      case ColorKind.success:
-        return (bg: _GTheme.emerald100, fg: _GTheme.emerald700);
-      case ColorKind.warning:
-        return (bg: _GTheme.orange100, fg: _GTheme.orange600);
-      case ColorKind.danger:
-        return (bg: _GTheme.rose50, fg: _GTheme.rose500);
-      default:
-        return (bg: _GTheme.slate100, fg: _GTheme.slate500);
-    }
-  }
-
-  ({Color bg, Color fg}) _pillDiasRestantes(int dias) {
-    if (dias <= 7) return (bg: _GTheme.rose50, fg: _GTheme.rose500);
-    if (dias <= 21) return (bg: _GTheme.orange100, fg: _GTheme.orange600);
-    return (bg: _GTheme.emerald100, fg: _GTheme.emerald700);
-  }
-
   @override
   Widget build(BuildContext context) {
     final activas = _activas;
-    final stats = calcularStats(activas.map((c) => c.fechaInseminacion).toList());
+    // Paridas = historial real de partos (no por días vencidos en activas)
+    final stats = calcularStats(
+      activas.map((c) => c.fechaInseminacion).toList(),
+      paridasHistorial: _partos.length,
+    );
     final alertas = calcularAlertas(
       activas.map((c) => (nombre: c.nombre, fechaInseminacion: c.fechaInseminacion)).toList(),
     );
@@ -198,26 +176,32 @@ class _GestacionPageState extends State<GestacionPage> {
     return Scaffold(
       backgroundColor: _GTheme.bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: _GTheme.slate900,
+        backgroundColor: _GTheme.primary,
+        foregroundColor: _GTheme.onPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.white,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: _GTheme.slate200),
-        ),
-        title: Text(
-          widget.modoEdicion ? 'Gestación (admin)' : 'Gestación',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _GTheme.slate900),
+        surfaceTintColor: _GTheme.primary,
+        title: Row(
+          children: [
+            const Icon(Icons.pets_rounded, color: _GTheme.onPrimary),
+            const SizedBox(width: 8),
+            Text(
+              widget.modoEdicion ? 'Granja Elvita · Admin' : 'Granja Elvita',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: _GTheme.onPrimary,
+              ),
+            ),
+          ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _GTheme.slate900),
+          icon: const Icon(Icons.arrow_back, color: _GTheme.onPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: _GTheme.slate500),
+            icon: const Icon(Icons.refresh, color: _GTheme.onPrimary),
             tooltip: 'Refrescar',
             onPressed: _cargar,
           ),
@@ -226,28 +210,53 @@ class _GestacionPageState extends State<GestacionPage> {
       floatingActionButton: widget.modoEdicion ? _buildFab() : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _GTheme.emerald500))
+          ? const Center(child: CircularProgressIndicator(color: _GTheme.primary))
           : _error != null
               ? _buildError()
               : RefreshIndicator(
+                  color: _GTheme.primary,
                   onRefresh: _cargar,
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
                     children: [
                       if (!widget.modoEdicion) _buildAvisoConsulta(),
+                      const Text(
+                        'Resumen de Gestación',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: _GTheme.onSurface,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _buildStats(stats),
                       if (alertas.isNotEmpty) ...[
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         ...alertas.map(_buildAlerta),
                       ],
                       const SizedBox(height: 24),
-                      Text(
-                        'Gestaciones activas (${activas.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _GTheme.slate800,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Gestaciones activas',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: _GTheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${activas.length}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _GTheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       if (activas.isEmpty)
@@ -260,7 +269,7 @@ class _GestacionPageState extends State<GestacionPage> {
                               padding: const EdgeInsets.only(bottom: 16),
                               child: _buildCard(c),
                             )),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       Text(
                         'Historial — no gestantes (${_noPrenadas.length})',
                         style: const TextStyle(
@@ -349,7 +358,12 @@ class _GestacionPageState extends State<GestacionPage> {
             width: 52,
             height: 52,
             child: thumb.isNotEmpty
-                ? Image.network(thumb, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _partoPh())
+                ? Image.network(
+                    thumb,
+                    fit: BoxFit.cover,
+                    cacheWidth: 160,
+                    errorBuilder: (_, __, ___) => _partoPh(),
+                  )
                 : _partoPh(),
           ),
         ),
@@ -478,51 +492,107 @@ class _GestacionPageState extends State<GestacionPage> {
   }
 
   Widget _buildStats(StatsGestacion stats) {
-    Widget stat(String lbl, int val, Color bg, Color border, Color valueColor, Color labelColor) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-            boxShadow: _GTheme.softShadow,
+    Widget metricCard({
+      required String label,
+      required int value,
+      required bool highlight,
+      IconData? icon,
+    }) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: highlight ? _GTheme.primaryContainer : _GTheme.surfaceLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: highlight
+                ? _GTheme.outlineVariant.withValues(alpha: 0.3)
+                : _GTheme.outlineVariant,
           ),
-          child: Column(
-            children: [
-              Text(
-                '$val',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: valueColor),
+          boxShadow: _GTheme.softShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: highlight ? _GTheme.onPrimaryContainer : _GTheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 4),
-              Text(
-                lbl.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                  color: labelColor,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Text(
+                    '$value',
+                    style: TextStyle(
+                      fontSize: highlight ? 28 : 24,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                      letterSpacing: -0.2,
+                      color: highlight ? _GTheme.onPrimaryContainer : _GTheme.onSurface,
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+                if (icon != null)
+                  Icon(
+                    icon,
+                    size: 22,
+                    color: highlight ? _GTheme.onPrimaryContainer : _GTheme.outline,
+                  ),
+              ],
+            ),
+          ],
         ),
       );
     }
 
-    return Row(
+    return Column(
       children: [
-        stat('Total', stats.total, Colors.white, _GTheme.slate100, _GTheme.slate700, _GTheme.slate400),
-        const SizedBox(width: 12),
-        stat('Gestando', stats.gestando, _GTheme.emerald50, _GTheme.emerald100, _GTheme.emerald600,
-            _GTheme.emerald600.withValues(alpha: 0.7)),
-        const SizedBox(width: 12),
-        stat('Pre-parto', stats.preParto, _GTheme.orange50, _GTheme.orange100, _GTheme.orange600,
-            _GTheme.orange600.withValues(alpha: 0.7)),
-        const SizedBox(width: 12),
-        stat('Paridas', stats.paridas, _GTheme.blue50, _GTheme.blue100, _GTheme.blue600,
-            _GTheme.blue600.withValues(alpha: 0.7)),
+        Row(
+          children: [
+            Expanded(
+              child: metricCard(
+                label: 'Gestando',
+                value: stats.gestando,
+                highlight: true,
+                icon: Icons.pets_rounded,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: metricCard(
+                label: 'Total',
+                value: stats.total,
+                highlight: false,
+                icon: Icons.list_alt_rounded,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: metricCard(
+                label: 'Pre-Parto',
+                value: stats.preParto,
+                highlight: false,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: metricCard(
+                label: 'Paridas',
+                value: stats.paridas,
+                highlight: false,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -571,176 +641,226 @@ class _GestacionPageState extends State<GestacionPage> {
   }
 
   Widget _buildCard(GestacionChancha c) {
-    final estado = getEstadoGestacion(c.fechaInseminacion);
-    final estadoBadge = _badgeEstado(estado.colorKind);
     final diasRest = diasRestantes(c.fechaInseminacion);
-    final diasPill = _pillDiasRestantes(diasRest);
     final progreso = progresoPorcentaje(c.fechaInseminacion);
     final parto = fechaPartoEstimada(c.fechaInseminacion);
-    final diasTrans = diasTranscurridos(c.fechaInseminacion);
-
+    final diasTrans = diasTranscurridos(c.fechaInseminacion).clamp(0, 999);
+    final etapa = getEtapaNombre(c.fechaInseminacion);
+    final loteLabel = c.loteCodigo.trim().isNotEmpty
+        ? c.loteCodigo.trim()
+        : (c.loteNombre.trim().isNotEmpty ? c.loteNombre.trim() : 'Sin lote');
     final foto = resolveGestacionMediaUrl(c.fotoUrl);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _GTheme.slate100),
+        color: _GTheme.surfaceLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _GTheme.outlineVariant),
         boxShadow: _GTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Cabecera: foto 1/3 + datos
+          SizedBox(
+            height: 108,
+            child: Row(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () => _actualizarFotoChancha(c),
-                      child: Stack(
+                GestureDetector(
+                  onTap: () => _actualizarFotoChancha(c),
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.28,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColoredBox(
+                          color: _GTheme.surfaceLow,
+                          child: foto.isNotEmpty
+                              ? Image.network(
+                                  foto,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 280,
+                                  errorBuilder: (_, __, ___) => _partoPh(),
+                                )
+                              : _partoPh(),
+                        ),
+                        Positioned(
+                          right: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: _GTheme.primary.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Icon(Icons.photo_camera, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _abrirFicha(c),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SizedBox(
-                              width: 64,
-                              height: 64,
-                              child: foto.isNotEmpty
-                                  ? Image.network(
-                                      foto,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _partoPh(),
-                                    )
-                                  : _partoPh(),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  c.nombre,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: _GTheme.onSurface,
+                                    height: 1.15,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  loteLabel,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: _GTheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: _GTheme.emerald600,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: Colors.white, width: 1.5),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '$diasTrans',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
+                                  color: _GTheme.primary,
+                                  height: 1,
+                                ),
                               ),
-                              child: const Icon(Icons.photo_camera, size: 12, color: Colors.white),
-                            ),
+                              const Text(
+                                'DÍAS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.4,
+                                  color: _GTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _chip('GESTANDO', _GTheme.primaryContainer.withValues(alpha: 0.2),
+                                  _GTheme.primary, border: _GTheme.primary.withValues(alpha: 0.3)),
+                              const SizedBox(height: 3),
+                              _chip(
+                                etapa.toUpperCase(),
+                                _GTheme.surfaceVariant,
+                                _GTheme.onSurfaceVariant,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _abrirFicha(c),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              c.nombre,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: _GTheme.slate900,
-                              ),
-                            ),
-                            if (c.subtituloLote.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  c.subtituloLote,
-                                  style: const TextStyle(fontSize: 12, color: _GTheme.slate500),
-                                ),
-                              ),
-                            const SizedBox(height: 2),
-                            Text(
-                              foto.isNotEmpty ? 'Toca la foto para cambiarla' : 'Toca para tomar foto',
-                              style: const TextStyle(fontSize: 11, color: _GTheme.emerald600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (!c.activa) _badge('Baja', _GTheme.slate100, _GTheme.slate500),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    _badge(estado.label.toUpperCase(), estadoBadge.bg, estadoBadge.fg),
-                    _badge(
-                      getEtapaNombre(c.fechaInseminacion).toUpperCase(),
-                      _GTheme.slate100,
-                      _GTheme.slate500,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Día $diasTrans / $diasGestacionTotal ($progreso%)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: _GTheme.slate600,
                   ),
                 ),
-                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+          // Progreso + fechas + countdown
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: _GTheme.surfaceVariant)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'PROGRESO ($progreso%)',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _GTheme.onSurfaceVariant,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: progreso / 100,
-                    minHeight: 6,
-                    backgroundColor: _GTheme.slate100,
-                    color: _GTheme.emerald500,
+                    minHeight: 8,
+                    backgroundColor: _GTheme.surfaceHigh,
+                    color: _GTheme.primary,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _infoRow('Inseminación', formatFechaEs(c.fechaInseminacion))),
-                    Expanded(child: _infoRow('Parto est.', formatFechaDesdeDate(parto))),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Text(
-                      'Faltan para parto:',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _GTheme.slate600),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: diasPill.bg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$diasRest días',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: diasPill.fg,
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _GTheme.bg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _GTheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _fechaMini(
+                          Icons.calendar_month_outlined,
+                          'Inseminación',
+                          formatFechaEs(c.fechaInseminacion),
                         ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: _fechaMini(
+                          Icons.event_available_outlined,
+                          'Parto Est.',
+                          formatFechaDesdeDate(parto),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _GTheme.primaryContainer.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _GTheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 18, color: _GTheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Faltan para parto: $diasRest días',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _GTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           Container(
               decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFF8FAFC))),
+                border: Border(top: BorderSide(color: _GTheme.surfaceVariant)),
               ),
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
               child: Row(
@@ -814,17 +934,53 @@ class _GestacionPageState extends State<GestacionPage> {
     );
   }
 
-  Widget _badge(String text, Color bg, Color fg) {
+  Widget _chip(String text, Color bg, Color fg, {Color? border}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(4),
+        border: border != null ? Border.all(color: border) : null,
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+          color: fg,
+        ),
       ),
+    );
+  }
+
+  Widget _fechaMini(IconData icon, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: _GTheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: _GTheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _GTheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 
@@ -855,28 +1011,6 @@ class _GestacionPageState extends State<GestacionPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-            color: _GTheme.slate400,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _GTheme.slate700),
-        ),
-      ],
     );
   }
 

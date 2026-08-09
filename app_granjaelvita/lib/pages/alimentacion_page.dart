@@ -69,7 +69,10 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
         }
       });
 
-      // 2) Stats en paralelo (no bloquean la apertura)
+      // Prefetch plan+stock para que el modal abra casi al instante
+      _planSrv.prefetch(_tipoAnimal);
+
+      // Stats en segundo plano, por lotes (sin saturar la red)
       _cargarEstadisticasEnParalelo(lotes);
     } catch (e) {
       if (!mounted) return;
@@ -80,34 +83,37 @@ class _AlimentacionPageState extends State<AlimentacionPage> {
     }
   }
 
-  /// Mortalidad + morbilidad de todos los lotes en paralelo (antes era secuencial).
+  /// Mortalidad + morbilidad por lotes en tandas (evita saturar la red al abrir).
   Future<void> _cargarEstadisticasEnParalelo(List<LoteDto> lotes) async {
     if (lotes.isEmpty) return;
     if (!mounted) return;
     setState(() => _cargandoStats = true);
 
     try {
-      final resultados = await Future.wait(
-        lotes.map((lote) async {
-          final pair = await Future.wait([
-            _planSrv.contarMortalidadPorLote(lote.id),
-            _planSrv.contarEnfermosPorLote(lote.id),
-          ]);
-          return (lote.id, pair[0], pair[1]);
-        }),
-      );
-
-      if (!mounted) return;
-      setState(() {
-        for (final r in resultados) {
-          _mortalidadPorLote[r.$1] = r.$2;
-          _morbilidadPorLote[r.$1] = r.$3;
-        }
-        _cargandoStats = false;
-      });
+      const batchSize = 3;
+      for (var i = 0; i < lotes.length; i += batchSize) {
+        final batch = lotes.skip(i).take(batchSize).toList();
+        final resultados = await Future.wait(
+          batch.map((lote) async {
+            final pair = await Future.wait([
+              _planSrv.contarMortalidadPorLote(lote.id),
+              _planSrv.contarEnfermosPorLote(lote.id),
+            ]);
+            return (lote.id, pair[0], pair[1]);
+          }),
+        );
+        if (!mounted) return;
+        setState(() {
+          for (final r in resultados) {
+            _mortalidadPorLote[r.$1] = r.$2;
+            _morbilidadPorLote[r.$1] = r.$3;
+          }
+        });
+      }
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _cargandoStats = false);
+      // silencioso: ya hay valores iniciales
+    } finally {
+      if (mounted) setState(() => _cargandoStats = false);
     }
   }
 
@@ -569,6 +575,10 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
   List<EtapaNutricional> _etapasDisponibles = [];
   Map<int, double> _stockDisponible = {};
 
+  /// Cuando la edad del lote no cae en ningún rango del plan (igual que Angular)
+  bool _alertaSinRango = false;
+  String _rangoConfigurado = 'sin rangos';
+
   final _obsCtrl = TextEditingController();
   final _vivosCtrl = TextEditingController();
   final _muertosCtrl = TextEditingController(text: '0');
@@ -608,19 +618,41 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
   String get _nombreAnimal => widget.tipoAnimal == 'chanchos' ? 'Chanchos' : 'Pollos';
 
   Future<void> _cargarPlan() async {
-    setState(() { _cargando = true; });
+    setState(() {
+      _cargando = true;
+      _alertaSinRango = false;
+    });
     try {
-      final plan = await widget.planService.obtenerPlanActivo(widget.tipoAnimal);
-      final stock = await widget.planService.obtenerStockValido();
+      // Plan y stock en paralelo (y suelen venir de caché por prefetch)
+      final results = await Future.wait([
+        widget.planService.obtenerPlanActivo(widget.tipoAnimal),
+        widget.planService.obtenerStockValido(),
+      ]);
+      final plan = results[0] as PlanNutricionalActivo?;
+      final stock = results[1] as Map<int, double>;
 
-      if (plan != null) {
+      if (plan != null && plan.etapas.isNotEmpty) {
         final etapas = plan.etapasDelRangoPrincipal(_diasVida);
         etapas.sort((a, b) {
           if (a.diasMin != b.diasMin) return a.diasMin.compareTo(b.diasMin);
           return a.diasMax.compareTo(b.diasMax);
         });
 
-        // Seleccionar todas por defecto
+        if (etapas.isEmpty) {
+          final mins = plan.etapas.map((e) => e.diasMin);
+          final maxs = plan.etapas.map((e) => e.diasMax);
+          final rangoMin = mins.reduce((a, b) => a < b ? a : b);
+          final rangoMax = maxs.reduce((a, b) => a > b ? a : b);
+          setState(() {
+            _plan = plan;
+            _etapasDisponibles = [];
+            _stockDisponible = stock;
+            _alertaSinRango = true;
+            _rangoConfigurado = '$rangoMin–$rangoMax';
+          });
+          return;
+        }
+
         for (var etapa in etapas) {
           etapa.seleccionado = true;
         }
@@ -629,12 +661,21 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
           _plan = plan;
           _etapasDisponibles = etapas;
           _stockDisponible = stock;
+          _alertaSinRango = false;
+        });
+      } else {
+        setState(() {
+          _plan = plan;
+          _etapasDisponibles = [];
+          _stockDisponible = stock;
+          _alertaSinRango = true;
+          _rangoConfigurado = 'sin rangos';
         });
       }
     } catch (e) {
       widget.onError('Error al cargar plan: $e');
     } finally {
-      setState(() { _cargando = false; });
+      if (mounted) setState(() { _cargando = false; });
     }
   }
 
@@ -698,6 +739,8 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
           observaciones: _obsCtrl.text.isNotEmpty ? _obsCtrl.text : null,
         );
       }
+      // Stock cambió: invalidar caché para el próximo registro
+      widget.planService.invalidarCache();
 
       // Registrar mortalidad
       final muertos = int.tryParse(_muertosCtrl.text) ?? 0;
@@ -760,60 +803,304 @@ class _ModalAlimentacionCompletoState extends State<_ModalAlimentacionCompleto> 
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        children: [
-          // Header
-          _buildHeader(),
+      child: _cargando
+          ? const Center(child: CircularProgressIndicator())
+          : _alertaSinRango
+              ? _buildAlertaPlanSinRango()
+              : Column(
+                  children: [
+                    _buildHeader(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_plan != null) _buildEtapaActual(),
+                            const SizedBox(height: 16),
+                            _buildCantidadTotalInput(),
+                            _buildAlimentosPlan(),
+                            if (_alimentosSeleccionados.isNotEmpty) _buildResumenSeleccionados(),
+                            if (_errorStock != null) _buildErrorStock(),
+                            const SizedBox(height: 16),
+                            _buildSeccionSalud(),
+                            const SizedBox(height: 16),
+                            _buildObservaciones(),
+                            const SizedBox(height: 16),
+                            _buildInfoInventario(),
+                            const SizedBox(height: 80),
+                          ],
+                        ),
+                      ),
+                    ),
+                    _buildBotonesAccion(),
+                  ],
+                ),
+    );
+  }
 
-          // Contenido
-          Expanded(
-            child: _cargando
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Etapa actual del plan
-                        if (_plan != null) _buildEtapaActual(),
+  /// Alerta profesional (misma idea que Angular) cuando no hay etapa para la edad
+  Widget _buildAlertaPlanSinRango() {
+    const errorRed = Color(0xFFBA1A1A);
+    const primaryDark = Color(0xFF121721);
+    // Preferir nombre visible (Lote001 / Lote002), no el código interno (03001)
+    final loteLabel = _etiquetaLoteVisible(widget.lote);
 
-                        const SizedBox(height: 16),
-
-                        // Total calculado
-                        _buildCantidadTotalInput(),
-
-                        // Alimentos del plan con checkboxes
-                        _buildAlimentosPlan(),
-
-                        // Resumen de seleccionados
-                        if (_alimentosSeleccionados.isNotEmpty) _buildResumenSeleccionados(),
-
-                        // Error de stock
-                        if (_errorStock != null) _buildErrorStock(),
-
-                        const SizedBox(height: 16),
-
-                        // Sección de salud del lote
-                        _buildSeccionSalud(),
-
-                        const SizedBox(height: 16),
-
-                        // Observaciones
-                        _buildObservaciones(),
-
-                        const SizedBox(height: 16),
-
-                        // Info inventario automático
-                        _buildInfoInventario(),
-
-                        const SizedBox(height: 80),
-                      ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
+          child: Row(
+            children: [
+              const Spacer(),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+                color: Colors.grey.shade700,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              children: [
+                // Ilustración original nítida (sin recortar ni distorsionar)
+                Center(
+                  child: SizedBox(
+                    width: 280,
+                    height: 280,
+                    child: Image.asset(
+                      'assets/images/alerta_plan_nutricional.png',
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      isAntiAlias: true,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFDAD6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.error_rounded, size: 72, color: errorRed),
+                      ),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_rounded, color: errorRed, size: 28),
+                    SizedBox(width: 8),
+                    Text(
+                      'ALERTA DE SISTEMA',
+                      style: TextStyle(
+                        color: errorRed,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Error de Plan Nutricional — Día $_diasVida',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: primaryDark,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No hay etapas del plan nutricional para $_diasVida días de edad. '
+                  'Rangos configurados en admin: $_rangoConfigurado días.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildCajaAlerta(
+                  color: const Color(0xFFFFDAD6),
+                  border: errorRed.withValues(alpha: 0.25),
+                  iconBg: errorRed,
+                  icon: Icons.build_rounded,
+                  titulo: 'ACCIÓN REQUERIDA',
+                  tituloColor: const Color(0xFF93000A),
+                  cuerpo:
+                      'Revise Plan Nutricional y agregue una etapa que cubra el día $_diasVida.',
+                  cuerpoColor: const Color(0xFF93000A),
+                ),
+                const SizedBox(height: 12),
+                _buildCajaAlerta(
+                  color: const Color(0xFFFFF3CD),
+                  border: const Color(0xFFE0A800).withValues(alpha: 0.4),
+                  iconBg: const Color(0xFFB45309),
+                  icon: Icons.support_agent_rounded,
+                  titulo: 'SOPORTE',
+                  tituloColor: const Color(0xFF78350F),
+                  cuerpo:
+                      'Contáctese con el administrador para actualizar el plan nutricional.',
+                  cuerpoColor: const Color(0xFF78350F),
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _chipMeta(Icons.tag_rounded, 'LOTE', loteLabel),
+                    _chipMeta(Icons.calendar_today_rounded, 'EDAD', '$_diasVida días'),
+                    _chipMeta(
+                      Icons.pets_rounded,
+                      'POBLACIÓN',
+                      '${widget.lote.quantity} $_nombreAnimal',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: primaryDark,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ],
+    );
+  }
 
-          // Botones de acción
-          _buildBotonesAccion(),
+  Widget _buildCajaAlerta({
+    required Color color,
+    required Color border,
+    required Color iconBg,
+    required IconData icon,
+    required String titulo,
+    required Color tituloColor,
+    required String cuerpo,
+    required Color cuerpoColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: tituloColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  cuerpo,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: cuerpoColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Etiqueta amigable del lote: "Lote001", "Lote002"...
+  String _etiquetaLoteVisible(LoteDto lote) {
+    final name = lote.name.trim();
+    if (name.isNotEmpty) return name;
+    final codigo = lote.codigo.trim();
+    if (codigo.isEmpty) return '—';
+    final lower = codigo.toLowerCase();
+    if (lower.contains('lote')) return codigo;
+    final digits = RegExp(r'\d+').allMatches(codigo).map((m) => m.group(0)!).join();
+    if (digits.isEmpty) return codigo;
+    final last3 = digits.length > 3 ? digits.substring(digits.length - 3) : digits;
+    final n = int.tryParse(last3) ?? 1;
+    return 'Lote${n.toString().padLeft(3, '0')}';
+  }
+
+  Widget _chipMeta(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF191C1B),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

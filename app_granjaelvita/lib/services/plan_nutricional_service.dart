@@ -121,6 +121,33 @@ class PlanNutricionalActivo {
 
 /// Servicio para obtener planes nutricionales del backend
 class PlanNutricionalService {
+  static const _httpTimeout = Duration(seconds: 12);
+  static const _cacheTtl = Duration(minutes: 5);
+
+  static PlanNutricionalActivo? _planCache;
+  static String? _planCacheTipo;
+  static DateTime? _planCacheAt;
+  static Map<int, double>? _stockCache;
+  static DateTime? _stockCacheAt;
+
+  /// Prefetch en background al abrir Alimentación (acelera el modal).
+  Future<void> prefetch(String tipoAnimal) async {
+    try {
+      await Future.wait([
+        obtenerPlanActivo(tipoAnimal),
+        obtenerStockValido(),
+      ]);
+    } catch (_) {}
+  }
+
+  void invalidarCache() {
+    _planCache = null;
+    _planCacheTipo = null;
+    _planCacheAt = null;
+    _stockCache = null;
+    _stockCacheAt = null;
+  }
+
   /// Headers con autenticación
   static Future<Map<String, String>> _getHeaders() async {
     if (AuthService.token == null || AuthService.token!.isEmpty) {
@@ -140,7 +167,7 @@ class PlanNutricionalService {
   Future<dynamic> _get(String path) async {
     final headers = await _getHeaders();
     final url = Uri.parse('$apiBaseUrl$path');
-    final response = await http.get(url, headers: headers);
+    final response = await http.get(url, headers: headers).timeout(_httpTimeout);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body.isNotEmpty ? json.decode(response.body) : null;
     }
@@ -152,68 +179,88 @@ class PlanNutricionalService {
 
   /// Obtener plan nutricional activo para un tipo de animal (pollos/chanchos)
   Future<PlanNutricionalActivo?> obtenerPlanActivo(String tipoAnimal) async {
+    final ahora = DateTime.now();
+    if (_planCache != null &&
+        _planCacheTipo == tipoAnimal &&
+        _planCacheAt != null &&
+        ahora.difference(_planCacheAt!) < _cacheTtl) {
+      return _planCache;
+    }
+
+    PlanNutricionalActivo? plan;
+
     // 1) Intentar endpoint integrado (si existe en el backend)
     try {
       final data = await _get('/api/plan-nutricional/integrado/$tipoAnimal');
       if (data != null && data is Map<String, dynamic>) {
-        return PlanNutricionalActivo.fromMap(data);
+        plan = PlanNutricionalActivo.fromMap(data);
       }
     } catch (_) {
       // ignorar y usar fallback integrado en cliente
     }
 
-    // 2) Fallback robusto: construir plan integrado desde endpoints reales del Admin
-    try {
-      final planes = await _get('/api/plan-alimentacion') as List<dynamic>;
-      // Filtrar por tipo de animal similar a Angular (por id y por nombres)
-      final planesFiltrados = planes.where((p) => _esPlanDelTipo(p as Map<String, dynamic>, tipoAnimal)).toList();
-      if (planesFiltrados.isEmpty) return null;
+    // 2) Fallback: detalles de planes en PARALELO (antes era secuencial y lento)
+    if (plan == null) {
+      try {
+        final planes = await _get('/api/plan-alimentacion') as List<dynamic>;
+        final planesFiltrados = planes
+            .where((p) => _esPlanDelTipo(p as Map<String, dynamic>, tipoAnimal))
+            .cast<Map<String, dynamic>>()
+            .toList();
+        if (planesFiltrados.isNotEmpty) {
+          final etapasPorPlan = await Future.wait(
+            planesFiltrados.map((planMap) async {
+              final planId = planMap['id'];
+              if (planId == null) return <EtapaNutricional>[];
+              try {
+                final detalles =
+                    await _get('/api/plan-alimentacion/$planId/detalles') as List<dynamic>;
+                return detalles.map((d) {
+                  final detalle = d as Map<String, dynamic>;
+                  final producto = detalle['product'] as Map<String, dynamic>?;
+                  final dayStart = int.tryParse((detalle['dayStart'] ?? '').toString()) ?? 0;
+                  final dayEnd = int.tryParse((detalle['dayEnd'] ?? '').toString()) ?? 0;
+                  final qty =
+                      double.tryParse((detalle['quantityPerAnimal'] ?? '0').toString()) ?? 0.0;
+                  return EtapaNutricional(
+                    id: int.tryParse((detalle['id'] ?? '').toString()),
+                    nombre: 'Etapa $dayStart-$dayEnd',
+                    planNombre: (planMap['name'] ?? '').toString(),
+                    diasMin: dayStart,
+                    diasMax: dayEnd,
+                    alimentoRecomendado: (producto?['name'] ?? '').toString(),
+                    cantidadPorAnimal: double.parse(qty.toStringAsFixed(3)),
+                    unidad: 'kg',
+                    productoId: int.tryParse((producto?['id'] ?? '').toString()),
+                    productoNombre: (producto?['name'] ?? '').toString(),
+                  );
+                }).toList();
+              } catch (_) {
+                return <EtapaNutricional>[];
+              }
+            }),
+          );
 
-      // Obtener detalles de TODOS los planes del tipo
-      final etapas = <EtapaNutricional>[];
-      for (final p in planesFiltrados) {
-        final plan = p as Map<String, dynamic>;
-        final planId = plan['id'];
-        if (planId == null) continue;
-        try {
-          final detalles = await _get('/api/plan-alimentacion/$planId/detalles') as List<dynamic>;
-          for (final d in detalles) {
-            final detalle = d as Map<String, dynamic>;
-            // Mapear al modelo EtapaNutricional igual que Angular
-            final producto = detalle['product'] as Map<String, dynamic>?;
-            final dayStart = int.tryParse((detalle['dayStart'] ?? '').toString()) ?? 0;
-            final dayEnd = int.tryParse((detalle['dayEnd'] ?? '').toString()) ?? 0;
-            final qty = double.tryParse((detalle['quantityPerAnimal'] ?? '0').toString()) ?? 0.0;
-
-            etapas.add(
-              EtapaNutricional(
-                id: int.tryParse((detalle['id'] ?? '').toString()),
-                nombre: 'Etapa $dayStart-$dayEnd',
-                planNombre: (plan['name'] ?? '').toString(),
-                diasMin: dayStart,
-                diasMax: dayEnd,
-                alimentoRecomendado: (producto?['name'] ?? '').toString(),
-                cantidadPorAnimal: double.parse(qty.toStringAsFixed(3)),
-                unidad: 'kg',
-                productoId: int.tryParse((producto?['id'] ?? '').toString()),
-                productoNombre: (producto?['name'] ?? '').toString(),
-              ),
+          final etapas = etapasPorPlan.expand((e) => e).toList();
+          if (etapas.isNotEmpty) {
+            plan = PlanNutricionalActivo(
+              nombre: 'Plan Integrado ${tipoAnimal[0].toUpperCase()}${tipoAnimal.substring(1)}',
+              tipoAnimal: tipoAnimal,
+              etapas: etapas,
             );
           }
-        } catch (_) {
-          // continuar con los demás planes
         }
+      } catch (_) {
+        plan = null;
       }
-
-      if (etapas.isEmpty) return null;
-      return PlanNutricionalActivo(
-        nombre: 'Plan Integrado ${tipoAnimal[0].toUpperCase()}${tipoAnimal.substring(1)}',
-        tipoAnimal: tipoAnimal,
-        etapas: etapas,
-      );
-    } catch (_) {
-      return null;
     }
+
+    if (plan != null) {
+      _planCache = plan;
+      _planCacheTipo = tipoAnimal;
+      _planCacheAt = ahora;
+    }
+    return plan;
   }
 
   bool _esPlanDelTipo(Map<String, dynamic> plan, String tipoAnimal) {
@@ -240,6 +287,12 @@ class PlanNutricionalService {
 
   /// Obtener stock válido agrupado por producto (FEFO)
   Future<Map<int, double>> obtenerStockValido() async {
+    final ahora = DateTime.now();
+    if (_stockCache != null &&
+        _stockCacheAt != null &&
+        ahora.difference(_stockCacheAt!) < _cacheTtl) {
+      return Map<int, double>.from(_stockCache!);
+    }
     try {
       final data = await _get('/api/inventario-entradas/stock-valido');
       if (data != null && data is Map<String, dynamic>) {
@@ -249,7 +302,9 @@ class PlanNutricionalService {
           final stock = double.tryParse(value.toString()) ?? 0;
           if (id != null) result[id] = stock;
         });
-        return result;
+        _stockCache = result;
+        _stockCacheAt = ahora;
+        return Map<int, double>.from(result);
       }
     } catch (_) {}
     return {};

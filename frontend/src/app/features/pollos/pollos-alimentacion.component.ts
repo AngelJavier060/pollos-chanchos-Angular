@@ -1624,7 +1624,10 @@ export class PollosAlimentacionComponent implements OnInit {
         Number.isFinite(rangoMin) && Number.isFinite(rangoMax)
           ? `${rangoMin}–${rangoMax}`
           : 'sin rangos',
-      loteCodigo: this.formatLoteCodigo(lote?.codigo) || '—',
+      // Nombre visible del lote (Lote001), no el código interno
+      loteCodigo: (lote?.name || '').toString().trim()
+        || this.formatLoteCodigo(lote?.codigo)
+        || '—',
       poblacion: lote?.quantity || 0
     };
   }

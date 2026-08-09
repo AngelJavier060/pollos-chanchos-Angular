@@ -11,6 +11,8 @@ import '../models/gestacion_parto_model.dart';
 import 'auth_service.dart';
 
 class GestacionService {
+  static const _httpTimeout = Duration(seconds: 12);
+
   static Future<Map<String, String>> _headers({bool json = true}) async {
     if (AuthService.token == null || AuthService.token!.isEmpty) {
       await AuthService.loadSavedSession();
@@ -24,10 +26,77 @@ class GestacionService {
     return h;
   }
 
+  Future<http.Response> _get(String path, Map<String, String> headers) {
+    return http.get(Uri.parse('$apiBaseUrl$path'), headers: headers).timeout(_httpTimeout);
+  }
+
+  /// Carga inicial en paralelo con un solo header (más rápido al abrir la pantalla).
+  Future<({
+    List<GestacionChancha> chanchas,
+    List<GestacionParto> partos,
+    List<GestacionNoPrenada> noPrenadas,
+  })> cargarResumenInicial() async {
+    final headers = await _headers();
+    final results = await Future.wait([
+      _get('/api/gestacion', headers),
+      _get('/api/gestacion/partos', headers),
+      _get('/api/gestacion/no-prenadas', headers),
+    ]);
+
+    List<GestacionChancha> chanchas = [];
+    List<GestacionParto> partos = [];
+    List<GestacionNoPrenada> noPrenadas = [];
+
+    try {
+      final decoded = _decode(results[0]);
+      _ensureOk(results[0], decoded, 'Error al listar gestaciones');
+      final data = decoded['data'];
+      if (data is List) {
+        chanchas = data
+            .whereType<Map>()
+            .map((e) => GestacionChancha.fromMap(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+    } catch (_) {
+      rethrow;
+    }
+
+    try {
+      final decoded = _decode(results[1]);
+      if (results[1].statusCode >= 200 && results[1].statusCode < 300) {
+        final data = decoded['data'];
+        if (data is List) {
+          partos = data
+              .whereType<Map>()
+              .map((e) => GestacionParto.fromMap(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      }
+    } catch (_) {
+      partos = [];
+    }
+
+    try {
+      final decoded = _decode(results[2]);
+      if (results[2].statusCode >= 200 && results[2].statusCode < 300) {
+        final data = decoded['data'];
+        if (data is List) {
+          noPrenadas = data
+              .whereType<Map>()
+              .map((e) => GestacionNoPrenada.fromMap(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      }
+    } catch (_) {
+      noPrenadas = [];
+    }
+
+    return (chanchas: chanchas, partos: partos, noPrenadas: noPrenadas);
+  }
+
   Future<List<GestacionChancha>> listar() async {
     final headers = await _headers();
-    final url = Uri.parse('$apiBaseUrl/api/gestacion');
-    final response = await http.get(url, headers: headers);
+    final response = await _get('/api/gestacion', headers);
     final decoded = _decode(response);
     _ensureOk(response, decoded, 'Error al listar gestaciones');
     final data = decoded['data'];
@@ -62,8 +131,7 @@ class GestacionService {
 
   Future<List<GestacionParto>> listarPartos() async {
     final headers = await _headers();
-    final url = Uri.parse('$apiBaseUrl/api/gestacion/partos');
-    final response = await http.get(url, headers: headers);
+    final response = await _get('/api/gestacion/partos', headers);
     final decoded = _decode(response);
     _ensureOk(response, decoded, 'Error al listar partos');
     final data = decoded['data'];
@@ -83,8 +151,7 @@ class GestacionService {
 
   Future<List<GestacionNoPrenada>> listarNoPrenadas() async {
     final headers = await _headers();
-    final url = Uri.parse('$apiBaseUrl/api/gestacion/no-prenadas');
-    final response = await http.get(url, headers: headers);
+    final response = await _get('/api/gestacion/no-prenadas', headers);
     final decoded = _decode(response);
     _ensureOk(response, decoded, 'Error al listar no gestantes');
     final data = decoded['data'];
